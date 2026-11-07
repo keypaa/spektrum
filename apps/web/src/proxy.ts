@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/api/auth",
   "/api/health",
   "/login",
+  "/invite",
   "/_next",
   "/fonts",
   "/favicon.ico",
@@ -31,5 +32,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/auth|api/health|login|_next|fonts|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/health|login|invite|_next|fonts|favicon.ico).*)"],
 };

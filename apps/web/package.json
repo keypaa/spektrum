@@ -20,6 +20,7 @@
     "@node-rs/argon2": "2.2.2",
     "drizzle-orm": "0.45.4",
     "tsx": "4.23.15",
+    "zod": "4.6.7",
     "@spektrum/db": "workspace:*",
     "@spektrum/shared": "workspace:*",
     "@spektrum/ui": "workspace:*"
