@@ -1519,19 +1519,19 @@ git commit -m "feat(security): redis rate limiting with spec budgets"
 - Consumes: nothing
 - Produces: `pnpm dev:infra` up → Postgres 16 on 5432, Redis 7 on 6379, MinIO on 9000/9001; `spektrum` and `spektrum_test` databases exist
 
-- [ ] **Step 1: Write `compose.dev.yml`**
+- [x] **Step 1: Write `compose.dev.yml`**
 
 Services: `postgres:16-alpine` (POSTGRES_USER/PASSWORD/DB=`spektrum`), `redis:7-alpine`,
 `minio/minio` with `server /data --console-address ":9001"`, and a one-shot
 `createbuckets` using `minio/mc`. Volumes named; ports published to localhost only.
 Health checks on all three.
 
-- [ ] **Step 2: Add the test database bootstrap**
+- [x] **Step 2: Add the test database bootstrap**
 
 `scripts/dev-db.sh` runs `CREATE DATABASE spektrum_test` if absent (idempotent), plus
 `CREATE EXTENSION citext` in both.
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 ```bash
 docker compose -f docker/compose.dev.yml up -d
@@ -1541,7 +1541,7 @@ docker compose -f docker/compose.dev.yml ps
 
 Expected: four services `running`/`healthy`; `psql` to 5432 succeeds with the dev credentials.
 
-- [ ] **Step 4: Prove the app connects**
+- [x] **Step 4: Prove the app connects**
 
 ```bash
 cp .env.example .env.local
@@ -1552,7 +1552,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/login
 
 Expected: `200`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docker scripts .env.example
