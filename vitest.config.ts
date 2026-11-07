@@ -21,6 +21,15 @@ export default defineConfig({
         name: "web",
         test: {
           include: ["apps/web/**/*.test.ts", "apps/web/**/*.test.tsx"],
+          env: {
+            DATABASE_URL:
+              process.env.DATABASE_URL ??
+              "postgres://spektrum:spektrum@localhost:5432/spektrum_test",
+            REDIS_URL: "redis://localhost:6379",
+            BETTER_AUTH_SECRET: "test-secret-32-chars-minimum!!!!!!",
+            BETTER_AUTH_URL: "http://localhost:3000",
+            LLM_KEY_ENCRYPTION_SECRET: "test-key-encryption-secret-32ch!",
+          },
         },
       },
       {
