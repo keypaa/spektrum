@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./common-passwords": "./src/common-passwords.ts",
-    "./env": "./src/env.ts"
+    "./env": "./src/env.ts",
+    "./http/guard": "./src/http/guard.ts"
   },
   "scripts": { "build": "tsc --noEmit" },
   "devDependencies": {
