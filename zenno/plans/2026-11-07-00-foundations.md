@@ -1572,7 +1572,7 @@ git commit -m "chore(dev): docker compose for postgres, redis, minio"
 - Consumes: everything above
 - Produces: CI runs typecheck, unit tests, build, and Playwright against ephemeral Postgres/Redis
 
-- [ ] **Step 1: Write the workflow**
+- [x] **Step 1: Write the workflow**
 
 Jobs: `typecheck` (`pnpm install --frozen-lockfile && pnpm typecheck`), `unit`
 (services postgres 16 + redis 7, `pnpm db:migrate` against `spektrum_test`, `pnpm test`),
@@ -1582,7 +1582,7 @@ Jobs: `typecheck` (`pnpm install --frozen-lockfile && pnpm typecheck`), `unit`
 `packageManager` via `pnpm/action-setup`. Cache the pnpm store. `next build` no longer
 lints in Next 16, so lint is a separate `lint` job (`eslint .`). Fail on any `tsc` error.
 
-- [ ] **Step 2: Run the full suite locally**
+- [x] **Step 2: Run the full suite locally**
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm test && pnpm build
@@ -1590,7 +1590,7 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 
 Expected: all green. This is the Phase 0 gate.
 
-- [ ] **Step 3: Verify the closed-signup posture manually**
+- [x] **Step 3: Verify the closed-signup posture manually**
 
 ```bash
 curl -s -X POST http://localhost:3000/api/auth/sign-up/email \
@@ -1601,7 +1601,7 @@ curl -s -X POST http://localhost:3000/api/auth/sign-up/email \
 Expected: `403` with `invite_required` (the signup gate), and **no user row** created.
 `GET /login` shows no "Create account" link.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .github packages/shared/src/common-passwords.ts package.json
@@ -1612,15 +1612,15 @@ git commit -m "chore(ci): full pipeline and password list"
 
 ## Phase 0 exit checklist
 
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all pass, on Node 26.13.0 / pnpm 12.18.0 from the repo pins.
-- [ ] `docker compose -f docker/compose.dev.yml ps` shows healthy Postgres, Redis, MinIO.
-- [ ] Owner exists via CLI; owner can sign in; wrong password shows the generic error.
-- [ ] A direct `POST /api/auth/sign-up/email` from a stranger returns `403 invite_required` and creates no row.
-- [ ] An invite can be created, redeemed once, and never twice (including concurrently).
-- [ ] Banning a user kills their session on the next request; suspension expires by itself.
-- [ ] A stored BYOK key never appears in any response or log.
-- [ ] Six failed logins produce `429` with `Retry-After`.
-- [ ] `GET /login` in both themes renders Crixet Sans (check the computed font family).
-- [ ] Design-token test passes; no component contains a hex literal.
-- [ ] No emoji in the rendered DOM; every `<svg>` has `viewBox="0 0 16 16"` and uses `currentColor` only.
-- [ ] No file named `middleware.ts` exists; the gate is `proxy.ts`.
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all pass, on Node 26.13.0 / pnpm 12.18.0 from the repo pins.
+- [x] `docker compose -f docker/compose.dev.yml ps` shows healthy Postgres, Redis, MinIO.
+- [x] Owner exists via CLI; owner can sign in; wrong password shows the generic error.
+- [x] A direct `POST /api/auth/sign-up/email` from a stranger returns `403 invite_required` and creates no row.
+- [x] An invite can be created, redeemed once, and never twice (including concurrently).
+- [x] Banning a user kills their session on the next request; suspension expires by itself.
+- [x] A stored BYOK key never appears in any response or log.
+- [x] Six failed logins produce `429` with `Retry-After`.
+- [x] `GET /login` in both themes renders Crixet Sans (check the computed font family).
+- [x] Design-token test passes; no component contains a hex literal.
+- [x] No emoji in the rendered DOM; every `<svg>` has `viewBox="0 0 16 16"` and uses `currentColor` only.
+- [x] No file named `middleware.ts` exists; the gate is `proxy.ts`.
