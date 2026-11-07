@@ -5,6 +5,11 @@ export default defineConfig({
   timeout: 30_000,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    // Fresh source IP per run so the sign-in rate limit (5 / 15 min / IP,
+    // spec §10.5) never accumulates across repeated e2e runs.
+    extraHTTPHeaders: {
+      "x-forwarded-for": `10.66.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`,
+    },
   },
   webServer: {
     command: "pnpm --filter @spektrum/web dev",

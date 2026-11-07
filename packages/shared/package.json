@@ -9,9 +9,13 @@
     "./env": "./src/env.ts",
     "./http/guard": "./src/http/guard.ts",
     "./crypto/envelope": "./src/crypto/envelope.ts",
-    "./log/redact": "./src/log/redact.ts"
+    "./log/redact": "./src/log/redact.ts",
+    "./rate-limit": "./src/rate-limit.ts"
   },
   "scripts": { "build": "tsc --noEmit" },
+  "dependencies": {
+    "ioredis": "6.0.0"
+  },
   "devDependencies": {
     "@types/node": "^26.0.0",
     "typescript": "6.0.3",

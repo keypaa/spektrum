@@ -8,6 +8,10 @@ export default defineConfig({
         name: "shared",
         test: {
           include: ["packages/shared/**/*.test.ts"],
+          env: {
+            REDIS_URL:
+              process.env.REDIS_URL ?? "redis://localhost:6379",
+          },
         },
       },
       {

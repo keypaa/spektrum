@@ -11,6 +11,7 @@ import { loadWebEnv } from "@spektrum/shared/env";
 import { hashPassword, verifyPassword } from "./password";
 import { assertSignupAllowed, hasValidInvite } from "./signup-gate";
 import { validateProviderUserInfo } from "./oauth-gate";
+import { redisSecondaryStorage } from "@spektrum/shared/rate-limit";
 
 function createAuth() {
   const env = loadWebEnv();
@@ -66,6 +67,19 @@ function createAuth() {
       expiresIn: 30 * 24 * 60 * 60, // 30 days
       updateAge: 24 * 60 * 60, // rolling refresh daily
       cookieCache: { enabled: false }, // bans visible on the next request
+    },
+    // spec §10.5: /api/auth/* limited by Better Auth itself, backed by Redis
+    // so limits are shared across instances (5 sign-in attempts / 15 min / IP)
+    secondaryStorage: redisSecondaryStorage(),
+    rateLimit: {
+      enabled: true, // default is production-only; we want it in dev/e2e too
+      storage: "secondary-storage",
+      window: 10,
+      max: 100,
+      customRules: {
+        "/sign-in/email": { window: 15 * 60, max: 5 },
+        "/sign-up/email": { window: 15 * 60, max: 5 },
+      },
     },
     plugins: [admin({ defaultRole: "member", adminRoles: ["admin"] })],
     databaseHooks: {
