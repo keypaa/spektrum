@@ -7,6 +7,12 @@
 // (databaseHooks.user.create.before) only runs inside better-auth's create
 // path — a CLI bootstrap inserting directly is the intended escape hatch and
 // avoids fragile context plumbing through the API layer.
+// Load .env.local when run as a CLI (Next.js loads it for the app, tsx does not)
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+const envLocal = resolve(import.meta.dirname, "../../.env.local");
+if (existsSync(envLocal)) process.loadEnvFile(envLocal);
+
 import { db, pool } from "@spektrum/db";
 import { users, accounts } from "@spektrum/db/schema";
 import { sql, eq } from "drizzle-orm";
@@ -59,7 +65,8 @@ export async function createOwner(input: {
       id: crypto.randomUUID(),
       userId: id,
       providerId: "credential",
-      accountId: input.email,
+      // better-auth's credential sign-in matches accountId === user.id
+      accountId: id,
       password: passwordHash,
     });
 

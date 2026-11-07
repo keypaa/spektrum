@@ -1,0 +1,26 @@
+import { defineConfig } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./e2e",
+  timeout: 30_000,
+  use: {
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+  },
+  webServer: {
+    command: "pnpm --filter @spektrum/web dev",
+    url: "http://localhost:3000/login",
+    reuseExistingServer: true,
+    timeout: 60_000,
+    env: {
+      DATABASE_URL:
+        process.env.DATABASE_URL ??
+        "postgres://spektrum:spektrum@localhost:5432/spektrum_test",
+      REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
+      BETTER_AUTH_SECRET:
+        process.env.BETTER_AUTH_SECRET ?? "e2e-secret-32-chars-minimum!!!!!",
+      BETTER_AUTH_URL: "http://localhost:3000",
+      LLM_KEY_ENCRYPTION_SECRET:
+        process.env.LLM_KEY_ENCRYPTION_SECRET ?? "e2e-key-encryption-secret-32ch!x",
+    },
+  },
+});

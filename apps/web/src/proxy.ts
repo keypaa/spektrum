@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = [
   "/api/auth",
   "/api/health",
-  "/sign-in",
+  "/login",
   "/_next",
   "/fonts",
   "/favicon.ico",
@@ -23,7 +23,7 @@ export default function proxy(request: NextRequest) {
   )?.value;
   if (!sessionCookie) {
     const url = request.nextUrl.clone();
-    url.pathname = "/sign-in";
+    url.pathname = "/login";
     url.searchParams.set("from", pathname);
     return NextResponse.redirect(url);
   }
@@ -31,5 +31,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/auth|api/health|sign-in|_next|fonts|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/health|login|_next|fonts|favicon.ico).*)"],
 };
