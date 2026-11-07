@@ -1463,7 +1463,7 @@ git commit -m "feat(security): envelope-encrypted BYOK keys with redaction"
 - Consumes: `REDIS_URL`
 - Produces: `consume(key: string, budget: Budget): Promise<{ allowed: boolean; retryAfterMs: number }>` where `Budget = { limit: number; windowMs: number; burst?: number }`; exported `BUDGETS` map with the spec's values
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it("allows up to the limit then blocks with a retry hint", async () => {
@@ -1485,9 +1485,9 @@ it("defines the spec's budgets", () => {
 Plus a login test: six wrong passwords in a row produce the fifth-attempt generic error
 and then `429` with `Retry-After`.
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Sliding-window counter with a single Lua script (`INCR` + `PEXPIRE` on first hit, plus a
 bucket key per window) so the check is atomic across instances.
@@ -1496,9 +1496,9 @@ Scope note: this limiter covers **our** routes (compile, AI, upload). Better Aut
 `/api/auth/*` endpoints are limited by its built-in `rateLimit` config, pointed at Redis
 via `secondaryStorage` in Task 7 — do not double-count them here.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/shared/src/rate-limit.ts packages/shared/src/rate-limit.test.ts apps/web/src/auth/login-rate-limit.test.ts
