@@ -35,6 +35,7 @@ export function IconSearch({ size, className, ...rest }: IconProps) {
 export function IconWarning({ size, className, ...rest }: IconProps) {
   return (
     <svg {...base({ size, className, ...rest })}>
+      <title>Warning</title>
       <path d="M8 1.5 14.5 13H1.5Z" />
       <path d="M8 6.5v3.5M8 11.5v.5" />
     </svg>
@@ -44,6 +45,7 @@ export function IconWarning({ size, className, ...rest }: IconProps) {
 export function IconError({ size, className, ...rest }: IconProps) {
   return (
     <svg {...base({ size, className, ...rest })}>
+      <title>Error</title>
       <circle cx="8" cy="8" r="6.5" />
       <path d="M8 5v4M8 11v.5" />
     </svg>
@@ -53,6 +55,7 @@ export function IconError({ size, className, ...rest }: IconProps) {
 export function IconInfo({ size, className, ...rest }: IconProps) {
   return (
     <svg {...base({ size, className, ...rest })}>
+      <title>Info</title>
       <circle cx="8" cy="8" r="6.5" />
       <path d="M8 5v.5M8 6.5v5M8 11.5v.5" />
     </svg>
@@ -92,17 +95,20 @@ export function IconChevronRight({ size, className, ...rest }: IconProps) {
 }
 
 export function IconBrand({ size, className, ...rest }: IconProps) {
-  // Prism brand mark — six concentric petals, white strokes on a dark card.
-  // Not the OpenAI logo. Spec §10.8.
+  // Solid brand mark — spec §5.8: solid marks use fill="currentColor" and NO
+  // stroke. Distinct from every stroked icon in the registry.
   return (
     <svg
-      {...base({ size, className, ...rest })}
+      width={size ?? 16}
+      height={size ?? 16}
+      viewBox="0 0 16 16"
       fill="currentColor"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+      {...rest}
     >
-      <path d="M8 2.2c.7-1 2-1.3 2.9-.6.9.7 1.2 1.9 1 2.8.9.2 1.7.8 2.1 1.6.5.9.3 2-.4 2.7 1 .2 1.7 1 1.9 1.9.2.9-.2 1.9-1 2.5-.7.5-1.7.6-2.4.2-.4.9-1.2 1.5-2.1 1.6-.9.1-1.8-.3-2.4-1-.7.6-1.7.7-2.5.2-.9-.5-1.4-1.5-1.3-2.4-.8-.2-1.5-.8-1.9-1.6-.4-.8-.3-1.9.4-2.7-.9-.3-1.6-1-1.9-1.9-.2-.9.2-1.9 1-2.5.7-.5 1.7-.6 2.4-.2z" />
+      <path d="M8 1.2c.75-1.05 2.15-1.4 3.1-.65.95.75 1.3 2.05 1.05 3-.95.2-1.8.85-2.25 1.7-.55.95-.35 2.15.45 2.9-1.05.2-1.85 1-2.1 1.95-.2.95.2 2 .95 2.65-.75.55-1.85.65-2.6.2-.4.95-1.3 1.6-2.25 1.7-.95.1-1.9-.35-2.55-1.1-.75.65-1.8.75-2.7.25-.95-.55-1.5-1.6-1.4-2.6-.85-.2-1.6-.85-2.05-1.7-.45-.85-.3-2 .45-2.9-1-.3-1.75-1.05-2-2-.2-.95.2-2 .95-2.65.75-.55 1.85-.65 2.6-.2.4-.95 1.3-1.6 2.25-1.7.95-.1 1.9.35 2.55 1.1z" />
+      <circle cx="8" cy="8" r="1.6" />
     </svg>
   );
 }

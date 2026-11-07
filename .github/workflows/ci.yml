@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.18.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm --filter @spektrum/web build
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: ci-dummy-secret-32-chars-minimum!!
+          BETTER_AUTH_URL: http://localhost:3000
+          LLM_KEY_ENCRYPTION_SECRET: ci-dummy-key-encryption-secret!!

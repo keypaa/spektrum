@@ -8,6 +8,14 @@
  * --neutral-450 exist only in :root and survive in both themes.
  * ============================================================
 
+
+/* DECISION (2026-11-07, review finding): --tooltip-text in :root and the dark
+ * block aliases --text-button-editor-secondary-text, which is defined nowhere
+ * in the recon evidence, so it resolves to invalid/guaranteed-inherit in
+ * those scopes. The light block defines it as var(--neutral-800) and works.
+ * Kept verbatim (faithful to source) but DO NOT rely on --tooltip-text in
+ * :root/dark until the alias target is defined. */
+
 :root {
 --background:0 0% 100%;
 --foreground:0 0% 3.9%;
@@ -884,3 +892,8 @@ html.dark,html:not(.dark) .force-dark {
 @font-face { font-family: "Crixet Sans"; src: url("/fonts/CrixetSans/CrixetSans-SemiboldItalic.woff2") format("woff2"); font-weight: 600; font-style: italic; font-display: block; }
 @font-face { font-family: "Crixet Sans"; src: url("/fonts/CrixetSans/CrixetSans-BoldItalic.woff2") format("woff2"); font-weight: 700; font-style: italic; font-display: block; }
 @font-face { font-family: "Crixet Sans"; src: url("/fonts/CrixetSans/CrixetSans-LightItalic.woff2") format("woff2"); font-weight: 300; font-style: italic; font-display: block; }
+
+/* Roboto Mono 400 (latin) — editor font (spec §5.5). Fetched from Google Fonts
+ * 2026-11-07 because Prism's woff2 (RobotoMono_Regular.p.3eu1bwklczx67.woff2)
+ * was not captured in recon; same family/weight, OFL-licensed. */
+@font-face { font-family: "roboto_mono"; src: url("/fonts/RobotoMono/RobotoMono-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }

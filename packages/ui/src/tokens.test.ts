@@ -45,12 +45,17 @@ const ROOT_ONLY = {
 } as const;
 
 function declared(block: string, name: string): string | undefined {
-  const m = block.match(new RegExp(name.replace(/[-]/g, "\\-") + "\\s*:\\s*([^;]+)"));
+  // [^;}]+ so the match can never run past the block's closing brace
+  const m = block.match(
+    new RegExp(name.replace(/[-]/g, "\\-") + "\\s*:\\s*([^;}]+)"),
+  );
   return m?.[1]?.trim().replace(/\s+/g, " ");
 }
 
 function section(marker: string): string {
-  const i = css.indexOf(marker);
+  // anchor on the rule, not the bare word (the header comment mentions ":root")
+  const i = css.indexOf(marker + " {");
+  expect(i, marker).toBeGreaterThan(-1);
   const j = css.indexOf("}", i);
   return css.slice(i, j);
 }
@@ -74,6 +79,27 @@ describe("design tokens", () => {
     const root = section(":root");
     for (const [k, v] of Object.entries(ROOT_ONLY)) {
       expect(declared(root, k), k).toBe(v);
+    }
+  });
+
+  it("pins the cascade structure of spec §5.2", () => {
+    // Block order in the file: :root first, then light, then dark.
+    const rootIdx = css.indexOf(":root {");
+    const lightIdx = css.indexOf("html:not(.dark),html.dark .force-light {");
+    const darkIdx = css.indexOf("html.dark,html:not(.dark) .force-dark {");
+    expect(rootIdx).toBeGreaterThan(-1);
+    expect(lightIdx).toBeGreaterThan(rootIdx);
+    expect(darkIdx).toBeGreaterThan(lightIdx);
+
+    // --neutral-150 / --neutral-450 exist ONLY in :root (never in a theme
+    // block) — that is the quirk that makes them survive in both themes,
+    // because the theme blocks (specificity 0,1,1) outrank :root (0,1,0)
+    // for every name they DO define.
+    const light = section("html:not(.dark),html.dark .force-light");
+    const dark = section("html.dark,html:not(.dark) .force-dark");
+    for (const name of ["--neutral-150", "--neutral-450"]) {
+      expect(declared(light, name), `light ${name}`).toBeUndefined();
+      expect(declared(dark, name), `dark ${name}`).toBeUndefined();
     }
   });
 

@@ -5,6 +5,12 @@
   --color-bg-app: var(--bg-app);
   --color-bg-code: var(--bg-code);
   --color-bg-sidepanel: var(--bg-sidepanel);
+  --color-bg-sidepanel-secondary: var(--bg-sidepanel-secondary);
+  --color-bg-brand: var(--bg-brand);
+  --color-dropdown-bg: var(--dropdown-bg);
+  --color-dropdown-bg-hover: var(--dropdown-bg-hover);
+  --color-optionmenu-bg: var(--optionmenu-bg);
+  --color-optionmenu-bg-hover: var(--optionmenu-bg-hover);
   --color-bg-tertiary: var(--bg-tertiary);
   --color-bg-quaternary: var(--bg-quaternary);
   --color-bg-preview: var(--bg-preview);
@@ -61,6 +67,8 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 16px);
+  --shadow-surface: var(--shadow-surface);
+  --shadow-menu: var(--shadow-menu);
 }
 
 @layer base {
