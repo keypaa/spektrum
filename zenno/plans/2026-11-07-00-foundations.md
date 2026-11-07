@@ -1250,7 +1250,7 @@ git commit -m "feat(auth): invite-only registration"
 - Consumes: `auth.api` (admin plugin), `db`, `users`, `sessions`, `adminActions`, `requireAdmin`
 - Produces: `suspendUser({ actorId, userId, until, reason })` = `banUser` with `banExpiresIn`; `banUser({ actorId, userId, reason })` = permanent; `unbanUser({ actorId, userId })`; audit row per action
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it("a permanent ban revokes every live session", async () => {
@@ -1285,9 +1285,9 @@ it("writes an audit row for every action", async () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 All three wrap the Admin plugin's `auth.api.banUser` / `auth.api.unbanUser` (ban with
 `banExpiresIn` for suspension, no `banExpiresIn` for permanent) and write an
@@ -1295,9 +1295,9 @@ All three wrap the Admin plugin's `auth.api.banUser` / `auth.api.unbanUser` (ban
 ban; `requireUser()` (Task 7) re-checks `banned`/`ban_expires` on every request, which is
 what makes a pre-ban cookie die on the next request.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/auth/admin.ts apps/web/src/app/api/admin
