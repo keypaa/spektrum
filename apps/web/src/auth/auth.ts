@@ -1,10 +1,88 @@
-// Minimal Better Auth config used ONLY by the CLI to generate the Drizzle schema
-// (`pnpm dlx auth@1.7.18 generate`). Task 7 replaces this with the full instance.
-// The admin plugin adds users.role/banned/ban_reason/ban_expires and
-// sessions.impersonated_by regardless of the roles map.
+// The single Better Auth instance — spec §10.
+// Constructed LAZILY (Proxy) so that importing this module during `next build`
+// page-data collection does not require env vars; loadWebEnv() runs on first
+// real use, where fail-fast belongs.
 import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { admin } from "better-auth/plugins";
+import { db } from "@spektrum/db";
+import * as schema from "@spektrum/db/schema";
+import { loadWebEnv } from "@spektrum/shared/env";
+import { hashPassword, verifyPassword } from "./password";
+import { assertSignupAllowed, hasValidInvite } from "./signup-gate";
 
-export const auth = betterAuth({
-  plugins: [admin({ defaultRole: "member", adminRoles: ["admin"] })],
+function createAuth() {
+  const env = loadWebEnv();
+  return betterAuth({
+    baseURL: env.authUrl,
+    secret: env.authSecret,
+    database: drizzleAdapter(db, {
+      provider: "pg",
+      schema,
+      usePlural: true,
+    }),
+    advanced: {
+      database: { generateId: () => crypto.randomUUID() },
+      defaultCookieAttributes: {
+        httpOnly: true,
+        secure: env.nodeEnv === "production",
+        sameSite: "lax",
+      },
+    },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: 12,
+      maxPasswordLength: 128,
+      revokeSessionsOnPasswordReset: true,
+      password: {
+        hash: hashPassword,
+        verify: ({ hash, password }) => verifyPassword(hash, password),
+      },
+    },
+    socialProviders: {
+      google: {
+        clientId: env.googleClientId ?? "",
+        clientSecret: env.googleClientSecret ?? "",
+        // closed signup: a Google sign-in must not implicitly create an account
+        disableImplicitSignUp: true,
+      },
+    },
+    session: {
+      expiresIn: 30 * 24 * 60 * 60, // 30 days
+      updateAge: 24 * 60 * 60, // rolling refresh daily
+      cookieCache: { enabled: false }, // bans visible on the next request
+    },
+    plugins: [admin({ defaultRole: "member", adminRoles: ["admin"] })],
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            assertSignupAllowed({
+              email: user.email,
+              allowPublicSignup: env.allowPublicSignup,
+              hasValidInvite: await hasValidInvite(user.email),
+            });
+            return { data: user };
+          },
+        },
+      },
+    },
+  });
+}
+
+type Auth = ReturnType<typeof createAuth>;
+
+let _auth: Auth | undefined;
+
+function getAuth(): Auth {
+  return (_auth ??= createAuth());
+}
+
+export const auth = new Proxy({} as Auth, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getAuth(), prop, receiver);
+  },
+  has(_target, prop) {
+    return Reflect.has(getAuth(), prop);
+  },
 });

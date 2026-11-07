@@ -17,6 +17,7 @@
     "better-auth": "1.7.18",
     "@better-auth/drizzle-adapter": "1.7.18",
     "@node-rs/argon2": "2.2.2",
+    "drizzle-orm": "0.45.4",
     "@spektrum/db": "workspace:*",
     "@spektrum/shared": "workspace:*",
     "@spektrum/ui": "workspace:*"
