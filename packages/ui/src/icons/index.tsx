@@ -5,7 +5,7 @@ import type { SVGProps } from "react";
 // strokeWidth 1.5, round caps/joins. No emoji, no icon fonts, no third-party
 // package. Each later phase adds exactly the icons it needs.
 
-export type IconProps = SVGProps<SVGSVGElement> & { size?: number };
+export type IconProps = SVGProps<SVGSVGElement> & { size?: number | undefined };
 
 function base({ size = 16, className, ...rest }: IconProps) {
   return {
