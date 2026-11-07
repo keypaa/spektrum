@@ -1316,7 +1316,7 @@ git commit -m "feat(security): ban ladder with session revocation and audit"
 - Consumes: `socialProviders`, `signup-gate`, `invites`
 - Produces: Google sign-in that links to an existing account by verified email, creates a member only for invited emails, and refuses everyone else while signup is closed
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("rejects an unverified provider email", async () => {
@@ -1353,9 +1353,9 @@ it("creates a member when ALLOW_PUBLIC_SIGNUP=true", async () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `auth.ts`:
 
@@ -1380,9 +1380,9 @@ after the invite token is validated server-side; the `databaseHooks.user.create.
 gate (Task 7) is the backstop that rejects any other creation. GitHub is added the same
 way, gated on `GITHUB_CLIENT_ID`, and is not rendered in the UI until credentials exist.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/auth
