@@ -4,11 +4,19 @@ import { db, pool } from "@spektrum/db";
 import { createOwner, findUserById, findCredentialAccount } from "./create-owner";
 
 beforeAll(async () => {
-  await db.execute(sql`delete from users where email like '%@test.local'`);
+  // This runs on the dedicated unit DB (spektrum_unit): clear any owner left
+  // by another test file in the same single fork, plus our own fixtures.
+  await db.execute(sql`delete from users where role = 'owner'`);
+  await db.execute(
+    sql`delete from users where email in ('owner@test.local','second@test.local','weak@test.local')`,
+  );
 });
 
 afterAll(async () => {
-  await db.execute(sql`delete from users where email like '%@test.local'`);
+  await db.execute(sql`delete from users where role = 'owner'`);
+  await db.execute(
+    sql`delete from users where email in ('owner@test.local','second@test.local','weak@test.local')`,
+  );
   await pool.end();
 });
 

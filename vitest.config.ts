@@ -21,10 +21,18 @@ export default defineConfig({
         name: "web",
         test: {
           include: ["apps/web/**/*.test.ts", "apps/web/**/*.test.tsx"],
+          // DB-backed tests share one database — run them in a single worker
+          // so test files execute sequentially and cannot race on cleanup /
+          // owner rows. (Vitest 4+ removed poolOptions/singleFork; the
+          // top-level maxWorkers option replaces them.)
+          pool: "forks",
+          maxWorkers: 1,
           env: {
+            // spektrum_unit is the unit-test DB; spektrum_test is reserved for
+            // e2e/dev and holds the real bootstrapped owner.
             DATABASE_URL:
               process.env.DATABASE_URL ??
-              "postgres://spektrum:spektrum@localhost:5432/spektrum_test",
+              "postgres://spektrum:spektrum@localhost:5432/spektrum_unit",
             REDIS_URL: "redis://localhost:6379",
             BETTER_AUTH_SECRET: "test-secret-32-chars-minimum!!!!!!",
             BETTER_AUTH_URL: "http://localhost:3000",
@@ -39,7 +47,7 @@ export default defineConfig({
           env: {
             DATABASE_URL:
               process.env.DATABASE_URL ??
-              "postgres://spektrum:spektrum@localhost:5432/spektrum_test",
+              "postgres://spektrum:spektrum@localhost:5432/spektrum_unit",
           },
         },
       },

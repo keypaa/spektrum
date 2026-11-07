@@ -5,7 +5,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { db } from "@spektrum/db";
 import { invites, users, accounts } from "@spektrum/db/schema";
-import { eq, sql, and, isNull, gt } from "drizzle-orm";
+import { eq, sql, and, isNull } from "drizzle-orm";
 import { hashPassword, validatePassword } from "./password";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
