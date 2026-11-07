@@ -1,0 +1,70 @@
+name: spektrum-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spektrum-postgres
+    environment:
+      POSTGRES_USER: spektrum
+      POSTGRES_PASSWORD: spektrum
+      POSTGRES_DB: spektrum
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - spektrum-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spektrum -d spektrum"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: spektrum-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - spektrum-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:latest
+    container_name: spektrum-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: spektrum
+      MINIO_ROOT_PASSWORD: spektrum-secret
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - spektrum-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  createbuckets:
+    image: minio/mc:latest
+    container_name: spektrum-createbuckets
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 spektrum spektrum-secret &&
+      mc mb --ignore-existing local/spektrum-uploads &&
+      mc mb --ignore-existing local/spektrum-pdf &&
+      echo buckets-ready
+      "
+    restart: "no"
+
+volumes:
+  spektrum-postgres-data:
+  spektrum-redis-data:
+  spektrum-minio-data:
