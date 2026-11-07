@@ -51,7 +51,7 @@ The spec implies these and no task's tests would otherwise cover them. Each gets
 - Consumes: nothing
 - Produces: an empty git repository whose only content is `zenno/`
 
-- [ ] **Step 1: Create the backup outside the repo**
+- [x] **Step 1: Create the backup outside the repo**
 
 ```bash
 mkdir -p ~/Backups
@@ -61,7 +61,7 @@ tar -tzf ~/Backups/spektrum-pre-reset-2026-11-07.tar.gz | head -20
 
 Expected: the listing contains `spektrum/client/src/App.tsx`, `spektrum/zenno/recon/css/0xv4fsl8j2nmr.css`, and `spektrum/docs/PRD.md`.
 
-- [ ] **Step 2: Verify the archive is readable and complete**
+- [x] **Step 2: Verify the archive is readable and complete**
 
 ```bash
 tar -tzf ~/Backups/spektrum-pre-reset-2026-11-07.tar.gz | wc -l
@@ -70,7 +70,7 @@ du -h ~/Backups/spektrum-pre-reset-2026-11-07.tar.gz
 
 Expected: > 300 entries, archive between 5 MB and 60 MB. If the count is 0, stop and report.
 
-- [ ] **Step 3: Preserve the design evidence separately**
+- [x] **Step 3: Preserve the design evidence separately**
 
 ```bash
 cp -r /home/keypaa/Work/spektrum/zenno /home/keypaa/Work/spektrum-backup-2026-11-07/zenno
@@ -81,14 +81,14 @@ The full pre-reset tarball also lives at
 (488 entries: `.git` history, all source, `CLAUDE.md`, `package-lock.json`).
 `node_modules` (395 MB) and `dist` are excluded — they regenerate from `package.json`.
 
-- [ ] **Step 4: Wipe**
+- [x] **Step 4: Wipe**
 
 ```bash
 cd /home/keypaa/Work/spektrum
 rm -rf .git client server shared docs scripts package-lock.json README.md .gitignore CLAUDE.md
 ```
 
-- [ ] **Step 5: Re-initialise and commit**
+- [x] **Step 5: Re-initialise and commit**
 
 ```bash
 cd /home/keypaa/Work/spektrum
@@ -117,7 +117,7 @@ Expected: `git log --oneline` shows one commit; `git status` is clean.
 - Consumes: Task 0's empty repo
 - Produces: `pnpm -r exec tsc --noEmit` passes; `pnpm test` runs (zero tests); workspace packages resolvable as `@spektrum/db`, `@spektrum/shared`, `@spektrum/ui`; `node --version` inside the project resolves to 26.13.0 via mise
 
-- [ ] **Step 1: Write the workspace files**
+- [x] **Step 1: Write the workspace files**
 
 `pnpm-workspace.yaml`:
 
@@ -217,7 +217,7 @@ const nextConfig: NextConfig = {};
 export default nextConfig;
 ```
 
-- [ ] **Step 2: Create the package manifests and tsconfigs**
+- [x] **Step 2: Create the package manifests and tsconfigs**
 
 Each package's `tsconfig.json` extends `../../tsconfig.base.json` and sets
 `"include": ["src/**/*.ts"]`. `packages/shared/src/index.ts` exports nothing yet but must exist.
@@ -240,7 +240,7 @@ Each package's `tsconfig.json` extends `../../tsconfig.base.json` and sets
 `@spektrum/shared`, `@spektrum/ui`, plus `@types/react`, `@types/react-dom`.
 Do not add `next-auth`.
 
-- [ ] **Step 2b: Verify the toolchain pin is real**
+- [x] **Step 2b: Verify the toolchain pin is real**
 
 ```bash
 mise use node@26.13.0 pnpm@12.18.0   # inside the repo, writes .mise.toml
@@ -250,7 +250,7 @@ cd /tmp && node --version   # still the global one — proves the pin is per-rep
 cd - >/dev/null
 ```
 
-- [ ] **Step 3: Verify the workspace resolves**
+- [x] **Step 3: Verify the workspace resolves**
 
 ```bash
 pnpm install
@@ -259,7 +259,7 @@ pnpm typecheck
 
 Expected: exit 0, no diagnostics.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -280,7 +280,7 @@ git commit -m "chore: pnpm monorepo skeleton with strict TypeScript"
 - Consumes: nothing
 - Produces: `tokens.css` defining every variable in spec §5.2–§5.4; a test that fails if any pinned value drifts
 
-- [ ] **Step 1: Assemble `tokens.css` mechanically**
+- [x] **Step 1: Assemble `tokens.css` mechanically**
 
 Concatenate, in this order, into `packages/ui/styles/tokens.css`:
 
@@ -308,7 +308,7 @@ Concatenate, in this order, into `packages/ui/styles/tokens.css`:
 Do **not** hand-write the token values; if the extractor output looks malformed, re-run
 the extraction instead of typing hexes.
 
-- [ ] **Step 2: Copy the fonts**
+- [x] **Step 2: Copy the fonts**
 
 ```bash
 mkdir -p apps/web/public/fonts/CrixetSans
@@ -318,7 +318,7 @@ ls apps/web/public/fonts/CrixetSans | wc -l
 
 Expected: `10`.
 
-- [ ] **Step 3: Write the drift test**
+- [x] **Step 3: Write the drift test**
 
 `packages/ui/src/tokens.test.ts`:
 
@@ -394,7 +394,7 @@ Where the alias chain is used, the test compares the top-level declaration text,
 the alias form the extraction produced and adjust the expected string once, at authoring
 time, from the file itself.
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 ```bash
 pnpm vitest run packages/ui/src/tokens.test.ts
@@ -403,7 +403,7 @@ pnpm vitest run packages/ui/src/tokens.test.ts
 Expected: 3 passing. If a value mismatches, the expected value in the test is correct
 per the spec (§5.4) — fix `tokens.css`, not the test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/ui apps/web/public/fonts
@@ -427,7 +427,7 @@ git commit -m "feat(ui): design tokens and Crixet Sans from recon evidence"
 - Consumes: `packages/ui/styles/tokens.css`
 - Produces: `THEME_STORAGE_KEY` constant, `themeInitScript: string`, `<html>` always carrying `class`, `data-theme`, `data-theme-preference`, and an `Icon*` component per icon in spec §5.8
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { THEME_STORAGE_KEY, themeInitScript } from "./theme-script";
@@ -449,11 +449,11 @@ describe("theme bootstrap", () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 `pnpm vitest run apps/web/src/components/theme-script.test.ts` → FAIL, module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `theme-script.ts` exports:
 
@@ -485,7 +485,7 @@ synchronously (they are Promises in 16 — spec §3.5); `next build` no longer r
 so lint runs as its own CI job; and we do **not** add `data-scroll-behavior="smooth"` —
 Prism's editor pane manages its own scroll.
 
-- [ ] **Step 3b: Create the icon registry (spec §5.8)**
+- [x] **Step 3b: Create the icon registry (spec §5.8)**
 
 Write `packages/ui/src/icons/index.tsx`. One component per icon in the spec's list,
 each of the shape:
@@ -542,7 +542,7 @@ describe("icon registry", () => {
 });
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 ```bash
 pnpm vitest run apps/web/src/components/theme-script.test.ts packages/ui/src/icons/icons.test.ts
@@ -554,7 +554,7 @@ Expected: tests pass; build succeeds and the emitted HTML contains `data-theme`.
 Note: `packages/ui/package.json` needs `react` and `react-dom` as dev dependencies for
 `renderToStaticMarkup`, and `packages/ui/tsconfig.json` must include `jsx: "react-jsx"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web packages/ui
@@ -573,7 +573,7 @@ git commit -m "feat(web): tailwind v4, base typography, Prism theme bootstrap, S
 - Consumes: nothing
 - Produces: `loadWebEnv(source?: NodeJS.ProcessEnv): WebEnv` and `WebEnv` type; throws a single aggregated error listing every missing/invalid variable
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { loadWebEnv } from "./env";
@@ -612,9 +612,9 @@ it("treats only the literal string \"true\" as true", () => {
 });
 ```
 
-- [ ] **Step 2: Run it — FAIL (module missing)**
+- [x] **Step 2: Run it — FAIL (module missing)**
 
-- [ ] **Step 3: Implement with zod 4**
+- [x] **Step 3: Implement with zod 4**
 
 `WebEnv` fields: `databaseUrl`, `redisUrl`, `authSecret` (from `BETTER_AUTH_SECRET`),
 `authUrl` (from `BETTER_AUTH_URL`), `llmKeyEncryptionSecret`, `llmBaseUrl` (default
@@ -630,9 +630,9 @@ want — it stringifies truthiness, so `"1"` becomes true. Use a custom
 for env booleans. Aggregate issues with
 `error.issues.map(i => i.path.join(".") + ": " + i.message).join("\n")`.
 
-- [ ] **Step 4: Run the tests — PASS**
+- [x] **Step 4: Run the tests — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/shared/src/env.ts packages/shared/src/env.test.ts
@@ -655,7 +655,7 @@ git commit -m "feat(shared): fail-fast environment validation"
 - Consumes: `DATABASE_URL`
 - Produces: `db` (Drizzle client), Better Auth core tables `users`, `sessions`, `accounts`, `verifications` (generated by `pnpm dlx auth@latest generate`, then hand-extended in `packages/db/src/schema.ts`) plus our tables `invites`, `admin_actions`, `projects`, `folders`, `documents`, `project_members`, `snapshots`, `pdf_renders`, `chat_threads`, `chat_messages`, `user_preferences`, `llm_usage`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { afterAll, expect, it } from "vitest";
@@ -701,13 +701,13 @@ it("defaults render status to queued", async () => {
 });
 ```
 
-- [ ] **Step 2: Run it — FAIL (no tables)**
+- [x] **Step 2: Run it — FAIL (no tables)**
 
 ```bash
 pnpm --filter @spektrum/db test
 ```
 
-- [ ] **Step 3: Implement the schema**
+- [x] **Step 3: Implement the schema**
 
 Rules:
 
@@ -736,7 +736,7 @@ Rules:
 
 `client.ts` exports `pool` (from `postgres`) and `db` (Drizzle), both from `DATABASE_URL`.
 
-- [ ] **Step 4: Generate and apply migrations, run the test**
+- [x] **Step 4: Generate and apply migrations, run the test**
 
 ```bash
 pnpm db:generate
@@ -746,7 +746,7 @@ DATABASE_URL=postgres://spektrum:spektrum@localhost:5432/spektrum_test pnpm --fi
 
 Expected: 4 passing.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/db
@@ -765,7 +765,7 @@ git commit -m "feat(db): Better Auth core schema + app tables, citext emails, mi
 - Consumes: nothing
 - Produces: `hashPassword(plain: string): Promise<string>`, `verifyPassword(hash: string, plain: string): Promise<boolean>`, `validatePassword(plain: string): { ok: true } | { ok: false; reason: string }`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { hashPassword, validatePassword, verifyPassword } from "./password";
@@ -792,9 +792,9 @@ it("rejects the top common passwords even when long enough", () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Use `@node-rs/argon2` `hash()` with `{ memoryCost: 19456, timeCost: 2, parallelism: 1, salt: randomBytes(16), outputLen: 32 }`.
 `verifyPassword` catches malformed hashes and returns `false` (never throws).
@@ -807,9 +807,9 @@ so **every** password path (sign-up, reset, change) uses Argon2id, not Better Au
 default scrypt. Add a test that asserts the config object handed to `betterAuth()`
 references these exact functions.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/auth packages/shared/src/common-passwords.ts
@@ -833,7 +833,7 @@ git commit -m "feat(auth): argon2id hashing and password policy"
 - Consumes: `db`, `users`, `sessions`, `hashPassword`/`verifyPassword`, env
 - Produces: `auth`, `authClient`, `requireUser(): Promise<{ id, email, role }>` throwing `UnauthorizedError`/`ForbiddenError`, `requireAdmin()`, `assertBanState()` pure function
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -861,9 +861,9 @@ it("accepts a user whose ban has expired — the ladder lifts itself", () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `auth.ts` — the single Better Auth instance:
 
@@ -943,7 +943,7 @@ export const { GET, POST } = toNextJsHandler(auth);
 `/api/` except `/api/auth/*` and `/api/health`. It only checks **cookie presence**
 (fast path); the real check is `requireUser()` in the route/RSC.
 
-- [ ] **Step 4: Run — PASS, then a manual check**
+- [x] **Step 4: Run — PASS, then a manual check**
 
 ```bash
 pnpm --filter @spektrum/web dev
@@ -952,7 +952,7 @@ curl -i -X POST http://localhost:3000/api/auth/sign-in/email -H 'content-type: a
 
 Expected: `4xx`, never a `set-cookie` session header. (A scripted happy-path login arrives in Task 9.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/auth apps/web/src/proxy.ts apps/web/src/app/api/auth
