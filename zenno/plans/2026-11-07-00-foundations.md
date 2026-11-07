@@ -971,7 +971,7 @@ git commit -m "feat(auth): Better Auth sessions, ban-state check, signup gate, p
 - Consumes: nothing
 - Produces: `assertSameOrigin(req: Request, expectedOrigin: string): void` (throws `CsrfError`), `issueCsrfCookie(): { token: string; setCookie: string }`, `verifyCsrf(req: Request, cookieToken?: string): boolean`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { assertSameOrigin } from "./guard";
@@ -996,9 +996,9 @@ it("ignores Origin on GET", () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Compare `new URL(origin).origin` with `expectedOrigin` after normalising case and
 trailing slash. Methods `GET`, `HEAD`, `OPTIONS` bypass. `verifyCsrf` is a constant-time
@@ -1007,9 +1007,9 @@ comparison of the `x-csrf-token` header with the `spektrum.csrf` cookie value.
 Note: Better Auth already validates `Origin` on its own `/api/auth/*` endpoints, so this
 guard is for **our** mutating routes only — do not wrap `/api/auth/*`.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/shared/src/http
@@ -1029,7 +1029,7 @@ git commit -m "feat(security): same-origin and CSRF guards"
 - Consumes: `authClient`, `requireUser`
 - Produces: `/login` renders with the spec's field labels; successful sign-in redirects to `/`
 
-- [ ] **Step 1: Write the failing E2E test**
+- [x] **Step 1: Write the failing E2E test**
 
 ```ts
 import { expect, test } from "@playwright/test";
@@ -1055,9 +1055,9 @@ test("wrong password keeps the user on the login page", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL (no /login)**
+- [x] **Step 2: Run — FAIL (no /login)**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 The login page uses the tokens: `--bg-app` canvas, a centred `--modal-bg` card,
 `--radius-2xl`, title `Sign in`, fields labelled `Email` and `Password`, primary
@@ -1072,13 +1072,13 @@ the password. The Google button calls
 (a real dashboard arrives in plan 01). Note Next 16: the page component is `async` and
 any `params`/`searchParams` are awaited.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
 ```bash
 pnpm exec playwright test e2e/auth.spec.ts
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/app e2e
@@ -1098,7 +1098,7 @@ git commit -m "feat(auth): login page and credentials sign-in"
 - Consumes: `auth.api`, `hashPassword`, `db`, `users`
 - Produces: `createOwner({ email, password, name }): Promise<{ id: string }>`; CLI exits 1 when an owner already exists or the password is rejected
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 it("creates the first owner", async () => {
@@ -1120,9 +1120,9 @@ it("refuses a weak password", async () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `createOwner` runs in a transaction: `select count(*) from users where role = 'owner' for update`,
 then calls `auth.api.createUser` with `allowBootstrap` context (the signup-gate escape
@@ -1131,13 +1131,13 @@ the Task 6 Argon2id functions. The CLI reads `--email`, `--name` and prompts for
 password twice with hidden input; it prints `Owner created: <email>` and nothing else
 (no hashes, no ids beyond a UUID prefix).
 
-- [ ] **Step 4: Run — PASS, then bootstrap the dev database**
+- [x] **Step 4: Run — PASS, then bootstrap the dev database**
 
 ```bash
 pnpm --filter @spektrum/web admin:create-owner --email owner@spektrum.local --name "Keyhayn"
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/cli apps/web/package.json
@@ -1159,7 +1159,7 @@ git commit -m "feat(auth): owner bootstrap CLI"
 - Consumes: `db`, `invites`, `users`, `auth.api`, `validatePassword`, `requireAdmin`, `assertSignupAllowed`
 - Produces: `createInvite({ email, actorId }): Promise<{ token: string }>`, `redeemInvite({ token, password, name }): Promise<{ userId: string }>`, `revokeInvite(id)`, `listInvites()`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it("creates an invite bound to a normalised email", async () => {
@@ -1203,9 +1203,9 @@ it("rejects an expired invite", async () => {
 });
 ```
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `redeemInvite` runs in a transaction:
 
@@ -1228,9 +1228,9 @@ cannot both succeed (exactly one `UPDATE ... RETURNING` returns a row).
 `${BETTER_AUTH_URL}/invite/${token}`. The page at `/invite/[token]` shows the bound email, two
 password fields, and the button `Create account`.
 
-- [ ] **Step 4: Run — PASS (including the concurrency test)**
+- [x] **Step 4: Run — PASS (including the concurrency test)**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/auth/invites* apps/web/src/app/api/admin apps/web/src/app/invite
