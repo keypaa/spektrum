@@ -10,6 +10,7 @@ import * as schema from "@spektrum/db/schema";
 import { loadWebEnv } from "@spektrum/shared/env";
 import { hashPassword, verifyPassword } from "./password";
 import { assertSignupAllowed, hasValidInvite } from "./signup-gate";
+import { validateProviderUserInfo } from "./oauth-gate";
 
 function createAuth() {
   const env = loadWebEnv();
@@ -43,9 +44,23 @@ function createAuth() {
       google: {
         clientId: env.googleClientId ?? "",
         clientSecret: env.googleClientSecret ?? "",
+        scope: ["openid", "email", "profile"],
         // closed signup: a Google sign-in must not implicitly create an account
         disableImplicitSignUp: true,
       },
+    },
+    account: {
+      accountLinking: {
+        enabled: true,
+        // Google is trusted: a verified Google email links to the existing
+        // local account with that email instead of creating a duplicate.
+        trustedProviders: ["google"],
+      },
+    },
+    user: {
+      // OAuth identities must carry a provider-verified email (oauth-gate.ts)
+      validateUserInfo: ({ user, source }) =>
+        validateProviderUserInfo({ user, source }),
     },
     session: {
       expiresIn: 30 * 24 * 60 * 60, // 30 days
