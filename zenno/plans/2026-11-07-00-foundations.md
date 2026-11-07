@@ -6,7 +6,7 @@
 
 **Architecture:** pnpm monorepo. `apps/web` is Next.js 16 (App Router, RSC) and owns HTTP, auth and UI. `packages/db` owns the Drizzle schema and migrations. `packages/shared` holds zod contracts and cross-cutting helpers. Design tokens live in `packages/ui/styles/tokens.css` and are generated from the recon evidence, never retyped. Postgres, Redis and MinIO run in Docker Compose for development.
 
-**Tech Stack:** Node **26.13.0**, pnpm **12.18.0**, TypeScript **6.0.3** (`strict`), Next.js **16.4.5**, React **19.3.1**, Tailwind CSS **4.3.5**, Drizzle ORM **0.45.4** + `postgres` **4.1.0**, **Better Auth 1.7.18** + `@better-auth/drizzle-adapter` 1.11.3 (database sessions, admin plugin), `@node-rs/argon2` 2.2.2, zod **4.6.7**, ioredis, Vitest **5.1.0**, Playwright 1.65.0. Exact pins and rationale: spec §3.2/§3.4.
+**Tech Stack:** Node **26.13.0**, pnpm **12.18.0**, TypeScript **6.0.3** (`strict`), Next.js **16.4.5**, React **19.3.1**, Tailwind CSS **4.3.5**, Drizzle ORM **0.45.4** + `postgres` **4.1.0**, **Better Auth 1.7.18** + `@better-auth/drizzle-adapter` 1.7.18 (database sessions, admin plugin), `@node-rs/argon2` 2.2.2, zod **4.6.7**, ioredis, Vitest **5.1.0**, Playwright 1.65.0. Exact pins and rationale: spec §3.2/§3.4.
 
 **Spec:** `zenno/specs/2026-11-07-spektrum-design.md` — read §3.4, §3.5, §10 and §19 before writing any code.
 
@@ -236,7 +236,7 @@ Each package's `tsconfig.json` extends `../../tsconfig.base.json` and sets
 ```
 
 `apps/web/package.json` lists `next@16.4.5`, `react@19.3.1`, `react-dom@19.3.1`,
-`better-auth@1.7.18`, `@better-auth/drizzle-adapter@1.11.3`, `@spektrum/db`,
+`better-auth@1.7.18`, `@better-auth/drizzle-adapter@1.7.18`, `@spektrum/db`,
 `@spektrum/shared`, `@spektrum/ui`, plus `@types/react`, `@types/react-dom`.
 Do not add `next-auth`.
 

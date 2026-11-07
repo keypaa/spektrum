@@ -1,0 +1,12 @@
+{
+  "name": "@spektrum/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "build": "tsc --noEmit" },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "zod": "4.6.7"
+  }
+}

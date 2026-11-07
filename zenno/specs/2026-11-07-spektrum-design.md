@@ -189,7 +189,7 @@ pinned and §3.5 for the Next.js 16 behaviours an implementer must not get wrong
 | DB driver | `postgres` | **4.1.0** | Fast, no native build step |
 | Validation | zod | **4.6.7** | Shared contracts across web and worker |
 | Auth | **Better Auth** | **1.7.18** | Stable semver; sessions, bans, rate limits and an admin plugin are built in |
-| Auth adapter | `@better-auth/drizzle-adapter` | **1.11.3** | First-class Drizzle support |
+| Auth adapter | `@better-auth/drizzle-adapter` | **1.7.18** | First-class Drizzle support; the adapter follows Better Auth's own versioning, so it is pinned at the same version as `better-auth` |
 | Queue | Redis 7 + BullMQ | latest | Compile jobs |
 | Storage | S3-compatible (MinIO dev, R2/S3 prod) | latest | Prism uploads/downloads archives |
 | Realtime | None in v1 (SSE for AI streaming only) | — | Collaboration deferred |
