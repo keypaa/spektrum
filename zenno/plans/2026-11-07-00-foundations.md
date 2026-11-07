@@ -1403,7 +1403,7 @@ git commit -m "feat(auth): google oauth with invite-aware linking via Better Aut
 - Consumes: `LLM_KEY_ENCRYPTION_SECRET`
 - Produces: `sealSecret(plain, aad): string`, `openSecret(sealed, aad): string`, `last4(plain): string`; `PUT/DELETE /api/user/llm-key`, `GET` returns `{ configured: boolean, last4?: string }`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 const KEY = Buffer.alloc(32, 7);
@@ -1431,9 +1431,9 @@ it("fails when the ciphertext is tampered with", () => {
 Route tests assert: `GET` never returns the secret; `PUT` with a bad key shape returns
 400; the response body of every method does not contain the string that was stored.
 
-- [ ] **Step 2: Run — FAIL**
+- [x] **Step 2: Run — FAIL**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 AES-256-GCM, 12-byte random nonce, 16-byte tag, `base64(nonce || tag || ciphertext)`.
 `PUT` body `{ apiKey: string }` validated `min(20).max(200)`, stores ciphertext +
@@ -1441,9 +1441,9 @@ AES-256-GCM, 12-byte random nonce, 16-byte tag, `base64(nonce || tag || cipherte
 Add a request-scoped logger redaction rule: any value matching `/^sk-[A-Za-z0-9_-]{8,}$/`
 is replaced with `sk-***` before logging.
 
-- [ ] **Step 4: Run — PASS**
+- [x] **Step 4: Run — PASS**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/shared/src/crypto apps/web/src/app/api/user
