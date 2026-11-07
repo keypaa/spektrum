@@ -4,6 +4,9 @@
 // ban state on every request, because cookieCache is disabled (Task 7) so a
 // ban is visible on the next request, not after cache expiry.
 import { headers } from "next/headers";
+import { eq } from "drizzle-orm";
+import { db } from "@spektrum/db";
+import { users, sessions } from "@spektrum/db/schema";
 import { auth } from "./auth";
 import { assertBanState } from "./ban-state";
 
@@ -61,4 +64,27 @@ export async function requireAdmin(): Promise<SessionUser> {
     throw new ForbiddenError("admin");
   }
   return u;
+}
+
+// Token-based variant of requireUser (used by tests and by any non-request
+// context): looks the session up directly, then applies the same ban check.
+export async function requireUserForToken(token: string): Promise<SessionUser> {
+  const rows = await db
+    .select({ session: sessions, user: users })
+    .from(sessions)
+    .innerJoin(users, eq(users.id, sessions.userId))
+    .where(eq(sessions.token, token))
+    .limit(1);
+  const row = rows[0];
+  if (!row || row.session.expiresAt.getTime() <= Date.now()) {
+    throw new UnauthorizedError();
+  }
+  const state = assertBanState(
+    { banned: row.user.banned, banExpires: row.user.banExpires },
+    new Date(),
+  );
+  if (!state.ok) {
+    throw new ForbiddenError(state.reason, state.retryAfterMs);
+  }
+  return { id: row.user.id, email: row.user.email, role: row.user.role };
 }
