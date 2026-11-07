@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./common-passwords": "./src/common-passwords.ts",
     "./env": "./src/env.ts",
-    "./http/guard": "./src/http/guard.ts"
+    "./http/guard": "./src/http/guard.ts",
+    "./crypto/envelope": "./src/crypto/envelope.ts",
+    "./log/redact": "./src/log/redact.ts"
   },
   "scripts": { "build": "tsc --noEmit" },
   "devDependencies": {
