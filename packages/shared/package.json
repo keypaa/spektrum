@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./common-passwords": "./src/common-passwords.ts",
+    "./env": "./src/env.ts"
+  },
   "scripts": { "build": "tsc --noEmit" },
   "devDependencies": {
     "@types/node": "^26.0.0",
