@@ -12,7 +12,8 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "pnpm --filter @spektrum/web dev",
+    command:
+      process.env.E2E_WEB_COMMAND ?? "pnpm --filter @spektrum/web dev",
     url: "http://localhost:3000/login",
     reuseExistingServer: true,
     timeout: 60_000,

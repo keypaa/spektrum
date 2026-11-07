@@ -30,6 +30,16 @@ describe("validatePassword", () => {
   });
 
   it("rejects the top common passwords even when long enough", () => {
-    expect(validatePassword("passwordpassword").ok).toBe(false);
+    expect(validatePassword("password1").ok).toBe(false); // #1 in the 10k list after "password"
+    expect(validatePassword("qwerty123").ok).toBe(false);
+    expect(validatePassword("letmein1").ok).toBe(false);
+  });
+
+  it("is case-insensitive against the list", () => {
+    expect(validatePassword("QWERTY123").ok).toBe(false);
+  });
+
+  it("accepts a long non-listed password", () => {
+    expect(validatePassword("correct horse battery staple").ok).toBe(true);
   });
 });

@@ -7,24 +7,115 @@ on:
     branches: [main]
 
 jobs:
-  gate:
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .node-version
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 12.18.0
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+
+  unit:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: spektrum
+          POSTGRES_PASSWORD: spektrum
+          POSTGRES_DB: spektrum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U spektrum -d spektrum"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create test databases + citext
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          for db in spektrum_test spektrum_unit; do
+            PGPASSWORD=spektrum psql -h localhost -U spektrum -d postgres \
+              -c "CREATE DATABASE $db" || true
+            PGPASSWORD=spektrum psql -h localhost -U spektrum -d "$db" \
+              -c "CREATE EXTENSION IF NOT EXISTS citext"
+          done
+      - name: Migrate unit DB
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_unit
       - run: pnpm test
-      - run: pnpm --filter @spektrum/web build
+        env:
+          REDIS_URL: redis://localhost:6379
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: spektrum
+          POSTGRES_PASSWORD: spektrum
+          POSTGRES_DB: spektrum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U spektrum -d spektrum"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Create + migrate e2e database
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=spektrum psql -h localhost -U spektrum -d postgres \
+            -c "CREATE DATABASE spektrum_test" || true
+          PGPASSWORD=spektrum psql -h localhost -U spektrum -d spektrum_test \
+            -c "CREATE EXTENSION IF NOT EXISTS citext"
+          pnpm db:migrate
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+      - name: Seed e2e owner
+        run: pnpm --filter @spektrum/web exec tsx src/cli/ci-seed.ts
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+      - run: pnpm --filter @spektrum/web build
+      - run: pnpm test:e2e
+        env:
+          E2E_WEB_COMMAND: pnpm --filter @spektrum/web start
           REDIS_URL: redis://localhost:6379
-          BETTER_AUTH_SECRET: ci-dummy-secret-32-chars-minimum!!
-          BETTER_AUTH_URL: http://localhost:3000
-          LLM_KEY_ENCRYPTION_SECRET: ci-dummy-key-encryption-secret!!
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
