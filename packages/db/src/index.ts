@@ -1,3 +1,14 @@
-// @spektrum/db — Drizzle schema + migrations.
-// Nothing exported yet; the schema lands in Phase 2 (§4, §19.2).
-export const DB_PACKAGE = "@spektrum/db" as const;
+// @spektrum/db — Drizzle client + pool, both built from DATABASE_URL.
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is not set");
+}
+
+export const pool = postgres(databaseUrl, { max: 10 });
+export const db = drizzle(pool, { schema });
+
+export * as schema from "./schema";
