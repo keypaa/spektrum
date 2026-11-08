@@ -1,130 +1,57 @@
-"use client";
+// /invite/[token] — server wrapper (plan Tasks 11/13): the token is validated
+// SERVER-SIDE before any form is rendered; the bound email is shown; the
+// client form receives only { token, email, googleEnabled }.
+import { getInviteStatus } from "@/auth/invites";
+import InviteForm from "./invite-form";
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+export const dynamic = "force-dynamic";
 
-export default function InvitePage() {
-  const { token } = useParams<{ token: string }>();
-  const router = useRouter();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (password !== confirm) {
-      setError("Passwords do not match");
-      return;
-    }
-    setLoading(true);
-    const res = await fetch("/api/auth/invite/redeem", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token, password, name }),
-    });
-    setLoading(false);
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      setError(body.message ?? "This invite is no longer valid.");
-      return;
-    }
-    router.push("/login");
-  }
-
-  return (
-    <main
-      className="flex min-h-screen items-center justify-center"
-      style={{ background: "var(--bg-app)" }}
-    >
-      <div
-        className="w-full max-w-[585px] p-8"
-        style={{
-          background: "var(--modal-bg)",
-          borderRadius: "var(--radius-2xl)",
-          boxShadow: "var(--shadow-surface)",
-        }}
+export default async function InvitePage({
+  params,
+}: {
+  params: Promise<{ token: string }>;
+}) {
+  const { token } = await params;
+  const status = await getInviteStatus(token);
+  const googleEnabled = Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+  );
+  if (!status.ok) {
+    const message =
+      status.reason === "revoked"
+        ? "This invite has been revoked."
+        : status.reason === "used"
+          ? "This invite has already been used."
+          : status.reason === "expired"
+            ? "This invite has expired."
+            : "This invite is no longer valid.";
+    return (
+      <main
+        className="flex min-h-screen items-center justify-center"
+        style={{ background: "var(--bg-app)" }}
       >
-        <h1
-          className="text-center text-2xl font-semibold"
-          style={{ color: "var(--fg-primary)" }}
+        <div
+          className="w-full max-w-[585px] p-8"
+          style={{
+            background: "var(--modal-bg)",
+            borderRadius: "var(--radius-2xl)",
+            boxShadow: "var(--shadow-surface)",
+          }}
         >
-          Create account
-        </h1>
-        <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="name" style={{ color: "var(--fg-secondary)" }} className="text-sm">
-              Name
-            </label>
-            <input
-              id="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{
-                background: "var(--input-bg)",
-                borderColor: "var(--input-border)",
-                color: "var(--fg-primary)",
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" style={{ color: "var(--fg-secondary)" }} className="text-sm">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{
-                background: "var(--input-bg)",
-                borderColor: "var(--input-border)",
-                color: "var(--fg-primary)",
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="confirm" style={{ color: "var(--fg-secondary)" }} className="text-sm">
-              Confirm password
-            </label>
-            <input
-              id="confirm"
-              type="password"
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-              style={{
-                background: "var(--input-bg)",
-                borderColor: "var(--input-border)",
-                color: "var(--fg-primary)",
-              }}
-            />
-          </div>
-          {error && (
-            <p className="text-sm" style={{ color: "var(--red-500)" }}>
-              {error}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 w-full rounded-full py-2.5 text-sm font-medium disabled:opacity-60"
-            style={{
-              background: "var(--button-primary-bg)",
-              color: "var(--button-primary-text)",
-            }}
+          <h1
+            className="text-center text-2xl font-semibold"
+            style={{ color: "var(--fg-primary)" }}
           >
             Create account
-          </button>
-        </form>
-      </div>
-    </main>
+          </h1>
+          <p className="mt-4 text-center text-sm" style={{ color: "var(--red-500)" }}>
+            {message}
+          </p>
+        </div>
+      </main>
+    );
+  }
+  return (
+    <InviteForm token={token} email={status.email} googleEnabled={googleEnabled} />
   );
 }
