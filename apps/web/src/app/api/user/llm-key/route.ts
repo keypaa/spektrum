@@ -9,6 +9,7 @@ import {
   deleteLlmKey,
   validateApiKeyShape,
 } from "@/auth/llm-key";
+import { errorResponse } from "@/auth/route-errors";
 
 // /api/user/llm-key — BYOK key management (spec §12.2).
 // GET  -> { configured: boolean, last4?: string }   (never the plaintext)
@@ -17,27 +18,39 @@ import {
 const putSchema = z.object({ apiKey: z.string() });
 
 export async function GET(req: NextRequest) {
-  const user = await requireUser();
-  assertSameOrigin(req, loadWebEnv().authUrl);
-  return NextResponse.json(await getLlmKeyStatus(user.id));
+  try {
+    const user = await requireUser();
+    assertSameOrigin(req, loadWebEnv().authUrl);
+    return NextResponse.json(await getLlmKeyStatus(user.id));
+  } catch (e) {
+    return errorResponse(e);
+  }
 }
 
 export async function PUT(req: NextRequest) {
-  const user = await requireUser();
-  assertSameOrigin(req, loadWebEnv().authUrl);
-  const body = putSchema.parse(await req.json());
-  const check = validateApiKeyShape(body.apiKey);
-  if (!check.ok) {
-    return NextResponse.json({ message: check.reason }, { status: 400 });
+  try {
+    const user = await requireUser();
+    assertSameOrigin(req, loadWebEnv().authUrl);
+    const body = putSchema.parse(await req.json());
+    const check = validateApiKeyShape(body.apiKey);
+    if (!check.ok) {
+      return NextResponse.json({ error: "bad_request", message: check.reason }, { status: 400 });
+    }
+    await saveLlmKey(user.id, body.apiKey);
+    // respond with status only — never echo the key back
+    return NextResponse.json(await getLlmKeyStatus(user.id));
+  } catch (e) {
+    return errorResponse(e);
   }
-  await saveLlmKey(user.id, body.apiKey);
-  // respond with status only — never echo the key back
-  return NextResponse.json(await getLlmKeyStatus(user.id));
 }
 
 export async function DELETE(req: NextRequest) {
-  const user = await requireUser();
-  assertSameOrigin(req, loadWebEnv().authUrl);
-  await deleteLlmKey(user.id);
-  return NextResponse.json({ configured: false });
+  try {
+    const user = await requireUser();
+    assertSameOrigin(req, loadWebEnv().authUrl);
+    await deleteLlmKey(user.id);
+    return NextResponse.json({ configured: false });
+  } catch (e) {
+    return errorResponse(e);
+  }
 }

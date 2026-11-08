@@ -14,15 +14,26 @@ const PUBLIC_PATHS = [
   "/favicon.ico",
 ];
 
+// Better Auth prefixes cookies with __Secure- when the base URL is https
+// (production), so both names must be accepted.
+const SESSION_COOKIE_NAMES = [
+  "__Secure-better-auth.session_token",
+  "better-auth.session_token",
+];
+
 export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
-  const sessionCookie = request.cookies.get(
-    "better-auth.session_token",
-  )?.value;
+  const sessionCookie = SESSION_COOKIE_NAMES.map(
+    (name) => request.cookies.get(name)?.value,
+  ).find(Boolean);
   if (!sessionCookie) {
+    // API consumers get a real 401, browsers get the login redirect
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("from", pathname);
