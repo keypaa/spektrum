@@ -26,7 +26,7 @@ test("wrong password keeps the user on the login page", async ({ page }) => {
   await expect(page.getByText("Incorrect email or password.")).toBeVisible();
 });
 
-test("signup without invite is refused", async ({ request }) => {
+test("signup without invite is refused and creates no account", async ({ request }) => {
   const res = await request.post("/api/auth/sign-up/email", {
     data: {
       email: "stranger@example.com",
@@ -35,4 +35,11 @@ test("signup without invite is refused", async ({ request }) => {
     },
   });
   expect(res.status()).toBe(403);
+  const body = await res.json();
+  expect(JSON.stringify(body)).toContain("invite_required");
+  // no user row was created: signing in with those credentials must fail
+  const signIn = await request.post("/api/auth/sign-in/email", {
+    data: { email: "stranger@example.com", password: "a long enough password" },
+  });
+  expect(signIn.status()).toBe(401);
 });
