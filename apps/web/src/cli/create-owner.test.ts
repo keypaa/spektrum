@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
-import { createOwner, findUserById, findCredentialAccount } from "./create-owner";
+import { createOwner, findUserById, findCredentialAccount, argValue } from "./create-owner";
 
 beforeAll(async () => {
   // This runs on the dedicated unit DB (spektrum_unit): clear any owner left
@@ -53,5 +53,16 @@ describe("createOwner", () => {
         name: "X",
       }),
     ).rejects.toThrow(/at least 12/i);
+  });
+});
+
+describe("argValue", () => {
+  it("reads --flag value and --flag=value forms", () => {
+    expect(argValue(["--email", "a@b.c", "--name", "X"], "--email")).toBe("a@b.c");
+    expect(argValue(["--email=a@b.c"], "--email")).toBe("a@b.c");
+    expect(argValue(["--name", "X"], "--email")).toBeUndefined();
+    expect(argValue([], "--email")).toBeUndefined();
+    // regression: with no --email at all, args[0] must NOT be returned
+    expect(argValue(["--name", "X"], "--email")).not.toBe("--name");
   });
 });

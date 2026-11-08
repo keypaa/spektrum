@@ -41,9 +41,10 @@ export async function createOwner(input: {
   if (!check.ok) throw new Error(check.reason);
 
   return db.transaction(async (tx) => {
-    // Lock the owner rows (FOR UPDATE is not allowed with aggregates, so lock
-    // the rows themselves and count in JS) so two concurrent bootstraps cannot
-    // both win.
+    // Serialize bootstraps: `FOR UPDATE` on the owner rows locks nothing when
+    // no owner exists yet, so take a transaction-scoped advisory lock first
+    // and then lock the rows themselves (belt and braces).
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('spektrum:owner-bootstrap'))`);
     const locked = await tx.execute(sql`
       select id from users where role = 'owner' for update`);
     if (locked.length > 0) {
@@ -75,10 +76,17 @@ export async function createOwner(input: {
 }
 
 // --- CLI entrypoint (only when run directly) ---
+export function argValue(args: string[], flag: string): string | undefined {
+  const i = args.indexOf(flag);
+  if (i !== -1) return args[i + 1];
+  const prefixed = args.find((a) => a.startsWith(`${flag}=`));
+  return prefixed?.slice(flag.length + 1);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
-  const email = args[args.indexOf("--email") + 1];
-  const name = args[args.indexOf("--name") + 1] ?? "Owner";
+  const email = argValue(args, "--email");
+  const name = argValue(args, "--name") ?? "Owner";
   if (!email) {
     console.error(
       "usage: admin:create-owner --email <email> [--name <name>] (password via OWNER_PASSWORD env or interactive prompt)",
