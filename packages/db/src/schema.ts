@@ -12,6 +12,8 @@ import {
   index,
   uniqueIndex,
   primaryKey,
+  inet,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { citext } from "./citext";
 import { users } from "./auth-schema";
@@ -84,7 +86,7 @@ export const adminActions = pgTable("admin_actions", {
     .references(() => users.id, { onDelete: "cascade" }),
   action: text("action").notNull(),
   reason: text("reason"),
-  ip: text("ip"), // inet
+  ip: inet("ip"), // spec §4: inet, not text
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -116,7 +118,11 @@ export const projects = pgTable(
     folderId: uuid("folder_id").references(() => folders.id, {
       onDelete: "set null",
     }),
-    mainDocumentId: uuid("main_document_id"),
+    // AnyPgColumn breaks the projects <-> documents type cycle (circular FK)
+    mainDocumentId: uuid("main_document_id").references(
+      (): AnyPgColumn => documents.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
