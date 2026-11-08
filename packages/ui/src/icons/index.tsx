@@ -97,6 +97,8 @@ export function IconChevronRight({ size, className, ...rest }: IconProps) {
 export function IconBrand({ size, className, ...rest }: IconProps) {
   // Solid brand mark — spec §5.8: solid marks use fill="currentColor" and NO
   // stroke. Distinct from every stroked icon in the registry.
+  // Six petals rotated around the centre; every point stays inside 0..16
+  // (petal tip reaches 8-6.8=1.2 from the edge at most).
   return (
     <svg
       width={size ?? 16}
@@ -107,7 +109,16 @@ export function IconBrand({ size, className, ...rest }: IconProps) {
       className={className}
       {...rest}
     >
-      <path d="M8 1.2c.75-1.05 2.15-1.4 3.1-.65.95.75 1.3 2.05 1.05 3-.95.2-1.8.85-2.25 1.7-.55.95-.35 2.15.45 2.9-1.05.2-1.85 1-2.1 1.95-.2.95.2 2 .95 2.65-.75.55-1.85.65-2.6.2-.4.95-1.3 1.6-2.25 1.7-.95.1-1.9-.35-2.55-1.1-.75.65-1.8.75-2.7.25-.95-.55-1.5-1.6-1.4-2.6-.85-.2-1.6-.85-2.05-1.7-.45-.85-.3-2 .45-2.9-1-.3-1.75-1.05-2-2-.2-.95.2-2 .95-2.65.75-.55 1.85-.65 2.6-.2.4-.95 1.3-1.6 2.25-1.7.95-.1 1.9.35 2.55 1.1z" />
+      {Array.from({ length: 6 }, (_, k) => (
+        <ellipse
+          key={k}
+          cx="8"
+          cy="4.6"
+          rx="1.7"
+          ry="3.4"
+          transform={`rotate(${k * 60} 8 8)`}
+        />
+      ))}
       <circle cx="8" cy="8" r="1.6" />
     </svg>
   );

@@ -50,6 +50,27 @@ describe("icon registry", () => {
     expect(html).not.toContain("stroke=");
   });
 
+  it("IconBrand geometry stays inside the 16x16 viewBox", () => {
+    const html = renderToStaticMarkup(<icons.IconBrand size={16} />);
+    // six petals rotated around the centre, plus the hub
+    const ellipses = html.match(/<ellipse[^>]*>/g) ?? [];
+    expect(ellipses).toHaveLength(6);
+    for (const e of ellipses) {
+      const cx = Number(e.match(/cx="([\d.]+)"/)![1]);
+      const cy = Number(e.match(/cy="([\d.]+)"/)![1]);
+      const rx = Number(e.match(/rx="([\d.]+)"/)![1]);
+      const ry = Number(e.match(/ry="([\d.]+)"/)![1]);
+      expect(cx - rx).toBeGreaterThanOrEqual(0);
+      expect(cx + rx).toBeLessThanOrEqual(16);
+      expect(cy - ry).toBeGreaterThanOrEqual(0);
+      expect(cy + ry).toBeLessThanOrEqual(16);
+    }
+    // a rotated petal's farthest point from the centre must stay inside too
+    const cy = 4.6, ry = 3.4;
+    expect(8 - (cy - ry)).toBeGreaterThanOrEqual(0);
+    expect(8 + (8 - (cy - ry))).toBeLessThanOrEqual(16);
+  });
+
   it("severity icons carry a <title>", () => {
     for (const name of ["IconWarning", "IconError", "IconInfo"] as const) {
       const Icon = icons[name];
