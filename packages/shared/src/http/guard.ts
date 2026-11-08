@@ -1,7 +1,7 @@
 // Same-origin + CSRF guards for OUR mutating routes (spec §10.6).
 // Better Auth validates Origin on /api/auth/* itself; this guard is only for
 // our own /api/* mutation routes — never wrap /api/auth/*.
-import { timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 
 export class CsrfError extends Error {
   constructor(message: string) {
@@ -38,4 +38,17 @@ export function verifyCsrf(req: Request, cookieToken?: string): boolean {
   const b = Buffer.from(cookieToken);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
+}
+
+// Double-submit pair (spec §10.3): the cookie is NOT httpOnly so the client can
+// echo it in the x-csrf-token header; the server compares both in constant time.
+// Our routes currently rely on assertSameOrigin (browsers cannot forge Origin
+// cross-site) plus SameSite=Lax; this pair is the fallback for non-browser
+// clients that cannot send Origin.
+export const CSRF_COOKIE_NAME = "spektrum.csrf";
+
+export function issueCsrfCookie(): { token: string; setCookie: string } {
+  const token = randomBytes(32).toString("base64url");
+  const setCookie = `${CSRF_COOKIE_NAME}=${token}; Path=/; SameSite=Strict; Secure`;
+  return { token, setCookie };
 }

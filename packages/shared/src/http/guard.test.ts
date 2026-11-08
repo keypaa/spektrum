@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSameOrigin, verifyCsrf } from "./guard";
+import { assertSameOrigin, verifyCsrf, issueCsrfCookie, CSRF_COOKIE_NAME } from "./guard";
 
 const req = (headers: Record<string, string>, method = "POST") =>
   new Request("https://spektrum.app/api/x", { method, headers });
@@ -56,5 +56,17 @@ describe("verifyCsrf", () => {
     expect(verifyCsrf(req({ "x-csrf-token": "abc123" }), "different")).toBe(false);
     expect(verifyCsrf(req({}), "abc123")).toBe(false);
     expect(verifyCsrf(req({ "x-csrf-token": "abc123" }), undefined)).toBe(false);
+  });
+});
+
+describe("issueCsrfCookie", () => {
+  it("issues a 43-char token and a matching non-httpOnly cookie", () => {
+    const { token, setCookie } = issueCsrfCookie();
+    expect(token).toHaveLength(43);
+    expect(setCookie).toContain(`${CSRF_COOKIE_NAME}=${token}`);
+    expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).not.toContain("HttpOnly"); // client must read it to echo back
+    const again = issueCsrfCookie();
+    expect(again.token).not.toBe(token);
   });
 });

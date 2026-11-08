@@ -270,6 +270,9 @@ importers:
       ioredis:
         specifier: 6.0.0
         version: 6.0.0(supports-color@7.2.0)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -277,9 +280,6 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
 
   packages/ui:
     dependencies:
