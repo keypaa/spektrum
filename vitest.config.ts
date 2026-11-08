@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -23,6 +24,12 @@ export default defineConfig({
       },
       {
         name: "web",
+        resolve: {
+          // apps/web source uses the "@/..." path alias (tsconfig paths)
+          alias: {
+            "@": fileURLToPath(new URL("./apps/web/src", import.meta.url)),
+          },
+        },
         test: {
           include: ["apps/web/**/*.test.ts", "apps/web/**/*.test.tsx"],
           // DB-backed tests share one database — run them in a single worker
