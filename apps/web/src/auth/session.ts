@@ -9,6 +9,7 @@ import { db } from "@spektrum/db";
 import { users, sessions } from "@spektrum/db/schema";
 import { auth } from "./auth";
 import { assertBanState } from "./ban-state";
+import { revokeAllUserSessions } from "./revoke";
 
 export { assertBanState } from "./ban-state";
 export type { BanState } from "./ban-state";
@@ -38,24 +39,38 @@ export interface SessionUser {
 export async function requireUser(): Promise<SessionUser> {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) throw new UnauthorizedError();
+  // The session/user pair can be cached in Redis (secondary storage), so the
+  // authoritative ban state and role are re-read from Postgres on every
+  // request: a ban or role change is visible immediately, never after cache
+  // expiry. This is the backstop for a revocation whose cache delete failed.
+  const rows = await db
+    .select({
+      email: users.email,
+      role: users.role,
+      banned: users.banned,
+      banExpires: users.banExpires,
+    })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+  const user = rows[0];
+  if (!user) throw new UnauthorizedError(); // session without a user row
   const state = assertBanState(
-    {
-      banned: session.user.banned ?? false,
-      banExpires: session.user.banExpires ?? null,
-    },
+    { banned: user.banned, banExpires: user.banExpires },
     new Date(),
   );
   if (!state.ok) {
-    await auth.api.revokeUserSessions({
-      body: { userId: session.user.id },
-    });
+    // Revoke through Better Auth's internal adapter (DB + Redis cache). If the
+    // revocation itself fails we still fail closed via the DB check above.
+    try {
+      await revokeAllUserSessions(session.user.id);
+    } catch {
+      // logged by the caller's 500 path if it ever happens; the ban state in
+      // Postgres still blocks this request
+    }
     throw new ForbiddenError(state.reason, state.retryAfterMs);
   }
-  return {
-    id: session.user.id,
-    email: session.user.email,
-    role: session.user.role ?? "member",
-  };
+  return { id: session.user.id, email: user.email, role: user.role };
 }
 
 export async function requireAdmin(): Promise<SessionUser> {

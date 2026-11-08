@@ -11,6 +11,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@spektrum/db";
 import { users, sessions, adminActions } from "@spektrum/db/schema";
+import { revokeAllUserSessions } from "./revoke";
 
 export class AdminActionError extends Error {
   constructor(message: string) {
@@ -43,7 +44,8 @@ async function applyBan(
       updatedAt: new Date(),
     })
     .where(eq(users.id, input.userId));
-  // revoke every live session — the pre-ban cookie dies on next request
+  // revoke every live session in the DB (same transaction as the ban) — the
+  // pre-ban cookie dies on next request
   await tx.delete(sessions).where(eq(sessions.userId, input.userId));
   await tx.insert(adminActions).values({
     actorId: input.actorId,
@@ -52,6 +54,21 @@ async function applyBan(
     reason: input.reason,
     ip: input.ip ?? null,
   });
+}
+
+// After the ban commits, also purge Better Auth's Redis session cache via the
+// internal adapter. A direct `DELETE FROM sessions` alone leaves the cached
+// session (and its cached user snapshot) alive in secondary storage, which is
+// exactly the stale-cookie hole this closes.
+async function revokeCache(userId: string): Promise<void> {
+  try {
+    await revokeAllUserSessions(userId);
+  } catch (e) {
+    // The DB ban state is already committed and requireUser() re-reads it from
+    // Postgres on every request, so a cache purge failure degrades to the
+    // 403/429 path instead of letting the cookie through.
+    console.error("failed to purge cached sessions for", userId, e);
+  }
 }
 
 export async function banUser(input: {
@@ -63,6 +80,7 @@ export async function banUser(input: {
   await db.transaction(async (tx) => {
     await applyBan(tx, { ...input, until: null, action: "ban" });
   });
+  await revokeCache(input.userId);
 }
 
 export async function suspendUser(input: {
@@ -75,6 +93,7 @@ export async function suspendUser(input: {
   await db.transaction(async (tx) => {
     await applyBan(tx, { ...input, until: input.until, action: "suspend" });
   });
+  await revokeCache(input.userId);
 }
 
 export async function unbanUser(input: {
