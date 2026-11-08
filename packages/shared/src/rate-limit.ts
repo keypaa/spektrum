@@ -17,6 +17,9 @@ export const BUDGETS = {
   compile: { limit: 6, windowMs: 60_000, burst: 12 },
   ai: { limit: 30, windowMs: 60_000 },
   upload: { limit: 20, windowMs: 60_000 },
+  // audit addition: the invite-redemption route lives under /api/auth/* but is
+  // our own handler, so Better Auth's limiter does not cover it
+  inviteRedeem: { limit: 5, windowMs: 15 * 60_000 },
 } as const;
 
 let _redis: Redis | undefined;

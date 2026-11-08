@@ -24,12 +24,13 @@ export function assertSignupAllowed(input: {
 }
 
 export async function hasValidInvite(email: string): Promise<boolean> {
+  const normalised = email.trim().toLowerCase();
   const rows = await db
     .select({ id: invites.id })
     .from(invites)
     .where(
       and(
-        eq(invites.email, email),
+        eq(invites.email, normalised),
         isNull(invites.acceptedAt),
         isNull(invites.revokedAt),
         gt(invites.expiresAt, new Date()),

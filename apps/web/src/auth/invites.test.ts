@@ -49,6 +49,16 @@ describe("createInvite", () => {
       token,
     );
   });
+
+  it("refuses to invite an email that already has an account", async () => {
+    await db.execute(sql`
+      insert into users (id,email,name,email_verified,role,banned)
+      values ('22222222-2222-2222-2222-222222222222','exists@invite.test','E',true,'member',false)
+      on conflict (id) do nothing`);
+    await expect(
+      createInvite({ email: "Exists@Invite.Test", actorId: ownerId }),
+    ).rejects.toThrow(/already exists/i);
+  });
 });
 
 describe("redeemInvite", () => {

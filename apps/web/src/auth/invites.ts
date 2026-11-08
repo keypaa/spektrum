@@ -19,8 +19,39 @@ export async function findUserById(id: string) {
   return rows[0];
 }
 
+export async function findUserByEmail(email: string) {
+  // citext: the comparison is already case-insensitive
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email.trim().toLowerCase()))
+    .limit(1);
+  return rows[0];
+}
+
+/** User-facing redemption failure — safe to serialise to the client. */
+export class RedeemError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RedeemError";
+  }
+}
+
 export async function listInvites() {
-  return db.select().from(invites).orderBy(sql`${invites.createdAt} desc`);
+  // never select token_hash — the admin list endpoint serialises these rows
+  return db
+    .select({
+      id: invites.id,
+      email: invites.email,
+      createdBy: invites.createdBy,
+      expiresAt: invites.expiresAt,
+      acceptedAt: invites.acceptedAt,
+      acceptedUserId: invites.acceptedUserId,
+      revokedAt: invites.revokedAt,
+      createdAt: invites.createdAt,
+    })
+    .from(invites)
+    .orderBy(sql`${invites.createdAt} desc`);
 }
 
 export async function createInvite(input: {
@@ -29,6 +60,11 @@ export async function createInvite(input: {
   ttlMs?: number;
 }): Promise<{ token: string }> {
   const email = input.email.trim().toLowerCase();
+  // an invite for an address that already has an account is pointless (and
+  // leaks account existence through the invite list) — refuse it
+  if (await findUserByEmail(email)) {
+    throw new RedeemError("An account with this email already exists.");
+  }
   const token = randomBytes(32).toString("base64url"); // 43 chars
   await db.insert(invites).values({
     email,
@@ -37,6 +73,24 @@ export async function createInvite(input: {
     expiresAt: new Date(Date.now() + (input.ttlMs ?? INVITE_TTL_MS)),
   });
   return { token };
+}
+
+/** Server-side status of an invite token (never returns the hash/token). */
+export async function getInviteStatus(token: string): Promise<
+  | { ok: true; email: string }
+  | { ok: false; reason: "invalid" | "revoked" | "used" | "expired" }
+> {
+  const rows = await db
+    .select()
+    .from(invites)
+    .where(eq(invites.tokenHash, sha256(token)))
+    .limit(1);
+  const invite = rows[0];
+  if (!invite) return { ok: false, reason: "invalid" };
+  if (invite.revokedAt) return { ok: false, reason: "revoked" };
+  if (invite.acceptedAt) return { ok: false, reason: "used" };
+  if (invite.expiresAt.getTime() <= Date.now()) return { ok: false, reason: "expired" };
+  return { ok: true, email: invite.email };
 }
 
 export async function revokeInvite(id: string): Promise<void> {
@@ -52,63 +106,85 @@ export async function redeemInvite(input: {
   name: string;
 }): Promise<{ userId: string }> {
   const check = validatePassword(input.password);
-  if (!check.ok) throw new Error(check.reason);
+  if (!check.ok) throw new RedeemError(check.reason);
 
   const tokenHash = sha256(input.token);
 
-  return db.transaction(async (tx) => {
-    // Find the invite row first (for the email), then atomically consume it.
-    const found = await tx
-      .select()
-      .from(invites)
-      .where(eq(invites.tokenHash, tokenHash))
-      .limit(1);
-    const invite = found[0];
-    if (!invite) throw new Error("This invite is no longer valid.");
-    if (invite.revokedAt) throw new Error("This invite has been revoked.");
-    if (invite.acceptedAt) throw new Error("This invite has already been used.");
-    if (invite.expiresAt.getTime() <= Date.now()) {
-      throw new Error("This invite has expired.");
-    }
+  try {
+    return await db.transaction(async (tx) => {
+      // Find the invite row first (for the email), then atomically consume it.
+      const found = await tx
+        .select()
+        .from(invites)
+        .where(eq(invites.tokenHash, tokenHash))
+        .limit(1);
+      const invite = found[0];
+      if (!invite) throw new RedeemError("This invite is no longer valid.");
+      if (invite.revokedAt) throw new RedeemError("This invite has been revoked.");
+      if (invite.acceptedAt) throw new RedeemError("This invite has already been used.");
+      if (invite.expiresAt.getTime() <= Date.now()) {
+        throw new RedeemError("This invite has expired.");
+      }
 
-    // Atomic consume: only one concurrent redemption gets a row back.
-    const consumed = await tx.execute(sql`
-      update invites
-      set accepted_at = now()
-      where id = ${invite.id}
-        and accepted_at is null
-        and revoked_at is null
-        and expires_at > now()
-      returning id`);
-    if (consumed.length === 0) {
-      throw new Error("This invite has already been used.");
-    }
+      // Atomic consume: only one concurrent redemption gets a row back.
+      const consumed = await tx.execute(sql`
+        update invites
+        set accepted_at = now()
+        where id = ${invite.id}
+          and accepted_at is null
+          and revoked_at is null
+          and expires_at > now()
+        returning id`);
+      if (consumed.length === 0) {
+        throw new RedeemError("This invite has already been used.");
+      }
 
-    // Create the user directly (the signup gate's hasValidInvite check would
-    // fail now that the invite is consumed, so insert + credential account
-    // in the same transaction).
-    const userId = crypto.randomUUID();
-    const passwordHash = await hashPassword(input.password);
-    await tx.insert(users).values({
-      id: userId,
-      email: invite.email,
-      name: input.name,
-      emailVerified: true,
-      role: "member",
-      banned: false,
+      // Create the user directly (the signup gate's hasValidInvite check would
+      // fail now that the invite is consumed, so insert + credential account
+      // in the same transaction).
+      const userId = crypto.randomUUID();
+      const passwordHash = await hashPassword(input.password);
+      await tx.insert(users).values({
+        id: userId,
+        email: invite.email,
+        name: input.name,
+        emailVerified: true,
+        role: "member",
+        banned: false,
+      });
+      await tx.insert(accounts).values({
+        id: crypto.randomUUID(),
+        userId,
+        providerId: "credential",
+        accountId: userId, // better-auth matches accountId === user.id
+        password: passwordHash,
+      });
+      await tx
+        .update(invites)
+        .set({ acceptedUserId: userId })
+        .where(eq(invites.id, invite.id));
+
+      return { userId };
     });
-    await tx.insert(accounts).values({
-      id: crypto.randomUUID(),
-      userId,
-      providerId: "credential",
-      accountId: userId, // better-auth matches accountId === user.id
-      password: passwordHash,
-    });
-    await tx
-      .update(invites)
-      .set({ acceptedUserId: userId })
-      .where(eq(invites.id, invite.id));
+  } catch (e) {
+    // A user row created between invite creation and redemption trips the
+    // users.email unique index inside the transaction — surface it as a
+    // user-facing error instead of a raw Postgres error.
+    if (isUniqueViolation(e)) {
+      throw new RedeemError("An account with this email already exists.");
+    }
+    throw e;
+  }
+}
 
-    return { userId };
-  });
+/** Walks the cause chain looking for a Postgres unique-violation (23505). */
+function isUniqueViolation(e: unknown): boolean {
+  let cur: unknown = e;
+  while (cur) {
+    if (typeof cur === "object" && cur !== null && "code" in cur) {
+      if ((cur as { code: unknown }).code === "23505") return true;
+    }
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return false;
 }
