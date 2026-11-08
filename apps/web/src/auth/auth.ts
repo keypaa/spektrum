@@ -5,6 +5,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { admin } from "better-auth/plugins";
+import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import { db } from "@spektrum/db";
 import * as schema from "@spektrum/db/schema";
 import { loadWebEnv } from "@spektrum/shared/env";
@@ -49,6 +50,18 @@ function createAuth() {
         // closed signup: a Google sign-in must not implicitly create an account
         disableImplicitSignUp: true,
       },
+      // spec §10.4: the GitHub provider is written but only enabled when
+      // credentials exist; it is never rendered in the UI before that.
+      ...(env.githubClientId && env.githubClientSecret
+        ? {
+            github: {
+              clientId: env.githubClientId,
+              clientSecret: env.githubClientSecret,
+              scope: ["read:user", "user:email"],
+              disableImplicitSignUp: true,
+            },
+          }
+        : {}),
     },
     account: {
       accountLinking: {
@@ -67,6 +80,11 @@ function createAuth() {
       expiresIn: 30 * 24 * 60 * 60, // 30 days
       updateAge: 24 * 60 * 60, // rolling refresh daily
       cookieCache: { enabled: false }, // bans visible on the next request
+      // spec §10.3: database sessions are the store of record. Redis secondary
+      // storage is an additional cache (and the rate-limit store), not the
+      // session store — otherwise flushing Redis resurrects revoked sessions
+      // and deleting a DB row leaves the cached one alive.
+      storeSessionInDatabase: true,
     },
     // spec §10.5: /api/auth/* limited by Better Auth itself, backed by Redis
     // so limits are shared across instances (5 sign-in attempts / 15 min / IP)
@@ -81,7 +99,14 @@ function createAuth() {
         "/sign-up/email": { window: 15 * 60, max: 5 },
       },
     },
-    plugins: [admin({ defaultRole: "member", adminRoles: ["admin"] })],
+    plugins: [
+      admin({
+        defaultRole: "member",
+        // spec §10.1: owner and admin both carry the admin access controller
+        adminRoles: ["owner", "admin"],
+        roles: { owner: adminAc, admin: adminAc, member: userAc },
+      }),
+    ],
     databaseHooks: {
       user: {
         create: {
