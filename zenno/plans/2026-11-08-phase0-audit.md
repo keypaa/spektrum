@@ -83,3 +83,29 @@ running the code, not just reading it: `pnpm typecheck`, `pnpm lint`,
 - Live smoke: bogus cookie → 307 to `/login` on pages, 401 JSON on APIs;
   banned user's pre-ban cookie → 307/401 immediately after ban; redeem route →
   400×5 then 429 + `Retry-After`, cross-origin → 403; `/api/health` → 200.
+
+## Post-audit follow-up (2026-11-09)
+
+Two Phase 0 exit checks were still open after the audit; both are now closed.
+
+- **Password-reset token lifecycle (spec §10.2).** Better Auth's defaults did
+  not meet the spec: identifiers were stored plaintext in Redis secondary
+  storage, the TTL defaulted to 1 hour, and `/change-password` left outstanding
+  reset tokens alive. Fix: `verification.storeInDatabase: true` +
+  `storeIdentifier` with a `reset-password:` override that SHA-256-hashes the
+  secret while keeping the prefix selectable per user, 30-minute
+  `resetPasswordTokenExpiresIn`, and thin route wrappers at
+  `/api/auth/reset-password` + `/api/auth/change-password` that clear the
+  user's remaining tokens after a successful write. The database hook could
+  not do this: `updateManyWithHooks` hands the hook an affected-row count, not
+  the account. Covered by `apps/web/src/auth/password-reset.test.ts`
+  (single use, sibling invalidation, change-password invalidation, expiry,
+  hash-only storage).
+- **Crixet Sans on `/login` in both themes.** Now automated in
+  `e2e/theme.spec.ts`: `data-theme` / `data-theme-preference`, `color-scheme`,
+  computed `font-family`, and loaded `Crixet Sans` faces in light and dark.
+
+Reset requests are not user-reachable yet: `emailAndPassword.sendResetPassword`
+is not configured, so `request-password-reset` returns
+`RESET_PASSWORD_DISABLED`. An email-provider decision is required before the
+forgot-password link can be enabled; the token lifecycle above is ready for it.

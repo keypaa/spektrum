@@ -1552,6 +1552,42 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/login
 
 Expected: `200`.
 
+> **Verification gap recorded 2026-11-09 — MinIO was never smoke-tested.**
+>
+> Compose defines two services beyond Postgres/Redis:
+>
+> - `minio` — the S3-compatible object store for file blobs, uploads and
+>   rendered PDFs/SyncTeX (spec §4, §12–13);
+> - `createbuckets` — a one-shot `minio/mc` job that creates
+>   `spektrum-uploads` and `spektrum-pdf` once `minio` is healthy.
+>
+> The build sandbox's registry proxy refuses to pull `minio/minio` and
+> `minio/mc`, so **neither service ever started here**. The Postgres and Redis
+> services do start and are healthy, and every Phase 0 check that depends on
+> them (migrations, auth, unit tests, e2e) was run for real. What remains
+> unverified is only the MinIO half:
+>
+> 1. the `minio` container starts and its `mc ready local` healthcheck passes;
+> 2. `createbuckets` completes and both buckets exist;
+> 3. the app can reach MinIO at the configured S3 endpoint and round-trip an
+>    object (put/get/delete).
+>
+> This does not block Phase 1 or CI (neither touches object storage), but it
+> **must be verified before Phase 3**, where the compile worker uploads PDFs
+> and SyncTeX maps to S3, and before any deployment.
+>
+> **Reminder for later:** on a machine with Docker Hub access, pin release tags
+> (do not ship `:latest`), then:
+>
+> ```bash
+> docker compose -f docker/compose.dev.yml up -d
+> docker compose -f docker/compose.dev.yml ps          # all four healthy
+> docker compose -f docker/compose.dev.yml logs createbuckets  # "buckets-ready"
+> ```
+>
+> Then exercise a real S3 round-trip against `http://localhost:9000` with the
+> dev credentials, and tick the MinIO item in the exit checklist with the date.
+
 - [x] **Step 5: Commit**
 
 ```bash
@@ -1613,7 +1649,10 @@ git commit -m "chore(ci): full pipeline and password list"
 ## Phase 0 exit checklist
 
 - [x] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all pass, on Node 26.13.0 / pnpm 12.18.0 from the repo pins.
-- [x] `docker compose -f docker/compose.dev.yml ps` shows healthy Postgres, Redis, MinIO.
+- [ ] `docker compose -f docker/compose.dev.yml ps` shows healthy Postgres, Redis, MinIO.
+  — Postgres and Redis verified healthy. **MinIO not verified in the build
+  sandbox** (registry proxy denies `minio/minio` and `minio/mc`); see the
+  verification-gap note under Task 16. Must be closed before Phase 3 / deploy.
 - [x] Owner exists via CLI; owner can sign in; wrong password shows the generic error.
 - [x] A direct `POST /api/auth/sign-up/email` from a stranger returns `403 invite_required` and creates no row.
 - [x] An invite can be created, redeemed once, and never twice (including concurrently).
@@ -1621,6 +1660,8 @@ git commit -m "chore(ci): full pipeline and password list"
 - [x] A stored BYOK key never appears in any response or log.
 - [x] Six failed logins produce `429` with `Retry-After`.
 - [x] `GET /login` in both themes renders Crixet Sans (check the computed font family).
+  — automated in `e2e/theme.spec.ts` (light + dark: `data-theme`, `color-scheme`,
+  computed `font-family`, and loaded `Crixet Sans` font faces).
 - [x] Design-token test passes; no component contains a hex literal.
 - [x] No emoji in the rendered DOM; every `<svg>` has `viewBox="0 0 16 16"` and uses `currentColor` only.
 - [x] No file named `middleware.ts` exists; the gate is `proxy.ts`.
