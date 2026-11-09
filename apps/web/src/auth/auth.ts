@@ -12,6 +12,7 @@ import { loadWebEnv } from "@spektrum/shared/env";
 import { hashPassword, verifyPassword } from "./password";
 import { assertSignupAllowed, hasValidInvite } from "./signup-gate";
 import { validateProviderUserInfo } from "./oauth-gate";
+import { RESET_TOKEN_PREFIX, hashResetIdentifier } from "./password-reset";
 import { redisSecondaryStorage } from "@spektrum/shared/rate-limit";
 
 function createAuth() {
@@ -37,6 +38,8 @@ function createAuth() {
       minPasswordLength: 12,
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
+      // spec §10.2: reset tokens live for 30 minutes
+      resetPasswordTokenExpiresIn: 30 * 60,
       password: {
         hash: hashPassword,
         verify: ({ hash, password }) => verifyPassword(hash, password),
@@ -85,6 +88,20 @@ function createAuth() {
       // session store — otherwise flushing Redis resurrects revoked sessions
       // and deleting a DB row leaves the cached one alive.
       storeSessionInDatabase: true,
+    },
+    // spec §10.2: verification values (reset tokens included) are stored
+    // hashed, and the database is the store of record — the Redis copy is only
+    // a cache. That makes single-use and password-change invalidation survive
+    // a cache flush. The reset-token override keeps the purpose prefix visible
+    // so outstanding tokens can be selected per user.
+    verification: {
+      storeInDatabase: true,
+      storeIdentifier: {
+        default: "hashed",
+        overrides: {
+          [RESET_TOKEN_PREFIX]: { hash: hashResetIdentifier },
+        },
+      },
     },
     // spec §10.5: /api/auth/* limited by Better Auth itself, backed by Redis
     // so limits are shared across instances (5 sign-in attempts / 15 min / IP)
