@@ -13,6 +13,20 @@ const STROKED = [
   "IconClose",
   "IconChevronDown",
   "IconChevronRight",
+  "IconList",
+  "IconGrid",
+  "IconPlus",
+  "IconMoreHorizontal",
+  "IconSortAscending",
+  "IconSortDescending",
+  "IconChevronExpand",
+  "IconDownload",
+  "IconSettings",
+  "IconKeyboard",
+  "IconFeedback",
+  "IconMail",
+  "IconLogOut",
+  "IconUser",
 ] as const;
 
 describe("icon registry", () => {
