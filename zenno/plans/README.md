@@ -12,7 +12,7 @@ previous one's exit criteria pass.
 | # | Plan | Scope | Exit criteria |
 |---|---|---|---|
 | 00 | `2026-11-07-00-foundations.md` | Repo reset, monorepo, tokens + fonts, DB schema, auth (credentials, invites, Google, ban ladder, BYOK), rate limits, dev compose, CI | Owner signs in; invite redeemed; tokens test green; CI green |
-| 01 | `2026-11-07-01-shell-dashboard.md` | Rail, dashboard, project rows, menus, dialogs, theme switcher, account menu | Visual diff vs dashboard references < 0.15 % |
+| 01 | `2026-11-07-01-shell-dashboard.md` | Dashboard shell, project rows, menus, dialogs, theme switcher component, account menu | Visual diff vs dashboard references ≤ 0.15 % |
 | 02 | `2026-11-07-02-editor.md` | Monaco + both themes, LaTeX grammar, folding, tabs, sidebar, file CRUD, composer shell, settings modal | Edit, switch tabs, reload; visual diff vs editor references |
 | 03 | `2026-11-07-03-compile-pdf-logs.md` | Worker, TeX image, latexmk, log parser, PDF viewer, SyncTeX, Logs panel | Type → PDF < 3 s; errors in Logs at the right line |
 | 04 | `2026-11-07-04-ai.md` | LLM proxy, BYOK resolution, context builder, tools, diffs, Fix with AI, Review paper, threads | Accept/reject edits; Fix with AI repairs a broken document |

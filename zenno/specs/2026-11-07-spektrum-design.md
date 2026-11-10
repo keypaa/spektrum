@@ -47,8 +47,10 @@ hooks we leave in place so they can be added without re-architecting.
 
 ### 2.1 Screenshots (primary visual evidence)
 
-Dark, 38 files, captured 2026-11-05 21:22–21:28, physical resolution **2530×1380**
-(CSS viewport ≈ 1918×1046, DPR ≈ 1.319):
+Dark, 38 files, captured 2026-11-05 21:22–21:28, physical resolution **2530×1380**.
+The browser chrome occupies **64 px left** (Chrome's vertical tab strip) and **53 px top**
+(toolbar), so the app region is **2466×1327 physical = 2182×1174 CSS** at
+`deviceScaleFactor: 1.13`. References are compared 1:1 — never rescaled.
 
 | # | File (suffix) | Shows |
 |---|---|---|
@@ -79,7 +81,7 @@ Light, 2 files, captured 2026-11-07 13:04:
 - `screenshot-2026-11-07_13-04-25-google-chrome.png` — editor, light
 
 **Supplemental, 8 files, captured 2026-11-07 21:01–21:06** — the four screens §2.5
-requested, plus four more. Same resolution (2530×1380), same account, same example
+requested, plus four more. Same app-region geometry: 2466×1327 physical = 2182×1174 CSS at DSF 1.13, same account, same example
 project. All but the sign-in page are **light** theme; the sign-in card is dark.
 
 | # | File (suffix) | Shows |
@@ -139,7 +141,7 @@ What remains genuinely unobtained is the server-side behaviour above.
 
 Kept so a later re-shoot is directly comparable with the existing 46.
 
-- Window at 2530×1380 physical (CSS viewport ≈ 1918×1046, DPR ≈ 1.319).
+- Window at 2530×1380 physical — same app-region geometry: 2466×1327 physical = 2182×1174 CSS at DSF 1.13 (64 px left + 53 px top browser chrome).
 - Same account, same example project (`main.tex` + `diagram.jpg`, compiled PDF, ≥2 chats).
 - Dark theme unless the screen has no dark precedent (the sign-in card is dark; the
   dashboard/editor chrome around it is light).
@@ -629,18 +631,22 @@ components, each rendering a single `<svg viewBox="0 0 16 16">`. Naming is
 
 ```
 IconSearch          IconChevronDown      IconChevronRight     IconChevronLeft
-IconGrid            IconList             IconSettings         IconPlus
-IconFolder          IconFolderPlus       IconFileTex          IconFileBib
-IconFileImage       IconFileCsv          IconChat             IconMoreHorizontal
-IconRefresh         IconPanelLeftClose   IconTools            IconSend
-IconStop            IconPaperclip        IconMic              IconSparkle
-IconWarning         IconError            IconInfo             IconCheck
-IconClose           IconZoomIn           IconZoomOut          IconFit
-IconFullscreen      IconExternalLink     IconDownload         IconTrash
-IconPencil          IconUpload           IconCopy             IconLink
-IconSortAscending   IconSortDescending   IconSidebar          IconLock
-IconEye             IconTerminal         IconArrowUp          IconArrowDown
+IconChevronExpand   IconGrid             IconList             IconSettings
+IconPlus            IconFolder           IconFolderPlus       IconFileTex
+IconFileBib         IconFileImage        IconFileCsv          IconChat
+IconMoreHorizontal  IconRefresh          IconPanelLeftClose   IconTools
+IconSend            IconStop             IconPaperclip        IconMic
+IconSparkle         IconWarning          IconError            IconInfo
+IconCheck           IconClose            IconZoomIn           IconZoomOut
+IconFit             IconFullscreen       IconExternalLink     IconDownload
+IconTrash           IconPencil           IconUpload           IconCopy
+IconLink            IconSortAscending    IconSortDescending   IconSidebar
+IconLock            IconEye              IconTerminal         IconArrowUp
+IconArrowDown       IconKeyboard         IconFeedback         IconMail
+IconLogOut          IconUser
 ```
+
+Fourteen names in that list are new in Phase 1: `IconGrid`, `IconList`, `IconPlus`, `IconMoreHorizontal`, `IconSortAscending`, `IconSortDescending`, `IconChevronExpand`, `IconDownload`, `IconSettings`, `IconKeyboard`, `IconFeedback`, `IconMail`, `IconLogOut`, `IconUser`. (The first eight are the dashboard header/list; the last six are the account menu and chip, §10.7.)
 
 **Geometry.** 16×16 grid; `fill="none"`; `stroke="currentColor"`; `stroke-width="1.5"`;
 `stroke-linecap="round"`; `stroke-linejoin="round"`. Solid marks (the status dot, the
@@ -653,7 +659,7 @@ their colour from `--notification-border-warning` (warning),
 (success/accent).
 
 **Size.** The component takes a `size` prop (default 16) and sets `width`/`height`; the
-viewBox never changes. Used sizes: 20 px in the icon rail, 16 px in toolbars and menus,
+viewBox never changes. Used sizes: 16 px in the dashboard header and account chip, 16 px in toolbars and menus,
 14 px in dense rows (file tree, chat list), 28 px for the composer's send button.
 
 **Accessibility.** An icon inside a labelled control is `aria-hidden="true"`. An
@@ -678,105 +684,54 @@ emoji, and every `<svg>` in the app must have a `viewBox` of `0 0 16 16` and no 
 
 ### 6.1 Global shell
 
-A 40 px icon rail pinned to the left edge, **always dark** in both themes
-(`#0f0f10`-ish; the rail is not part of the themed surface). It contains, top to bottom:
-
-1. Sidebar toggle (`IconSidebar`)
-2. Projects (`IconGrid`) — active state gets a `--nav-bg-active` rounded square
-3. Settings (`IconSettings`) — opens the settings modal
-4. Workspace/app shortcuts (see §6.2)
-5. Add (`IconPlus`) — new project
-
-Bottom of the rail is empty; the user chip lives at the bottom of the dashboard
-container, not in the rail.
+There is **no icon rail**. The dashboard and the editor occupy the full viewport width.
+The dark strip at the left of the reference captures is Chrome's vertical tab strip,
+not application UI. The account chip lives at the bottom-left of the dashboard page,
+below the project card (§6.2).
 
 ### 6.2 Dashboard
 
-Page background `--bg-app`. A single rounded container (`--radius-xl`, 1 px
-`--border-outline`, `--bg-primary`) inset by 16 px, filling the rest of the viewport.
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ shutdown banner (only when enabled)                                  │
-├──────────────────────────────────────────────────────────────────────┤
-│ Your Projects  [search] [IconList|IconGrid] [Import IconChevronDown] [IconPlus New IconChevronDown] │
-│ ──────────────────────────────────────────────────────────────────────────────────────────────── │
-│ Name IconSortAscending                                             Created IconSortDescending     │
-│ IconChevronRight thumbnail  Project name                            6mo        IconMoreHorizontal    │
-│ …                                                                                              │
-├────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ IconSidebar  Keyhayn Paumand IconChevronDown                                               │
-│    Personal workspace                                                                         │
-└────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-- Title `Your Projects`: 18/24, weight 400.
-- Search: 288 px pill, `--input-bg`, `IconSearch` 16 px, placeholder `Search`.
-- Segmented list/grid control: two 32 px icon buttons (`IconList`, `IconGrid`) in a
-  `--bg-tertiary` track, itself a rounded pill.
-- `Import` + `IconChevronDown` → menu: **Import archive (.zip, .tar.gz)**, **Import Folder**.
-- `IconPlus New` + `IconChevronDown` → menu: **Blank project**, **Example project**, **New folder**.
-- Row height 52 px; thumbnail 28×28 rounded 4 px; name 13/18 weight 500; relative
-  date 11/14 `--fg-tertiary`; `IconMoreHorizontal` appears on row hover and on keyboard
-  focus.
-- Column headers are sticky, 11/14 uppercase-ish tracking, with `IconSortAscending` /
-  `IconSortDescending` appearing on hover. The sort control is a text label with a
-  chevron, not a button — clicking the header sorts, the chevron shows direction.
-- **Empty state** (captured: rows 42–43): centred, `You don't have any projects yet`
-  (14/18, `--fg-secondary`), sub-copy `Start with a hosted project on Prism` (12/16,
-  `--fg-tertiary`), and a single primary button **Start from Scratch** (pill,
-  `--button-primary-bg`). Note the wording is *not* `No projects yet` — it is
-  `You don't have any projects yet`, and the button is `Start from Scratch`, not
-  `New project`.
-
-**Project row `⋯` menu** (captured: row 46). On hover of a project row, `IconMoreHorizontal`
-opens a rounded **white** (`#ffffff`) card anchored to the row (right edge, just below
-the row, with a small outward pointer and a soft drop shadow). Three items, no
-separators, no icons:
-
-1. **Rename**
-2. **Duplicate**
-3. **Delete** — `--fg-error` text, no confirmation dialog (the action is soft-undoable
-   via the Versions panel, §9.2)
-
-The menu does **not** contain `Download` (that is the file-row menu only) and does not
-contain `Share` (that is the `Tools` menu). Row hover also fades the thumbnail to 80%
-opacity and shifts the `IconMoreHorizontal` from `--fg-quaternary` to `--fg-secondary`.
-
-**Shutdown banner** (config-flag `SHUTDOWN_BANNER`, default **off** for us — it is
-Prism's own message): full-width strip **above** the dashboard chrome and below the
-browser chrome, background **`#f3ead4`** (a warm cream — this is *not* the neutral grey
-and is *not* `--notification-bg`), a 1 px top border in `--notification-border-warning`
-(`#ffb200`), text
-`Prism will shut down on January 1, 2027. Export your Prism projects before the
-shutdown date to keep a copy of your files.` + two buttons **Open export settings**
-(white pill with an `IconDownload` glyph) and **Migration guide** (white pill), and a
-close `IconClose` at the far right. Dismissible. Observed in rows 42–43.
+- Page background `--bg-app`; the page wrapper is `p-2` (8 px).
+- The page wrapper is `h-screen flex flex-col p-2`. The card has **no border** (the captures show a plain white card on `#f1f1f1`), is `rounded-xl`, background `--dashboard-card-bg` (light `#ffffff`, dark `#27282980` = `#1f1f20` over the page), inset **16 px left** (`ml-2` inside the `p-2` wrapper) and **10 px top / 8 px right** (measured), `flex-1 min-h-0`, and its bottom edge sits above the account chip.
+- Header: `px-5 py-3` around the 38 px controls, plus a 1 px `--project-list-divider` bottom border (the capture measures 70 physical = 62 CSS: 12+38+12+1).
+  - Title `Your Projects`: 18 px, default line-height 28, **weight 600**, `--text-nav-primary`.
+  - Search: exactly **300 px** wide (the capture measures 339 physical = 300 CSS), 38 px tall (`py-2` + `text-sm` + 2 borders), white in light / `--input-bg` (`#2a2a2a`) in dark, `IconSearch` 22 px at `start-3.5`, input `pl-12`, placeholder `Search` in `--text-editor-tertiary` (hidden on focus), border `--neutral-300` in light / `--search-input-border` in dark.
+  - Segmented list/grid control: natural **78 px** track (2×30 px icon buttons with 18 px icons + `gap-2` + `p-1`, +2 px border in light), 38 px tall, `--input-bg`, `rounded-full`, active pill `--optionmenu-bg-hover`.
+  - `Import`: secondary button, natural **100 CSS px** wide (113 physical), 36 px tall (`h-9`), text + `IconChevronDown` 16 px.
+  - `New`: primary button, natural **109 CSS px** wide (123 physical), 36 px tall (`h-9`), `IconPlus` + text + `IconChevronDown`.
+- Column header row: **34 px** tall (`py-2` + 18 px content), `px-5`, 12 px `--text-nav-secondary`; the 1 px divider below it belongs to the first row (`divide-y` on the list container), making the measured 40 physical between the two header dividers. Each header shows ONE 12 px indicator: inactive headers get `IconChevronExpand` in `--text-nav-tertiary`; the active header gets `IconSortAscending`/`IconSortDescending` in `--text-nav-secondary` (verified in ref 12: `Name` shows the stacked up-down glyph, `Created` shows a down chevron). Clicking a header sorts and flips direction; the header text brightens when active. A `w-[26px] h-[18px]` spacer after `Created` mirrors the `⋯` trigger's box (bundle `p8`).
+- Rows: **57.6 physical px pitch = 51 CSS** (a 50 px row box — `py-2` menu cell + `p-2` trigger + 18 px icon — plus the 1 px `--project-list-divider` owned by `divide-y` on the list container); `px-5`; thumbnail **50×40** (list mode has no border/background on the thumbnail container — the grid card does); name **14 px / weight 400** `--text-nav-primary`; relative date **12 px / weight 300** `--text-nav-secondary`, right-aligned in a 80 px (`w-20`) column; `IconMoreHorizontal` **always visible** (not hover-gated), 18 px inside a `p-2` trigger (34×34), `--fg-tertiary`.
+- Grid: `grid-cols-[repeat(auto-fill,minmax(128px,140px))] gap-x-4 gap-y-5 px-5 py-4`; card 148 px tall, thumbnail 88×68, name 13 px / weight 500.
+- Empty state: copy unchanged — `You don't have any projects yet` (**16/24 `--text-nav-primary`**), `Start with a hosted project on Prism` (**14/20, weight 300, `--text-nav-tertiary`**), primary pill `Start from Scratch` (`py-2 px-4`, `text-sm`, weight 300, ≈149×36 CSS px). The group is **top-anchored**, not vertically centred: a 100 px spacer above the heading, `gap-2`, `mb-2` on the heading, `m-4` around the button, 150 px spacer below (bundle source + measured in ref 43).
+- **Row `⋯` menu:** right-aligned, `sideOffset` 9 `align="end"` (bundle `hN`), `min-w-[200px]`, no pointer arrow, three items with no icons and no separators: `Rename`, `Duplicate`, `Delete`. `Delete` uses the same `--fg-primary`-family colour as the other two (the capture shows near-black, **not** `--fg-error`) because deletion is confirmed by the Versions panel, not a dialog.
+- **Account chip:** *below* the card, aligned with the card's content inset (`ml-2 px-5`), avatar 28 px with the owner's initial, name 14 px / weight 500, `IconUser` 12 px + `Personal workspace` 12 px `--fg-tertiary`, `IconChevronExpand` 12 px. Opens the §10.7 menu upward.
+- **Shutdown banner:** config flag `SHUTDOWN_BANNER`, default **off**. Rendered in a `px-2 pb-2 pt-2` wrapper: full width minus 8 px each side, **50 px** tall, `rounded-lg` with a 1 px **all-round** border, `px-3 py-2 pr-11`, background `bg-fg-warning/10`, border `border-notification-border-warning/25` (composites to light `#f2ead8` / border `#f6dca2`, dark `#2e2614` / border `#62480f`). Warning icon 18 px in `--tools-text-warning` (`#855600` light, `#ffe6b7` dark). Content: the exact copy (`Prism will shut down on January 1, 2027. Export your Prism projects before the shutdown date to keep a copy of your files.`; `text-sm leading-5`; title `font-semibold` in `--text-editor-primary`, description in `--text-editor-secondary`, both inline), then `Open export settings` (primary pill, `min-h-8 py-1.5`, `IconDownload`) and `Migration guide` (secondary pill, `border-border-outline bg-modal-bg`), then an absolutely positioned 32 px close button (`right-2`, vertically centred, `IconClose` 16 px). Dismissible; no margin of its own — the wrapper's `p-2` and the card's `mt-0.5` supply the spacing.
 
 ### 6.3 Editor view
 
 ```
-┌────┬────────────────────┬──────────────────────────────────┬──────────────┐
-│    │ project header     │ tab strip                        │ PDF / info   │
-│ 40 │ ────────────────── │ ──────────────────────────────── │              │
-│ px │ Files │ Chats      │ editor                           │              │
-│    │ ────────────────── │                                  │              │
-│rail│ file list          │                                  │              │
-│    │                    │ ──────────────────────────────── │              │
-│    │                    │ composer                         │              │
-├────┴────────────────────┴──────────────────────────────────┴──────────────┤
+┌────────────────────┬──────────────────────────────────┬──────────────┐
+│ project header     │ tab strip                        │ PDF / info   │
+│ ────────────────── │ ──────────────────────────────── │              │
+│ Files │ Chats      │ editor                           │              │
+│ ────────────────── │                                  │              │
+│ file list          │                                  │              │
+│                    │ ──────────────────────────────── │              │
+│                    │ composer                         │              │
+└────────────────────┴──────────────────────────────────┴──────────────┘
 ```
 
 Measurements at a 1440 px viewport (derived from the 2530-wide captures at DPR 1.319):
 
 | Region | Size |
 |---|---|
-| Icon rail | 40 px, full height, `--bg-primary`, 1 px right border `--border-app` |
 | Project sidebar | 370 px default, resizable 240–480, `--bg-sidepanel` |
 | Centre | flex, minimum 480 px |
 | Right pane | 600 px default, resizable 360–900, `--bg-preview` |
 | Tab strip | 48 px |
 | Composer block | 88 px (input 64 px + 24 px margins) |
+
+Phase 1 removed the rail (see §6.1); the editor plan re-states the remaining three-column layout.
 
 **Project sidebar.**
 
@@ -1270,9 +1225,10 @@ Non-negotiable, because we execute arbitrary TeX:
 
 ### 10.7 Account menu
 
-Avatar chip at the bottom of the dashboard and the editor sidebar, opening a card:
-`Settings`, `Keyboard shortcuts`, `Give feedback`, `<email>`, `Sign out`.
-(Prism's support/Discord rows are dropped.)
+Avatar chip at the bottom-left of the dashboard page (below the project card), opening a
+card upward: `Settings`, `Keyboard shortcuts`, `Give feedback`, `<email>`, `Sign out`.
+Each row carries a 16 px prefix icon: `IconSettings`, `IconKeyboard`, `IconFeedback`,
+`IconMail`, `IconLogOut`. (Prism's support/Discord rows are dropped.)
 
 ### 10.8 Sign-in page (captured — §2.1 rows 44–45)
 
@@ -1731,20 +1687,24 @@ import the 2026-11-05 archive, export, re-import, diff every `.tex` byte.
 (`dashboard--dark--1920.png`, `settings-editor--dark.png`, …) and record the mapping in
 `e2e/baselines/README.md`. They are the only baseline; nothing is fetched at test time.
 
-**Capture geometry.** The references are CSS 1918×1046 (2530×1380 at DPR 1.319). The
-harness therefore runs Playwright at `viewport: {width:1918, height:1046}`,
-`deviceScaleFactor: 1`, and compares against the references **rescaled to 1918×1046**
-with the browser chrome (browser tabs/URL bar, the OS screenshot toast) masked out.
+**Capture geometry.** The references are 2530×1380 physical; the app region is
+2466×1327 physical = 2182×1174 CSS at `deviceScaleFactor: 1.13`. The harness runs
+Playwright at `viewport: { width: 2182, height: 1174 }`, `deviceScaleFactor: 1.13`, and
+screenshots `[data-testid="app-root"]`. References are cropped to
+`(64, 53, 2530, 1380)` and compared 1:1 — never rescaled.
+
+**Masks.** Per-reference allow-list rectangles (physical pixels, full-capture
+coordinates) are recorded in `e2e/baselines/README.md`. They cover the OS screenshot
+toast and the row thumbnails, neither of which is reproducible. A masked pixel is
+excluded from both images before diffing.
 
 **Procedure per screen.**
 
-1. Seed a fixture account and the imported Prism archive (deterministic project list,
-   same names and relative dates frozen via a fixed clock).
+1. Seed the fixture account and the deterministic project list (Appendix B).
 2. Navigate, assert structural expectations (roles, texts, counts) *before* pixels.
-3. Screenshot the app region only (`[data-testid=app-root]`), not the page.
-4. Diff with `pixelmatch`: threshold 0.1, tolerance **0.15 % of differing pixels**, plus
-   an allow-list mask for animated regions (spinners, carets, relative dates).
-5. Failures upload a highlighted diff to CI artefacts.
+3. Screenshot `[data-testid="app-root"]`.
+4. Diff with `pixelmatch`: threshold 0.1, tolerance **0.15 % of differing pixels**.
+5. Failures upload actual + highlighted-diff artefacts to CI.
 
 **Coverage.** Exact-diff gates apply to the 20 screens with references: dashboard
 (dark/light), editor+PDF (dark/light), settings ×6, New/Import menus, New folder dialog,
@@ -1833,7 +1793,7 @@ them and the spec changes accordingly.
 | D1 | DB is the source of truth; autosave 400 ms debounce; compile reads persisted state | Keeps the compile payload small, makes `revision_hash` server-owned, avoids multi-MB requests |
 | D2 | `revision_hash` is a server-side hash over all non-hidden files | Deterministic cache key for `pdf_renders`; survives reloads |
 | D3 | SyncTeX is parsed server-side into JSON fractions | `pdfjs-dist` cannot read `.synctex.gz`; keeps the client thin |
-| D4 | Visual gate uses 1918×1046 captures against rescaled references | The references are 2530×1380 at DPR 1.319; 1440-wide captures could never match |
+| D4 | Visual gate uses 2182×1174 CSS at DSF 1.13 against references cropped to the app region | The references are 2530×1380 with 64 px left / 53 px top of browser chrome; the app region is 2466×1327 physical = 2182×1174 CSS at DSF 1.13. Rescaling is never needed |
 | D5 | Prism conversations are imported when `items[]` exists, skipped otherwise | Verified: 7 of 18 exports carry transcripts, 11 say `unsupported` |
 | D6 | `uploads/` and `prism-uploads/` contents are re-rooted with `\includegraphics` rewritten | Otherwise every imported paper breaks its figures |
 | D7 | Export mirrors Prism's archive layout | Makes round-trip an acceptance test |
@@ -1851,6 +1811,9 @@ them and the spec changes accordingly.
 | D19 | No emoji, no icon fonts, no Unicode glyphs as icons — every icon is an inline SVG component on a 16×16 grid | Emoji render differently per platform and break the pixel diffs; one hand-authored set keeps stroke weight consistent with Crixet Sans |
 | D20 | Thread titles are generated by the model (fast model, fire-and-forget), with a truncated-first-message fallback and a **Regenerate title** action | A first message is an instruction, not a title; a thread's focus often changes after the first exchange |
 | D21 | The neutral ramp is theme-independent — one ladder, only `--neutral-100` differs — and theme contrast comes from the semantic tokens | This is what Prism's CSS actually does; two ladders coexist and `--neutral-150`/`--neutral-450` exist only in `:root`. "Fixing" it would diverge from the reference |
+| D22 | No icon rail | The dark strip at the left of every capture is Chrome's vertical tab strip — it carries Chrome's tab-search buttons and tab favicons and is identical on the signed-out capture. Spec §6.1 deleted |
+| D23 | The account chip sits below the project card, not inside it | Refs 12 and 39 show the card ending ~76 CSS above the viewport bottom with the chip on the page background underneath |
+| D24 | Row-menu `Delete` is not red and `IconMoreHorizontal` is always visible | Ref 46 is the only row-menu capture: three near-black items, no pointer, and `⋯` on every row |
 
 ### 18.1 Repo reset (Phase 0, first action)
 
