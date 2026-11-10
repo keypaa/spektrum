@@ -18,6 +18,9 @@ const DARK = {
   "--ai-bg": "var(--neutral-900)",
   "--button-primary-bg": "var(--neutral-50)",
   "--button-primary-text": "var(--neutral-900)",
+  "--dashboard-card-bg": "#27282980",
+  "--background": "0 0% 3.9%",
+  "--input": "0 0% 14.9%",
 } as const;
 
 const LIGHT = {
@@ -31,6 +34,7 @@ const LIGHT = {
   "--ai-bg": "var(--neutral-50)",
   "--button-primary-bg": "var(--neutral-900)",
   "--shadow-surface": "0 10px 24px #0000001f,0 1px 2px #00000014",
+  "--dashboard-card-bg": "var(--neutral-50)",
 } as const;
 
 // Names declared only in :root — they survive in both themes because the

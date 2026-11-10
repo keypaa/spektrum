@@ -407,6 +407,7 @@
 
 html:not(.dark),html.dark .force-light {
 --neutral-50:#fff;
+--dashboard-card-bg: var(--neutral-50);
 --neutral-100:#f1f1f1;
 --neutral-200:#cdcdcd;
 --neutral-300:#afafaf;
@@ -684,6 +685,15 @@ html:not(.dark),html.dark .force-light {
 
 html.dark,html:not(.dark) .force-dark {
 --neutral-50:#fff;
+/* --dashboard-card-bg is a Spektrum addition, not from the recon extraction.
+ * 50 percent opaque #272829 composites to #1f1f20 over the dark page #161616 */
+--dashboard-card-bg: #27282980;
+/* --background and --input dark values come from the bundled CSS
+ * (zenno/recon/css), not from the tokens root/light/dark extraction files.
+ * Keep them so a future re-extraction does not delete them. The :root block
+ * carries the light values 0 0% 100% and 0 0% 89.8% */
+--background: 0 0% 3.9%;
+--input: 0 0% 14.9%;
 --neutral-100:#e8e8e8;
 --neutral-200:#cdcdcd;
 --neutral-300:#afafaf;
