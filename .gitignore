@@ -9,3 +9,5 @@ coverage/
 *.tsbuildinfo
 playwright-report/
 test-results/
+# superpowers SDD scratch workspaces
+.superpowers/
