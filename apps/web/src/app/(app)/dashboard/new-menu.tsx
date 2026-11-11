@@ -12,7 +12,7 @@ export function NewMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button className="justify-between">
+          <Button>
             <IconPlus size={16} />
             New
             <IconChevronDown size={16} />

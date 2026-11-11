@@ -16,9 +16,7 @@ export function LayoutToggle({
     <div
       role="group"
       aria-label="Layout"
-      // Bundle: border neutral-300 in light only (`!isDark && "border ..."`);
-      // dark has no border on the toggle.
-      className="flex h-[38px] flex-row items-center gap-2 rounded-full border border-[color:var(--neutral-300)] bg-input-bg p-1 dark:border-transparent"
+      className="flex h-9 flex-row items-center gap-2 rounded-full border border-[color:var(--neutral-300)] bg-input-bg p-1 dark:border-transparent"
     >
       {(["list", "grid"] as const).map((value) => (
         <button
@@ -29,11 +27,11 @@ export function LayoutToggle({
           data-testid={value === "list" ? "layout-list" : "layout-grid"}
           onClick={() => onChange(value)}
           className={cn(
-            // Bundle: `p-1.5` + an 18 px (text-lg, 1em) icon = a 30 px button.
-            "flex h-[30px] w-[30px] items-center justify-center rounded-full p-1.5",
+            "rounded-full p-1.5 text-lg transition-all duration-200",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-button-primary-bg",
             layout === value
               ? "bg-optionmenu-bg-hover text-fg-primary"
-              : "text-fg-tertiary hover:text-fg-secondary",
+              : "cursor-pointer text-fg-tertiary",
           )}
         >
           {value === "list" ? <IconList size={18} /> : <IconGrid size={18} />}

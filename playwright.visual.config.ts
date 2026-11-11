@@ -33,6 +33,7 @@ export default defineConfig({
     animations: "disabled",
     caret: "hide",
     trace: "off",
+    channel: "chrome",
   },
   projects: [
     {

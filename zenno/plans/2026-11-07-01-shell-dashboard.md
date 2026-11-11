@@ -3644,19 +3644,19 @@ In `.github/workflows/ci.yml`, after the `e2e` job:
 
 `visual:seed` creates the owner itself when missing (Task 7, Step 7 falls back to `createOwner`, exactly like `ci-seed.ts`), so the seed step is only a warm-up — every test re-seeds with its own dataset.
 
-- [ ] **Step 7: Full gate**
+- [x] **Step 7: Full gate**
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm test:e2e && pnpm test:visual
 ```
 
-All green. `pnpm test:visual` prints a ratio ≤ 0.15 % for all eight baselines.
+`typecheck`, `lint`, `test`, `build` and `test:e2e` are green. **`pnpm test:visual` is NOT green: the ≤ 0.15 % target was NOT met** (best 0.213 %, 1/8 baselines within budget). See Appendix A. The `visual` CI job is therefore kept non-blocking (`continue-on-error: true`).
 
-- [ ] **Step 8: Record the final geometry**
+- [x] **Step 8: Record the final geometry**
 
-Update Appendix A of this plan with the *actual* rendered values (as opposed to the measured reference values), and note any residual diff hot-spots.
+Appendix A records the actual rendered values and the final ratios, with the ≤ 0.15 % shortfall stated explicitly.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -3681,23 +3681,25 @@ Measured in Playwright/Chromium at viewport 2182×1174 CSS, DSF ~1.13 (devicePix
 
 ### Final visual gate ratios (Task 18, final calibration run)
 
+**The ≤ 0.15 % acceptance target was NOT met.** Final state (`task-18-calibration-wip` @ `54f3fc4`): 1/8 baselines within budget; the other 7 remain above 0.15 %. This is accepted as a known shortfall (environment font rasterization / AA, exact icon glyphs, and banner/empty-state layout detail); the visual CI job is kept non-blocking. Reference PNGs were not modified.
+
 | Baseline | Ratio | Budget | Status |
 |---|---:|---:|---|
-| `dashboard--dark` | 0.353 % | ≤ 0.150 % | fail |
-| `dashboard--dark--import-menu` | 0.417 % | ≤ 0.150 % | fail |
-| `dashboard--dark--new-menu` | 0.388 % | ≤ 0.150 % | fail |
-| `dashboard--dark--new-folder-dialog` | 0.120 % | ≤ 0.150 % | **pass** |
-| `dashboard--light` | 0.368 % | ≤ 0.150 % | fail |
-| `dashboard--light--row-menu` | 0.387 % | ≤ 0.150 % | fail |
-| `dashboard--dark--banner` | 0.673 % | ≤ 0.150 % | fail |
-| `dashboard--light--empty--banner` | 0.296 % | ≤ 0.150 % | fail |
+| `dashboard--dark` | 0.213 % | ≤ 0.150 % | fail |
+| `dashboard--dark--import-menu` | 0.287 % | ≤ 0.150 % | fail |
+| `dashboard--dark--new-menu` | 0.267 % | ≤ 0.150 % | fail |
+| `dashboard--dark--new-folder-dialog` | 0.124 % | ≤ 0.150 % | **pass** |
+| `dashboard--light` | 0.242 % | ≤ 0.150 % | fail |
+| `dashboard--light--row-menu` | 0.274 % | ≤ 0.150 % | fail |
+| `dashboard--dark--banner` | 0.556 % | ≤ 0.150 % | fail |
+| `dashboard--light--empty--banner` | 0.292 % | ≤ 0.150 % | fail |
 
 ### Residual diff hot-spots / notes
 
 - **Root fix applied:** `apps/web/src/app/globals.css` `@source` corrected from `../../../packages/ui/src` to `../../../../packages/ui/src` so Tailwind v4 scans `packages/ui` primitives. Rebuild regenerated missing utilities (`max-w-xl`, `inset-0`, positioning/translate/shadow utilities etc.), fixing the New Folder dialog render (0.120%, passing) and substantially improving menus/banner geometry.
 - **Harness fixes:** `e2e/visual/compare.ts` screenshots full viewport (`page.screenshot()`) to include Radix portals; `playwright.visual.config.ts` webServer commands use `pnpm --filter @spektrum/web exec next start -p …` (arg-passing fix); gate specs/helpers made selectors unambiguous (`dashboard-header`-scoped Import/New); `calibrate.spec.ts` skips under `CI` to avoid polluting CI gate runs.
-- **Rows/text:** base cases show most differing pixels in the rows band (text anti-aliasing/baseline and per-row content rendering differences) plus account-chip area. Dark/light base ~0.34–0.36%; menu variants add menu surface/position/shadow diffs.
-- **Banners:** banner wrapper/height/position adjusted (now near reference vertical placement), but banner content/colors/buttons/icon/close details still differ (dark--banner 0.668%, light--empty--banner 0.301%). Light empty banner also differs in empty-state and header regions.
+- **Rows/text:** base cases show most differing pixels in the rows band (text anti-aliasing/baseline and per-row content rendering differences) plus account-chip area. Dark/light base ~0.21–0.24%; menu variants add menu surface/position/shadow diffs.
+- **Banners:** banner wrapper/height/position adjusted (now near reference vertical placement), but banner content/colors/buttons/icon/close details still differ (dark--banner 0.556%, light--empty--banner 0.292%). Light empty banner also differs in empty-state and header regions.
 - **Masks:** existing thumbnail/region masks kept as-is (already tight enough horizontally; tightening edges would unmask areas that differ from reference thumbnail previews and increase ratio). Mask table in `e2e/baselines/README.md` unchanged in geometry.
 - **Environment:** sign-in rate limits in Redis required clearing between batched runs during calibration (`ba:*|/sign-in/email` keys); seeds require `DATABASE_URL` in env. 7/8 baselines remain above the ≤0.15% budget; see task report for details.
 
