@@ -4,8 +4,16 @@ import { useState } from "react";
 import type { ProjectRow } from "@/lib/projects";
 import { ShutdownBanner } from "./shutdown-banner";
 import { DashboardHeader } from "./header";
+import type { Layout } from "./layout-toggle";
 import { ProjectList } from "./project-list";
 import { AccountChip } from "./account-chip";
+
+export type SortKey = "name" | "created";
+export type SortDirection = "asc" | "desc";
+export interface Sort {
+  key: SortKey;
+  direction: SortDirection;
+}
 
 export function DashboardClient({
   userName,
@@ -19,6 +27,9 @@ export function DashboardClient({
   bannerEnabled: boolean;
 }) {
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [query, setQuery] = useState("");
+  const [layout, setLayout] = useState<Layout>("list");
+  const [sort, setSort] = useState<Sort>({ key: "created", direction: "desc" });
 
   return (
     <div
@@ -37,8 +48,19 @@ export function DashboardClient({
         data-testid="dashboard-card"
         className="ml-2 mt-0.5 min-h-0 flex-1 rounded-xl bg-dashboard-card-bg"
       >
-        <DashboardHeader />
-        <ProjectList projects={projects} />
+        <DashboardHeader
+          query={query}
+          onQueryChange={setQuery}
+          layout={layout}
+          onLayoutChange={setLayout}
+        />
+        <ProjectList
+          projects={projects}
+          query={query}
+          layout={layout}
+          sort={sort}
+          onSort={setSort}
+        />
       </main>
       <AccountChip userName={userName} userEmail={userEmail} />
     </div>

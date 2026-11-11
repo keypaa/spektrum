@@ -13,25 +13,28 @@
     "visual:seed": "tsx src/cli/visual-seed.ts"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.18",
+    "@node-rs/argon2": "2.2.2",
+    "@spektrum/db": "workspace:*",
+    "@spektrum/shared": "workspace:*",
+    "@spektrum/ui": "workspace:*",
+    "better-auth": "1.7.18",
+    "drizzle-orm": "0.45.4",
     "next": "16.4.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "better-auth": "1.7.18",
-    "@better-auth/drizzle-adapter": "1.7.18",
-    "@node-rs/argon2": "2.2.2",
-    "drizzle-orm": "0.45.4",
     "tsx": "4.23.15",
-    "zod": "4.6.7",
-    "@spektrum/db": "workspace:*",
-    "@spektrum/shared": "workspace:*",
-    "@spektrum/ui": "workspace:*"
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "6.0.3",
+    "jsdom": "31.0.0",
+    "postcss": "^8.5.0",
     "tailwindcss": "4.3.5",
-    "@tailwindcss/postcss": "^4.0.0",
-    "postcss": "^8.5.0"
+    "typescript": "6.0.3"
   }
 }
