@@ -1,29 +1,8 @@
 "use client";
 
-import { IconMoreHorizontal } from "@spektrum/ui/icons";
 import { relativeTime } from "@/lib/relative-time";
 import type { ProjectRow as ProjectRowModel } from "@/lib/projects";
-
-function RowMenu({
-  project,
-  layout = "list",
-}: {
-  project: ProjectRowModel;
-  onRename: (project: ProjectRowModel) => void;
-  layout?: "list" | "grid";
-}) {
-  return (
-    <div className={layout === "grid" ? "absolute right-0 top-0 flex-none text-fg-tertiary" : "flex-none py-2 text-fg-tertiary"}>
-      <button
-        type="button"
-        aria-label={`${project.name} actions`}
-        className="flex items-center justify-center rounded-md p-2 text-fg-tertiary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-button-primary-bg"
-      >
-        <IconMoreHorizontal size={18} />
-      </button>
-    </div>
-  );
-}
+import { RowMenu } from "./row-menu";
 
 export function ProjectRow({
   project,

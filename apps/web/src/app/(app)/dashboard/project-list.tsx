@@ -6,19 +6,10 @@ import { ColumnHeader, type Sort } from "./column-header";
 import { ProjectGrid } from "./project-grid";
 import { ProjectRow } from "./project-row";
 import type { Layout } from "./layout-toggle";
+import { RenameDialog } from "./rename-dialog";
 
 function EmptyState() {
   return <div data-testid="project-empty-state" />;
-}
-
-function RenameDialog({
-  project: _project,
-  onOpenChange: _onOpenChange,
-}: {
-  project: ProjectRowModel | null;
-  onOpenChange: () => void;
-}) {
-  return null;
 }
 
 export function sortProjects(projects: ProjectRowModel[], sort: Sort): ProjectRowModel[] {
