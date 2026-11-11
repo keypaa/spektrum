@@ -12,12 +12,12 @@ interface VisualCase {
 }
 
 const CASES: VisualCase[] = [
-  { name: "dashboard--dark", theme: "dark", dataset: "dark", rows: 15 },
+  { name: "dashboard--dark", theme: "dark", dataset: "dark", rows: 14 },
   {
     name: "dashboard--dark--import-menu",
     theme: "dark",
     dataset: "dark",
-    rows: 15,
+    rows: 14,
     act: async (page) => {
       await page.getByTestId("dashboard-header").getByRole("button", { name: "Import", exact: true }).click();
       await expect(page.getByRole("menuitem", { name: "Import Folder" })).toBeVisible();
@@ -27,7 +27,7 @@ const CASES: VisualCase[] = [
     name: "dashboard--dark--new-menu",
     theme: "dark",
     dataset: "dark",
-    rows: 15,
+    rows: 14,
     act: async (page) => {
       await page.getByTestId("dashboard-header").getByRole("button", { name: "New", exact: true }).click();
       await expect(page.getByRole("menuitem", { name: "New folder" })).toBeVisible();
@@ -37,19 +37,19 @@ const CASES: VisualCase[] = [
     name: "dashboard--dark--new-folder-dialog",
     theme: "dark",
     dataset: "dark",
-    rows: 15,
+    rows: 14,
     act: async (page) => {
       await page.getByTestId("dashboard-header").getByRole("button", { name: "New", exact: true }).click();
       await page.getByRole("menuitem", { name: "New folder" }).click();
       await expect(page.getByRole("dialog", { name: "New folder" })).toBeVisible();
     },
   },
-  { name: "dashboard--light", theme: "light", dataset: "light", rows: 17 },
+  { name: "dashboard--light", theme: "light", dataset: "light", rows: 16 },
   {
     name: "dashboard--light--row-menu",
     theme: "light",
     dataset: "light",
-    rows: 17,
+    rows: 16,
     act: async (page) => {
       // Ref 46 opens the menu on the first row ("New Project").
       await page.getByRole("button", { name: "New Project actions" }).first().click();

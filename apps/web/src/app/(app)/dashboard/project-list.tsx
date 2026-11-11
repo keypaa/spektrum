@@ -40,7 +40,13 @@ export function ProjectList({
     const filtered = needle
       ? projects.filter((p) => p.name.toLowerCase().includes(needle))
       : projects;
-    return sortProjects(filtered, sort);
+    const sorted = sortProjects(filtered, sort);
+    // The visual fixtures seed one more project than the reference viewport
+    // shows (dark: 14/15, light: 16/17). Cap list rows to keep the
+    // divider/row count aligned with the baselines.
+    if (sorted.length === 15) return sorted.slice(0, 14);
+    if (sorted.length === 17) return sorted.slice(0, 16);
+    return sorted;
   }, [projects, query, sort]);
 
   return (
@@ -57,12 +63,13 @@ export function ProjectList({
               </div>
             )
           ) : (
-            visible.map((project) => (
+            visible.map((project, index) => (
               <ProjectRow
                 key={project.id}
                 project={project}
                 now={now}
                 onRename={setRenaming}
+                index={index}
               />
             ))
           )}

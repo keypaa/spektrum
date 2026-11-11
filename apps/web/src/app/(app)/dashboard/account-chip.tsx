@@ -17,7 +17,8 @@ export function AccountChip({
         <button
           type="button"
           data-testid="account-chip"
-          className="ml-2 mt-[18px] flex w-fit items-start gap-1.5 self-start rounded-lg px-5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-button-primary-bg"
+          className="ml-2 mt-[12.69px] flex w-fit items-start gap-1.5 self-start rounded-lg px-5 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-button-primary-bg"
+          style={{ transform: "translateY(-8px)" }}
         >
           {/* Bundle `mK` fallback avatar: 28 px, bg-button-secondary-bg,
               text-button-secondary-text, initial uppercase. */}

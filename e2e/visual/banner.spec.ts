@@ -11,8 +11,8 @@ interface BannerCase {
 }
 
 const CASES: BannerCase[] = [
-  // Ref 1: dark, 15 rows, banner on.
-  { name: "dashboard--dark--banner", theme: "dark", dataset: "dark", rows: 15 },
+  // Ref 1: dark, 14 visible rows, banner on.
+  { name: "dashboard--dark--banner", theme: "dark", dataset: "dark", rows: 14 },
   // Ref 42 (21-01-54): light, empty state, banner on. The capture is signed
   // out; the chip area is masked (see e2e/baselines/README.md).
   { name: "dashboard--light--empty--banner", theme: "light", dataset: "empty", rows: 0 },

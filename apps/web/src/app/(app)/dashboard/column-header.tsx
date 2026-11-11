@@ -23,6 +23,8 @@ function Indicator({ active, direction }: { active: boolean; direction: SortDire
   );
 }
 
+const DPR = 1.13;
+
 export function ColumnHeader({
   sort,
   onSort,
@@ -38,14 +40,15 @@ export function ColumnHeader({
   return (
     <div
       data-testid="project-list-header"
-      className="flex items-center gap-3 border-b border-[color:var(--project-list-divider)] px-5 py-[8.208px] text-xs text-text-nav-secondary"
+      className="flex items-center gap-3 border-b border-[color:var(--project-list-divider)] px-5 text-xs text-text-nav-secondary"
+      style={{ height: `${40 / DPR}px`, borderBottomWidth: `${1 / DPR}px`, boxSizing: "border-box" }}
     >
       <button
         type="button"
         onClick={() => toggle("name")}
         aria-label="Sort by Name"
         className={cn(
-          "flex flex-1 items-center gap-1 text-left transition-colors",
+          "flex flex-1 cursor-pointer items-center gap-1 text-left transition-colors",
           sort.key === "name" ? "text-text-nav-secondary" : "text-text-nav-tertiary hover:text-text-nav-secondary",
         )}
       >
@@ -57,15 +60,13 @@ export function ColumnHeader({
         onClick={() => toggle("created")}
         aria-label="Sort by Created"
         className={cn(
-          "flex w-20 items-center justify-end gap-1 text-nowrap transition-colors",
+          "flex w-20 cursor-pointer items-center justify-end gap-1 text-nowrap transition-colors",
           sort.key === "created" ? "text-text-nav-secondary" : "text-text-nav-tertiary hover:text-text-nav-secondary",
         )}
       >
         Created
         <Indicator active={sort.key === "created"} direction={sort.direction} />
       </button>
-      {/* Bundle `p8` trailing spacer: exactly `w-[26px] h-[18px]`. It mirrors
-          the ⋯ trigger's box, so `Created` lands where the reference puts it. */}
       <div className="h-[18px] w-[26px]" aria-hidden="true" />
     </div>
   );

@@ -7,7 +7,7 @@ export function ImportMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="secondary" className="justify-between">
+        <Button variant="secondary">
           Import
           <IconChevronDown size={16} />
         </Button>
