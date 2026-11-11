@@ -123,3 +123,63 @@ jobs:
           E2E_WEB_COMMAND: pnpm --filter @spektrum/web start
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+
+  visual:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: spektrum
+          POSTGRES_PASSWORD: spektrum
+          POSTGRES_DB: spektrum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U spektrum -d spektrum"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Build
+        run: pnpm build
+      - name: Create + migrate visual database
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=spektrum psql -h localhost -U spektrum -d postgres \
+            -c "CREATE DATABASE spektrum_test" || true
+          PGPASSWORD=spektrum psql -h localhost -U spektrum -d spektrum_test \
+            -c "CREATE EXTENSION IF NOT EXISTS citext"
+          pnpm db:migrate
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+      - name: Seed owner and dark fixture
+        run: pnpm --filter @spektrum/web visual:seed dark
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          E2E_OWNER_EMAIL: owner@spektrum.local
+          E2E_OWNER_PASSWORD: owner-password-123
+      - name: Visual diff
+        run: pnpm test:visual
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          E2E_OWNER_EMAIL: owner@spektrum.local
+          E2E_OWNER_PASSWORD: owner-password-123
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-artifacts
+          path: e2e/visual/artifacts/
+          if-no-files-found: ignore

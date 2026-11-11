@@ -85,7 +85,10 @@ export async function compareAgainstReference(
   const reference = cropToAppRegion(
     PNG.sync.read(readFileSync(join(REF_DIR, `${name}.png`))),
   );
-  const screenshot = await page.locator('[data-testid="app-root"]').screenshot();
+  // The dialog is Radix-portaled to <body>, outside `[data-testid="app-root"]`,
+  // so element screenshots would miss it. A full-viewport screenshot captures the
+  // same 2182×1174 CSS app region (2466×1327 at DSF 1.13) including portals.
+  const screenshot = await page.screenshot();
   const shot = PNG.sync.read(Buffer.from(screenshot));
   // DSF 1.13 turns 2182x1174 CSS into 2465.7x1326.6 physical, so the element
   // screenshot can come back one pixel larger than the reference. Cropping from

@@ -33,3 +33,19 @@ export async function setTheme(page: Page, theme: "light" | "dark"): Promise<voi
     [THEME_KEY, theme],
   );
 }
+
+export async function expectDashboardReady(page: Page, rows: number): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Your Projects" })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const header = page.getByTestId("dashboard-header");
+  await expect(header.getByRole("button", { name: "Import", exact: true })).toBeVisible();
+  await expect(header.getByRole("button", { name: "New", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sort by Name/ })).toBeVisible();
+  await expect(page.getByTestId("account-chip")).toBeVisible();
+  if (rows === 0) {
+    await expect(page.getByText("You don't have any projects yet")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start from Scratch" })).toBeVisible();
+  } else {
+    await expect(page.getByTestId(/^project-card-/)).toHaveCount(rows);
+  }
+}

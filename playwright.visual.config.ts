@@ -52,7 +52,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "pnpm --filter @spektrum/web start -- -p 3000",
+      command: "pnpm --filter @spektrum/web exec next start -p 3000",
       url: "http://localhost:3000/login",
       // Never reuse: a `pnpm dev` server on 3000 renders a different page
       // (dev overlay, unminified CSS) and would silently corrupt the diff.
@@ -65,7 +65,7 @@ export default defineConfig({
       },
     },
     {
-      command: "pnpm --filter @spektrum/web start -- -p 3100",
+      command: "pnpm --filter @spektrum/web exec next start -p 3100",
       url: "http://localhost:3100/login",
       reuseExistingServer: false,
       timeout: 120_000,

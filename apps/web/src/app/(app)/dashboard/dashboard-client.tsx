@@ -32,11 +32,11 @@ export function DashboardClient({
       data-testid="app-root"
       className="flex h-screen flex-col bg-bg-app p-2 text-fg-primary"
     >
-      {/* Bundle `_k`: the banner sits in a `px-2 pt-2` (plus `pb-2`) wrapper,
-          so its box is inset 8 CSS on the top/sides and the card follows after
-          8 + 2 (`mt-0.5`) CSS — measured: banner y 62–117, card top y 130. */}
+      {/* Bundle `_k`: the banner sits inside the app-root p-2 gutter; pb-2 keeps
+          the 8 CSS gap before the card (which follows after 8 + mt-0.5 = 10 CSS,
+          measured: banner y 62–117, card top y 130 in the full capture). */}
       {bannerEnabled && bannerVisible && (
-        <div className="shrink-0 px-2 pb-2 pt-2">
+        <div className="shrink-0 pb-2">
           <ShutdownBanner onClose={() => setBannerVisible(false)} />
         </div>
       )}

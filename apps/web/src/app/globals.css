@@ -2,7 +2,7 @@
 @import "@spektrum/ui/styles";
 
 @custom-variant dark (&:where(.dark, .dark *));
-@source "../../../packages/ui/src";
+@source "../../../../packages/ui/src";
 
 @theme {
   --color-bg-app: var(--bg-app);
