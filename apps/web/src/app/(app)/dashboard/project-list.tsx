@@ -3,14 +3,11 @@
 import { useMemo, useState } from "react";
 import type { ProjectRow as ProjectRowModel } from "@/lib/projects";
 import { ColumnHeader, type Sort } from "./column-header";
+import { EmptyState } from "./empty-state";
 import { ProjectGrid } from "./project-grid";
 import { ProjectRow } from "./project-row";
 import type { Layout } from "./layout-toggle";
 import { RenameDialog } from "./rename-dialog";
-
-function EmptyState() {
-  return <div data-testid="project-empty-state" />;
-}
 
 export function sortProjects(projects: ProjectRowModel[], sort: Sort): ProjectRowModel[] {
   return [...projects].sort((a, b) => {
