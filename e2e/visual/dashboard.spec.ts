@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { compareAgainstReference, VISUAL_BUDGET } from "./compare";
-import { seedVisualFixture } from "./fixtures";
-import { login, setTheme } from "./helpers";
+import { login, seedVisualFixture, setTheme } from "./helpers";
 
 test("dashboard dark matches the reference", async ({ page }) => {
   seedVisualFixture("dark");

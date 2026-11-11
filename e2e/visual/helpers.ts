@@ -1,5 +1,7 @@
 import { expect, type Page } from "@playwright/test";
+import { seedVisualFixture } from "./fixtures";
 
+export { seedVisualFixture };
 export const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
 export const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD ?? "owner-password-123";
 export const THEME_KEY = "crixet_light_mode_preference_v1";
