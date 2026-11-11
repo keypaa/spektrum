@@ -13,6 +13,10 @@ test("owner signs in and lands on the dashboard shell", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
   await expect(page.getByText("Your Projects")).toBeVisible();
+  await expect(page.getByTestId("app-root")).toBeVisible();
+  await expect(page.getByTestId("dashboard-card")).toBeVisible();
+  await expect(page.getByTestId("account-chip")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your Projects" })).toBeVisible();
 });
 
 test("wrong password keeps the user on the login page", async ({ page }) => {

@@ -2,6 +2,9 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // The visual suite has its own config (playwright.visual.config.ts) and its
+  // own two-server setup; the behavioural suite must never pick it up.
+  testIgnore: "**/visual/**",
   timeout: 30_000,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",

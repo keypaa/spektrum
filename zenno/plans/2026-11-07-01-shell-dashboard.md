@@ -3665,50 +3665,41 @@ git commit -m "test(visual): calibrate dashboard to the reference captures and g
 
 ---
 
-## Appendix A — Measured geometry (physical px in the 2530×1380 captures; CSS = physical / 1.13)
+## Appendix A — Actual rendered geometry (Task 18 calibration, 2026-11-11)
 
-| Element | Physical | CSS | Source |
-|---|---|---|---|
-| Chrome chrome | 64 left, 53 top | — | all refs |
-| App region | 2466×1327 | 2182×1174 (DSF 1.13) | all refs |
-| Card left edge | x=82 | 16.0 (`p-2` 8 + `ml-2` 8) | 12, 39 |
-| Card right edge | x=2519 | 9.7 (`p-2` 8 + antialiasing) | 12, 39 |
-| Card top edge (no banner) | y=64 | 9.7 (`p-2` 8 + `mt-0.5` 2) | 12, 39 |
-| Card top edge (banner) | y=130 | 68.1 (`p-2` 8 + banner 50 + gap 8 + `mt-0.5` 2) | 1, 43 |
-| Card bottom edge | y=1296 (1297 with card border) | — | 12, 39 |
-| Header divider | y=134 | header 62 CSS + 1 px divider (`py-3` + 38 px controls) | 12, 39 |
-| Column-header divider | y=174 | 34 CSS header (`py-2` + 18) + 1 px divider owned by row 1 | 12, 39 |
-| Row dividers (dark, no banner) | 174, 231, 289, 347, 404, 462, 520, 577, 635, 693, 750, 808, 866, 923, 981 | 57.6 pitch = 51 CSS (50 box + 1 divider), 15 rows | 12 |
-| Row dividers (dark, banner) | 200, 239, 297, 355, 412, 470, 527, 585, 643, 700, 758, 816, 873, 931, 989, 1046 | same pitch | 1 |
-| Row dividers (light) | 134, 174, 231, …, 1038, 1096 | same pitch, 17 rows | 39 |
-| Search pill | x 1793–2131, y 78–120 | 339×43 = **300×38** | 13 |
-| Layout toggle | x 2146–2233, y 78–120 | 88×43 = 78×38 (76 + 2 border) | 13 |
-| Import button | x 2248–2360, y 79–119 | 113×41 = 100×36 (`h-9`) | 13 |
-| New button | x 2374–2496, y 79–119 | 123×41 = 109×36 (`h-9`) | 13 |
-| Header gaps | 14–15 physical between controls | 12–13 CSS (`gap-3`) | 13 |
-| Title `Your Projects` | x 105–228, y 91–108 | `px-5` inset, 18 px / 28 weight 600 | 12, 39 |
-| Column header text | y 149–158 | 12 px font | 12, 39 |
-| Row name | y 197–210 | 14 px font, weight 400 | 12, 39 |
-| Row date | y 197–206 | 12 px font, weight 300, `w-20` right | 12, 39 |
-| Import menu | x 2127–2359, y 130–229 | 211×91, right-aligned | 13 |
-| New menu | x 2271–2497, y 129–283 | 206×141, right-aligned | 14 |
-| Row menu | x 2270–2497, y 231–376 | ~206×132, right-aligned | 46 |
-| New-folder dialog | x 971–1622, y 594–840 | 651×246 = **576×218** (`max-w-xl`), centred, radius 13.6 = `rounded-xl` | 15 |
-| Dialog title glyphs | x 999–1099, y 629–643 | 18 px / 600 | 15 |
-| Dialog description | x 998–1288, y 668–682 | 14 px | 15 |
-| Dialog input | x 999–1594, y 705–747 | 596×43 = 527×38, fill `(10,10,10)` = `hsl(0 0% 3.9%)` | 15 |
-| Dialog Cancel text | x 1387–1435, y 784–794 | ends 28 physical before the pill = px-4 + gap-2 | 15 |
-| Dialog action pill | x 1463–1595, y 766–812 | 133×47 = 118×42 (`h-10 px-4`), fill `#8f8f8f` = white @ 50 % over `#1f1f1f` (disabled) | 15 |
-| Banner | x 71–2521, y 62–117 | 2451×56 = 2168×50, 8 CSS side insets, 1 px border | 1, 43 |
-| Banner close button | glyph x 2491–2500, y 86–94 | 32×32 box, `right-2`, vertically centred | 1 |
-| Empty-state heading | x 1174–1427, y 369–385 | 16/24, centred on the card, 115 CSS below the column divider | 43 |
-| Empty-state sub | x 1174–1426, y 413–426 | 14/20 weight 300 | 43 |
-| Empty-state pill | x 1217–1384, y 458–498 | 168×41 = 149×36 | 43 |
-| Account chip avatar | x 105–136, y 1318–1349 | 28×28 | 12, 39 |
-| Account chip text | x 145–284, y 1318–1351 | 14 px / 12 px, two lines | 12, 39 |
-| Account chip top | y=1309 | 12 CSS below the card (`mt-3`) | 12 |
-| Row `⋯` trigger | icon dots x 2471–2485, centre y 202.5 | 34×34 (`p-2` + 18 px icon) inside a `py-2` cell = 50 CSS row | 12, 39 |
-| Account menu item pitch | ~47 | 43 | 19, 43 |
+Measured in Playwright/Chromium at viewport 2182×1174 CSS, DSF ~1.13 (devicePixelRatio 1.13), against the 2466×1327 app-region reference crops. Values below are from `getBoundingClientRect()` on the rendered dashboard (dark, 15-row fixture) unless noted.
+
+| Element | Actual (CSS, viewport coords) | Physical equiv. (×1.13) | Reference target (app-region physical) | Notes |
+|---|---|---|---|---|
+| App root | 0,0 2182×1174 | 2466×1327 | 2466×1327 | `data-testid="app-root"`, `h-screen p-2` |
+| Card (`dashboard-card`) | 16,10 2158×1092 (bottom 1102) | 18,11 2439×1234 | left 18, top 11, bottom ~1243 (no banner) | `ml-2 mt-0.5 flex-1 rounded-xl`; card height fills available space |
+| Header (`dashboard-header`) | 16,10 2158×63 | 18,11 2439×71 | header divider ~y=81 app-region phys (~72 CSS) | `px-5 py-3 border-b`, controls h-9/h-[38px] |
+| Column header | 16,73 2158×35 | 18,82 2439×40 | divider ~y=121 app-region phys | `px-5 py-2 text-xs`, 34 CSS box + 1px divider in list |
+| Rows (list, dark 15) | start 16,108; each 2158×51 | start 18,122; pitch ~58 phys | 15 rows, 57.6 phys pitch from y=121 | `divide-y` owns dividers; row box 50 CSS + 1px divider |
+| Account chip button | 16,1114 203×52 | 18,1259 229×59 | chip top ~1256 app-region phys, 12 CSS below card | `ml-2 mt-3 self-start w-fit items-start px-5 py-2`; avatar 28px |
+| Banner (dark--banner) | wrapper `pb-2` inside app-root p-2; banner `h-[50px]` | banner ~y=9–65 app-region phys | banner y=9–64 app-region phys, 2168×50 CSS | wrapper top inset fixed by removing extra `pt-2/px-2`; bg/border/content still differ |
+
+### Final visual gate ratios (Task 18, final calibration run)
+
+| Baseline | Ratio | Budget | Status |
+|---|---:|---:|---|
+| `dashboard--dark` | 0.353 % | ≤ 0.150 % | fail |
+| `dashboard--dark--import-menu` | 0.417 % | ≤ 0.150 % | fail |
+| `dashboard--dark--new-menu` | 0.388 % | ≤ 0.150 % | fail |
+| `dashboard--dark--new-folder-dialog` | 0.120 % | ≤ 0.150 % | **pass** |
+| `dashboard--light` | 0.368 % | ≤ 0.150 % | fail |
+| `dashboard--light--row-menu` | 0.387 % | ≤ 0.150 % | fail |
+| `dashboard--dark--banner` | 0.673 % | ≤ 0.150 % | fail |
+| `dashboard--light--empty--banner` | 0.296 % | ≤ 0.150 % | fail |
+
+### Residual diff hot-spots / notes
+
+- **Root fix applied:** `apps/web/src/app/globals.css` `@source` corrected from `../../../packages/ui/src` to `../../../../packages/ui/src` so Tailwind v4 scans `packages/ui` primitives. Rebuild regenerated missing utilities (`max-w-xl`, `inset-0`, positioning/translate/shadow utilities etc.), fixing the New Folder dialog render (0.120%, passing) and substantially improving menus/banner geometry.
+- **Harness fixes:** `e2e/visual/compare.ts` screenshots full viewport (`page.screenshot()`) to include Radix portals; `playwright.visual.config.ts` webServer commands use `pnpm --filter @spektrum/web exec next start -p …` (arg-passing fix); gate specs/helpers made selectors unambiguous (`dashboard-header`-scoped Import/New); `calibrate.spec.ts` skips under `CI` to avoid polluting CI gate runs.
+- **Rows/text:** base cases show most differing pixels in the rows band (text anti-aliasing/baseline and per-row content rendering differences) plus account-chip area. Dark/light base ~0.34–0.36%; menu variants add menu surface/position/shadow diffs.
+- **Banners:** banner wrapper/height/position adjusted (now near reference vertical placement), but banner content/colors/buttons/icon/close details still differ (dark--banner 0.668%, light--empty--banner 0.301%). Light empty banner also differs in empty-state and header regions.
+- **Masks:** existing thumbnail/region masks kept as-is (already tight enough horizontally; tightening edges would unmask areas that differ from reference thumbnail previews and increase ratio). Mask table in `e2e/baselines/README.md` unchanged in geometry.
+- **Environment:** sign-in rate limits in Redis required clearing between batched runs during calibration (`ba:*|/sign-in/email` keys); seeds require `DATABASE_URL` in env. 7/8 baselines remain above the ≤0.15% budget; see task report for details.
 
 ## Appendix B — Fixture datasets
 

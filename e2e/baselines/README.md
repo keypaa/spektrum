@@ -1,0 +1,46 @@
+# Visual baselines
+
+Reference screenshots captured from prism.openai.com (see `zenno/specs/2026-11-07-spektrum-design.md` §2.1/§2.5). These are the only baselines: they are committed here and nothing is fetched at test time. Copies are byte-identical to the sources in `~/Pictures/Screenshots/` (sha256-verified).
+
+## Geometry
+
+Every capture is **2530×1380 physical**; the app region is **2466×1327 at DSF 1.13** (2182×1174 CSS), crop `(64, 53, 2530, 1380)` — the browser chrome occupies 64 px left (Chrome's vertical tab strip) and 53 px top (toolbar). References are compared 1:1, never rescaled.
+
+## Mapping
+
+| Baseline | Spec §2.1 row | Source file | What it shows |
+|---|---|---|---|
+| `reference/dashboard--dark.png` | 12 | `screenshot-2026-11-05_21-24-40-google-chrome.png` | Dashboard, dark, populated with project rows, search pill, list/grid toggle, Import + New buttons, account chip (server port 3000, fixture `dark`) |
+| `reference/dashboard--dark--banner.png` | 1 | `screenshot-2026-11-05_21-22-28-google-chrome.png` | Dashboard, dark, with the shutdown banner (server port 3100, `SHUTDOWN_BANNER=true`, fixture `dark`) |
+| `reference/dashboard--dark--import-menu.png` | 13 | `screenshot-2026-11-05_21-24-49-google-chrome.png` | Dashboard, dark, Import menu open (fixture `dark`) |
+| `reference/dashboard--dark--new-menu.png` | 14 | `screenshot-2026-11-05_21-24-53-google-chrome.png` | Dashboard, dark, New menu open (fixture `dark`) |
+| `reference/dashboard--dark--new-folder-dialog.png` | 15 | `screenshot-2026-11-05_21-25-10-google-chrome.png` | Dashboard, dark, New folder dialog over the scrim (fixture `dark`) |
+| `reference/dashboard--light.png` | 39 | `screenshot-2026-11-07_21-01-02-google-chrome.png` | Dashboard, light, populated with project rows, search pill, list/grid toggle, Import + New buttons, user chip bottom-left (fixture `light`) |
+| `reference/dashboard--light--row-menu.png` | 46 | `screenshot-2026-11-07_21-06-09-google-chrome.png` | Dashboard, light, project list with the row `⋯` menu open: Rename / Duplicate / Delete (fixture `light`) |
+| `reference/dashboard--light--empty--banner.png` | 42 | `screenshot-2026-11-07_21-01-54-google-chrome.png` | Dashboard, light, empty state ("You don't have any projects yet") + shutdown banner, menu closed (server port 3100, `SHUTDOWN_BANNER=true`, fixture `empty`); doubles as the light-theme banner check, which row 1 cannot provide |
+
+### Deliberate exclusions
+
+- **No signed-in empty-state capture exists.** Both empty-state captures (`21-01-54`, `21-02-07`) are the **signed-out** dashboard: the bottom-left chip reads `Sign in` with the OpenAI mark, and `21-02-07` additionally has the account menu open. `21-01-54` (menu closed) is used, with the chip area masked; the signed-in chip itself is covered by row 39 (`dashboard--light`). The spec's §2.1 rows 42/43 label these two files the wrong way round — Task 1 fixes the labels.
+- **No dashboard account-menu capture exists.** The only user-menu capture is `21-25-52`, which is the **editor** (`Ready when you are!`, file tree, PDF), not the dashboard. Diffing it against the dashboard could never pass, so the account menu is verified behaviourally (Task 15) and by hand during Task 18; §15.1's gate lists `1, 12–15, 39, 46` and never included it.
+
+## Mask table
+
+Rectangles are written **`x0,y0 → x1,y1`** (exclusive `x1`/`y1`), in **full-capture physical coordinates**; the harness converts them to app-region offsets at load time:
+
+| Baseline | Mask rect(s) | Why |
+|---|---|---|
+| `dashboard--dark.png` | `2100,0 → 2530,115`; `100,174 → 170,1297` | Chrome "Screenshot saved and copied" toast over the top-right header; row thumbnails |
+| `dashboard--dark--banner.png` | `100,240 → 170,1297` | row thumbnails (the banner pushes the list down 55 px) |
+| `dashboard--dark--import-menu.png` | `100,174 → 170,1297` | row thumbnails |
+| `dashboard--dark--new-menu.png` | `100,174 → 170,1297` | row thumbnails |
+| `dashboard--dark--new-folder-dialog.png` | `100,174 → 170,1297` | row thumbnails behind the scrim |
+| `dashboard--light.png` | `100,174 → 170,1297` | row thumbnails |
+| `dashboard--light--row-menu.png` | `100,174 → 170,1297` | row thumbnails |
+| `dashboard--light--empty--banner.png` | `64,1290 → 360,1380` | the capture is **signed out**: its `Sign in` chip cannot match our account chip |
+
+Three things about these rectangles are not arbitrary:
+
+- **The toast really is only 62 px tall inside the app region.** The browser chrome ends at y=53; the toast panel is x 2107–2529, y 0–102 with a shadow to y≈111, so `y1=115` covers it with a little slack. Do not mask the whole top-right: the Import/New buttons and the segmented control are the point of this baseline.
+- **Every baseline with project rows masks the thumbnail column.** The references show real Prism page previews; the fixtures have no thumbnail, so our rows render Prism's default thumbnail. The strip is deliberately generous (55 px box + 6 px each side, every row from the column-header bottom to the card bottom); Task 18 tightens it.
+- **`dashboard--light--empty--banner` masks the bottom-left corner, not the empty state.** The signed-out chip and its menu-free area are the only unreproducible parts; the empty-state cluster in the middle of the card is fully gated, and so is the light banner.

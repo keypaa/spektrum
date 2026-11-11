@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "@spektrum/ui/styles";
 
+@custom-variant dark (&:where(.dark, .dark *));
+@source "../../../../packages/ui/src";
+
 @theme {
   --color-bg-app: var(--bg-app);
   --color-bg-code: var(--bg-code);
@@ -59,6 +62,26 @@
   --color-red-500: var(--red-500);
   --color-orange-500: var(--orange-500);
   --color-green-500: var(--green-500);
+  --color-dashboard-card-bg: var(--dashboard-card-bg);
+  --color-background: hsl(var(--background));
+  --color-input: hsl(var(--input));
+  --color-optionmenu-fg-primary: var(--optionmenu-fg-primary);
+  --color-optionmenu-text-primary: var(--optionmenu-text-primary);
+  --color-optionmenu-text-primary-hover: var(--optionmenu-text-primary-hover);
+  --color-optionmenu-border: var(--optionmenu-border);
+  --color-button-primary-bg-hover: var(--button-primary-bg-hover);
+  --color-button-primary-text-hover: var(--button-primary-text-hover);
+  --color-button-secondary-text: var(--button-secondary-text);
+  --color-button-secondary-bg-hover: var(--button-secondary-bg-hover);
+  --color-button-tertiary-text: var(--button-tertiary-text);
+  --color-button-tertiary-text-hover: var(--button-tertiary-text-hover);
+  --color-button-tertiary-bg-hover: var(--button-tertiary-bg-hover);
+  --color-text-nav-primary: var(--text-nav-primary);
+  --color-text-nav-secondary: var(--text-nav-secondary);
+  --color-text-nav-tertiary: var(--text-nav-tertiary);
+  --color-project-list-divider: var(--project-list-divider);
+  --color-fg-warning: var(--fg-warning);
+  --color-tools-text-warning: var(--tools-text-warning);
 
   --font-sans: "Crixet Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "roboto_mono", ui-monospace, "SF Mono", Menlo, monospace;
