@@ -19,10 +19,11 @@ export function NewFolderDialog({
   }, [open]);
 
   const submit = async () => {
-    if (!name.trim() || pending) return;
+    const trimmed = name.trim();
+    if (!trimmed || pending) return;
     setPending(true);
     try {
-      await createFolderAction(name);
+      await createFolderAction(trimmed);
       onOpenChange(false);
     } finally {
       setPending(false);
