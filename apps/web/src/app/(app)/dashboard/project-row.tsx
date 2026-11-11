@@ -35,7 +35,7 @@ export function ProjectRow({
             <span className="block h-full w-full" />
           </div>
           <div className="flex h-full w-full flex-1 cursor-pointer flex-col justify-center overflow-hidden">
-            <div className="overflow-hidden text-ellipsis text-nowrap text-text-nav-primary">
+            <div className="truncate text-sm text-text-nav-primary">
               {project.name}
             </div>
           </div>
