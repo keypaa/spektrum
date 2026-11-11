@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "admin:create-owner": "tsx src/cli/create-owner.ts"
+    "admin:create-owner": "tsx src/cli/create-owner.ts",
+    "visual:seed": "tsx src/cli/visual-seed.ts"
   },
   "dependencies": {
     "next": "16.4.5",
