@@ -7,13 +7,9 @@ import { DashboardHeader } from "./header";
 import type { Layout } from "./layout-toggle";
 import { ProjectList } from "./project-list";
 import { AccountChip } from "./account-chip";
+import type { Sort } from "./column-header";
 
-export type SortKey = "name" | "created";
-export type SortDirection = "asc" | "desc";
-export interface Sort {
-  key: SortKey;
-  direction: SortDirection;
-}
+export type { Sort, SortDirection, SortKey } from "./column-header";
 
 export function DashboardClient({
   userName,
