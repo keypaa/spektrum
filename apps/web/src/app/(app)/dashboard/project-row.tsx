@@ -14,14 +14,9 @@ export function ProjectRow({
   onRename: (project: ProjectRowModel) => void;
 }) {
   return (
-    // Bundle row (`ft`), list mode: `flex items-center gap-3 text-sm
-    // font-normal px-5` inside the parent's `divide-y` container — no fixed
-    // height and no own border. The height is natural: the menu cell is
-    // `py-2` + `p-2` trigger + 18 px icon = 50 CSS, + the 1 px divider from
-    // `divide-y` = the measured 51 CSS pitch (57.6 physical).
     <div
       data-testid={`project-card-${project.id}`}
-      className="group flex items-center gap-3 px-5 text-sm font-normal"
+      className="group flex items-center gap-3 border-b border-[color:var(--project-list-divider)] px-5 text-sm font-normal"
     >
       <button
         type="button"

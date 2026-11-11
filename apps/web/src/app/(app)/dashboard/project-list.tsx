@@ -44,14 +44,9 @@ export function ProjectList({
   }, [projects, query, sort]);
 
   return (
-    // Bundle: one scroll container (`overflow-auto`) whose inner list is
-    // `flex flex-col divide-y divide-[var(--project-list-divider)]` — the
-    // dividers (including the one under the column header) are owned by
-    // `divide-y`, not by the rows. In grid mode the same container becomes a
-    // grid without dividers and without the column header.
     <section className="relative flex min-h-0 flex-1 flex-col overflow-auto" data-testid="project-list">
       {layout === "list" ? (
-        <div className="flex flex-col divide-y divide-[var(--project-list-divider)]">
+        <div className="flex flex-col">
           <ColumnHeader sort={sort} onSort={onSort} />
           {visible.length === 0 ? (
             projects.length === 0 ? (

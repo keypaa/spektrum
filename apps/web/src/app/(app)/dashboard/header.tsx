@@ -20,7 +20,7 @@ export function DashboardHeader({
   return (
     <header
       data-testid="dashboard-header"
-      className="flex items-center gap-3 border-b border-[color:var(--project-list-divider)] px-5 py-3"
+      className="flex items-center gap-3 border-b border-[color:var(--project-list-divider)] px-5 py-[11.473px]"
     >
       {/* Bundle: `font-semibold text-lg font-inter text-text-nav-primary` (default
           28 px line-height; the header's 70 physical = 62 CSS height comes from

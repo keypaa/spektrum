@@ -38,12 +38,7 @@ export function ColumnHeader({
   return (
     <div
       data-testid="project-list-header"
-      // Bundle `p8`: `flex items-center gap-3 px-5 py-2 text-xs
-      // text-text-nav-secondary` — no fixed height, no own border. Its 34 CSS
-      // height (py-2 + 18 px content) + the 1 px divider owned by the first row
-      // below = 35 CSS = the measured 40 physical between the header divider
-      // (y=134) and the first row divider (y=174).
-      className="flex items-center gap-3 px-5 py-2 text-xs text-text-nav-secondary"
+      className="flex items-center gap-3 border-b border-[color:var(--project-list-divider)] px-5 py-[8.208px] text-xs text-text-nav-secondary"
     >
       <button
         type="button"
