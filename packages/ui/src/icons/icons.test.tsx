@@ -52,6 +52,9 @@ const STROKED = [
   "IconBeta",
   "IconIntegrations",
   "IconSpinner",
+  "IconUndo",
+  "IconRedo",
+  "IconArrowRight",
 ] as const;
 
 describe("icon registry", () => {

@@ -497,3 +497,29 @@ export function IconSpinner({ size, className, ...rest }: IconProps) {
     </svg>
   );
 }
+
+export function IconUndo({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <path d="M5.5 3.5 2.5 6.5l3 3" />
+      <path d="M2.5 6.5h6.25a3.75 3.75 0 0 1 0 7.5H6.5" />
+    </svg>
+  );
+}
+
+export function IconRedo({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <path d="m10.5 3.5 3 3-3 3" />
+      <path d="M13.5 6.5H7.25a3.75 3.75 0 0 0 0 7.5h2.25" />
+    </svg>
+  );
+}
+
+export function IconArrowRight({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <path d="M3 8h10M9.5 4.5 13 8l-3.5 3.5" />
+    </svg>
+  );
+}

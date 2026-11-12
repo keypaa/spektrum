@@ -121,12 +121,29 @@ Bundle quotes (offsets):
 
 ### 1.7 Right pane (E1/E2, pre-compile state)
 
-- Pane fill `#f1f1f1` light / `#161616` dark = `bg-bg-preview` (`--bg-sidepanel` in light).
-- A white sheet `#ffffff` at x 1749–2512, y 71–1287, i.e. the whole pane body is the sheet
-  (the pane has no separate header in the blank capture — the header appears once a
-  document compiles). `Initializing...` is centred in the sheet.
-- The dark capture's sheet is also `#ffffff` (E2 x 1748+ is `W` = ≥250 in the map), so the
-  sheet is always white in Phase 2.
+- Pane = `bg-bg-code`, with **8 CSS top and bottom padding only** (strips y 62–70 and
+  y 1365–1371; the sheet spans the full pane width — no side padding).
+- Sheet = `bg-bg-preview`, `rounded-t-lg`, from y 71 to y 1364 (`absolute inset-x-0
+  top-2 bottom-2` semantics). Dark sheet is white (`--bg-preview` is undefined in the
+  dark block, falls to `:root` `neutral-50`); light sheet is `#f1f1f1`.
+- **PDF topbar** (`056lqy1-luum3.js` @113182): `flex w-full items-center bg-transparent
+  px-2 pt-2 pb-2`; only the compile pill renders pre-compile (page controls/zoom/download
+  are `numPages`-gated). Pill at x 1757–1930, y 80–122 (36 CSS + border = h-9): the
+  bundle's compile control is `rounded-full border border-border-preview overflow-hidden`
+  with a main button (`px-3`, spinner 16 + label `Initializing...`, text-sm) and a menu
+  button (`h-9 w-7`, `border-l border-border-preview`, `IconChevronDown`).
+- **Centered placeholder** (`056lqy1-luum3.js` @113308): `flex grow h-full w-full items-center
+  justify-center gap-3 p-8` with `IconSpinner` (`h-4 w-4 animate-spin`, aria-hidden) +
+  `Initializing...` (`text-xs font-medium text-text-editor-quaternary`). Measured text
+  x 2110–2182, y 741–751; light spinner x 2079–2094.
+- **Floating bottom bar** = `CrixetPDFPanelToolbar` (`056lqy1-luum3.js` @52600): `rounded-full
+  px-3 py-2 bg-ai-bg shadow-[0_7px_24px_rgba(0,0,0,0.25)]`, contents `[undo][redo]` (`c`) +
+  `[goto-file]` `Go to PDF` `[arrow]` (`h`), `gap-1`. Measured bar box x 2012–2248
+  (209 CSS), y 1302–1353 (46 CSS), centered at the pane's x-centre, bottom inset ≈ 19 CSS
+  above the sheet bottom (y 1372). Fill `bg-ai-bg` (dark `#161616`, light `#fff`).
+
+Everything is inert (`aria-disabled` buttons where a control would act); `data-testid="pdf-pane"`.
+A comment marks it as the Phase 3 mount point.
 
 ### 1.8 Settings modal (E3)
 
