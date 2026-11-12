@@ -12,13 +12,22 @@
 
 import type { ReactElement } from "react";
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   DocumentRecord,
   DocumentSummary,
 } from "@/lib/documents";
+import {
+  createDocumentRequest,
+  deleteDocumentRequest,
+  renameDocumentRequest,
+} from "@/lib/document-client";
 import { usePreferences } from "@/components/preferences-provider";
 import { ProjectSidebar } from "./sidebar/project-sidebar";
 import { SIDEBAR_STORAGE_KEY, useResizablePane } from "./sidebar/resizable";
+import { NewFileDialog } from "./dialogs/new-file-dialog";
+import { RenameFileDialog } from "./dialogs/rename-file-dialog";
+import { DeleteFileDialog } from "./dialogs/delete-file-dialog";
 import { PdfPane } from "./pdf-pane";
 
 export interface EditorClientProps {
@@ -60,8 +69,79 @@ export function EditorClient({
     rootRef,
   });
   const { preferences } = usePreferences();
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState<"files" | "chats">("files");
   const [initialPath, setInitialPath] = useState(initialDocument?.path ?? null);
+  const [docs, setDocs] = useState<DocumentSummary[]>(documents);
+  const [newFileOpen, setNewFileOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
+
+  const paths = docs.map((d) => d.path);
+
+  const openDocument = (path: string) => {
+    // Task 14 owns tab state; until then the single buffer follows the click.
+    setInitialPath(path);
+    const url = new URL(window.location.href);
+    url.searchParams.set("p", path);
+    window.history.replaceState(null, "", url);
+  };
+
+  const afterMutation = () => {
+    // The local state is already updated; refresh the RSC tree without a
+    // visible flash.
+    router.refresh();
+  };
+
+  const createFile = async (path: string) => {
+    const doc = await createDocumentRequest(project.id, path);
+    setDocs((prev) =>
+      [...prev.filter((d) => d.path !== doc.path), doc].sort((a, b) =>
+        a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
+      ),
+    );
+    openDocument(doc.path);
+    afterMutation();
+  };
+
+  const renameFile = async (path: string) => {
+    if (!renameTarget) return;
+    const doc = await renameDocumentRequest(project.id, renameTarget.id, path);
+    const wasActive = initialPath === renameTarget.path;
+    setDocs((prev) =>
+      prev
+        .map((d) => (d.id === doc.id ? { ...d, path: doc.path, kind: doc.kind } : d))
+        .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
+    );
+    if (wasActive) {
+      setInitialPath(doc.path);
+      const url = new URL(window.location.href);
+      url.searchParams.set("p", doc.path);
+      window.history.replaceState(null, "", url);
+    }
+    afterMutation();
+  };
+
+  const deleteFile = async () => {
+    if (!deleteTarget) return;
+    const removed = deleteTarget;
+    await deleteDocumentRequest(project.id, removed.id);
+    const remaining = docs.filter((d) => d.id !== removed.id);
+    setDocs(remaining);
+    if (initialPath === removed.path) {
+      // Pick the neighbour: the next row, else the previous one.
+      const idx = docs.findIndex((d) => d.id === removed.id);
+      const neighbour = remaining[Math.min(idx, remaining.length - 1)];
+      setInitialPath(neighbour?.path ?? null);
+    }
+    afterMutation();
+  };
+
+  const download = (doc: DocumentSummary) => {
+    window.location.assign(
+      `/api/projects/${project.id}/documents/${doc.id}/download`,
+    );
+  };
 
   return (
     <div
@@ -78,16 +158,16 @@ export function EditorClient({
       <div className="relative min-h-0 min-w-0">
         <ProjectSidebar
           project={project}
-          documents={documents}
+          documents={docs}
           activePath={initialPath}
           activeSection={activeSection}
           hiddenFiles={preferences.hiddenFiles}
           onSectionChange={setActiveSection}
-          onOpenDocument={setInitialPath}
-          onNewFile={() => {}}
-          onRenameDocument={() => {}}
-          onDeleteDocument={() => {}}
-          onDownloadDocument={() => {}}
+          onOpenDocument={openDocument}
+          onNewFile={() => setNewFileOpen(true)}
+          onRenameDocument={setRenameTarget}
+          onDeleteDocument={setDeleteTarget}
+          onDownloadDocument={download}
           onOpenSettings={() => {}}
           user={user}
         />
@@ -139,6 +219,28 @@ export function EditorClient({
       </div>
 
       <PdfPane />
+
+      <NewFileDialog
+        open={newFileOpen}
+        existingPaths={paths}
+        onSubmit={createFile}
+        onOpenChange={setNewFileOpen}
+      />
+      <RenameFileDialog
+        document={renameTarget}
+        existingPaths={paths.filter((p) => p !== renameTarget?.path)}
+        onSubmit={renameFile}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+      />
+      <DeleteFileDialog
+        document={deleteTarget}
+        onConfirm={deleteFile}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

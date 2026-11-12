@@ -3,6 +3,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PREFERENCES } from "@spektrum/shared/preferences";
 import { PreferencesProvider } from "@/components/preferences-provider";
+
+// The client shell refreshes the RSC tree after a mutation; jsdom has no app
+// router, so stub the one hook it uses.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 import { EditorClient } from "./editor-client";
 import type { DocumentRecord, DocumentSummary } from "@/lib/documents";
 

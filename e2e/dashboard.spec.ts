@@ -1,8 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { login, OWNER_EMAIL } from "./helpers";
 
-const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
-const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD ?? "owner-password-123";
 
 function psql(sql: string): string {
   return execFileSync(
@@ -52,14 +51,6 @@ function folderCount(name: string): number {
   return Number(out || "0");
 }
 
-async function login(page: Page): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(OWNER_EMAIL);
-  await page.getByLabel("Password").fill(OWNER_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { name: "Your Projects" })).toBeVisible();
-}
 
 test.beforeEach(() => {
   resetOwnerState();
