@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { cn } from "../lib/cn";
 import { Button } from "./button";
 import { Input } from "./input";
 import * as DropdownMenu from "./dropdown-menu";
 import * as Dialog from "./dialog";
+import { Toggle } from "./toggle";
 
 // Dependency-free per the plan: `react-dom/server` only. Radix portals render
 // null on the server, so the Radix wrappers are asserted as component exports
@@ -129,5 +133,43 @@ describe("Dialog wrappers", () => {
       </Dialog.Dialog>,
     );
     expect(html).toContain("Open");
+  });
+});
+
+afterEach(cleanup);
+
+describe("Toggle", () => {
+  it("renders a switch with aria-checked=false by default", () => {
+    const onChange = vi.fn();
+    render(<Toggle checked={false} onCheckedChange={onChange} label="Vim Mode" />);
+    const sw = screen.getByRole("switch", { name: "Vim Mode" });
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("click calls onCheckedChange(true)", async () => {
+    const onChange = vi.fn();
+    render(<Toggle checked={false} onCheckedChange={onChange} label="Vim Mode" />);
+    await userEvent.click(screen.getByRole("switch", { name: "Vim Mode" }));
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("Space and Enter toggle too", async () => {
+    const onChange = vi.fn();
+    render(<Toggle checked={false} onCheckedChange={onChange} label="Auto Formatting" />);
+    const sw = screen.getByRole("switch", { name: "Auto Formatting" });
+    sw.focus();
+    await userEvent.keyboard(" ");
+    expect(onChange).toHaveBeenCalledWith(true);
+    await userEvent.keyboard("{Enter}");
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("disabled ignores clicks", async () => {
+    const onChange = vi.fn();
+    render(
+      <Toggle checked={false} onCheckedChange={onChange} label="Vim Mode" disabled />,
+    );
+    await userEvent.click(screen.getByRole("switch", { name: "Vim Mode" }));
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

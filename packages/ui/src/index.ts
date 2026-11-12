@@ -7,5 +7,6 @@ export * from "./primitives/button";
 export * from "./primitives/input";
 export * from "./primitives/dropdown-menu";
 export * from "./primitives/dialog";
+export * from "./primitives/toggle";
 export * from "./lib/cn";
 export * from "./theme-switcher";
