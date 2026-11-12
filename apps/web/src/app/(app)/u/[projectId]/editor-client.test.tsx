@@ -7,6 +7,12 @@ import { PreferencesProvider } from "@/components/preferences-provider";
 // The client shell refreshes the RSC tree after a mutation; jsdom has no app
 // router, so stub the one hook it uses.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+
+// jsdom cannot load Monaco; the dynamic import would otherwise pull the real
+// module into the test.
+vi.mock("@/editor/monaco-editor", () => ({
+  MonacoEditor: () => <div data-testid="monaco-editor" />,
+}));
 import { EditorClient } from "./editor-client";
 import type { DocumentRecord, DocumentSummary } from "@/lib/documents";
 
@@ -41,7 +47,7 @@ function renderShell(overrides: Partial<React.ComponentProps<typeof EditorClient
 }
 
 describe("EditorClient", () => {
-  it("renders the three-column shell with the sidebar, tabs and placeholders", () => {
+  it("renders the three-column shell with the sidebar, tabs and placeholders", async () => {
     renderShell();
     expect(screen.getByTestId("editor-root")).toBeTruthy();
     expect(screen.getByTestId("project-sidebar")).toBeTruthy();
@@ -52,8 +58,8 @@ describe("EditorClient", () => {
     // Right pane's captured pre-compile state.
     expect(screen.getByTestId("pdf-pane")).toBeTruthy();
     expect(screen.getAllByText("Initializing...").length).toBeGreaterThanOrEqual(1);
-    // Placeholders Task 12/14/16 replace.
-    expect(screen.getByTestId("editor-area-placeholder")).toBeTruthy();
+    // The dynamic Monaco import resolves asynchronously in tests.
+    expect(await screen.findByTestId("monaco-editor")).toBeTruthy();
     expect(screen.getByTestId("composer-slot-placeholder")).toBeTruthy();
   });
 

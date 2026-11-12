@@ -295,3 +295,7 @@ cursor-pointer bg-bg-code flex-none flex justify-center items-center
   `h-[min(720px,calc(100vh-32px))]` (quoted above).
 - The `diagram.jpg` row in the settings captures is a masked, unreproducible thumbnail
   (Task 2); the example template still references the file (Phase 5 seeds it).
+## 6. Monaco spike (Task 12, 2026-11-12)
+
+- **Worker path:** Turbopack bundles `new Worker(new URL("monaco-editor/editor/editor.worker.js", import.meta.url), { type: "module" })` and the JSON worker the same way. Monaco 0.57's exports map is `"./*.js": "./esm/vs/*.js"`, so the subpath is `editor/editor.worker.js`; the older `monaco-editor/esm/vs/editor/editor.worker.js` form resolves to a doubled `esm/vs/esm/vs/...` and does not exist. Verified by the browser e2e (`monaco-editor` testid visible, no console errors).
+- **monaco-vim 0.4.4 does NOT attach to monaco-editor 0.57.** Both its ESM build (`dist/index.mjs`) and UMD build (`dist/monaco-vim.umd.js`) import `monaco-editor/esm/vs/editor/editor.api`, which monaco 0.57's exports map does not expose (same doubled-path failure). No alias exists that fixes the UMD's internal monaco 0.33 graph cleanly. Per the plan's bounded fallback (D42/Appendix D): the Vim Mode preference is stored but **inert** in Phase 2; `monaco-vim` is not imported. The `monaco-vim` dependency stays in package.json for a later phase that can patch the import or vendor the adapter.

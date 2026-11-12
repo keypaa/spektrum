@@ -216,4 +216,6 @@ test("a project name opens the editor", async ({ page }) => {
   await expect(page).toHaveURL(/\/u\/[0-9a-f-]{36}/);
   await expect(page.getByTestId("editor-root")).toBeVisible();
   await expect(page.getByRole("tab", { name: "main.tex" })).toBeVisible();
+  // Monaco actually loaded in the browser (the worker path works).
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
 });

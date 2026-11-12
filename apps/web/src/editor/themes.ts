@@ -1,0 +1,183 @@
+// The two Prism themes, transcribed from zenno/recon/extracted/monaco-themes.js
+// (a minified `u.editor.defineTheme("crixet", …)` pair). The minifier inlined
+// shared colours as local aliases (`n="D4D4D4"`), so every `foreground: n` is
+// the literal below; the themes test pins the rule count against the extract
+// so the transcription cannot silently drift.
+
+import type { editor } from "monaco-editor";
+
+const DARK = {
+  base: "vs-dark" as const,
+  inherit: false,
+  rules: [
+    { token: "", foreground: "D4D4D4", background: "1E1E1E" },
+    { token: "invalid", foreground: "f44747" },
+    { token: "emphasis", fontStyle: "italic" },
+    { token: "strong", fontStyle: "bold" },
+    { token: "variable", foreground: "74B0DF" },
+    { token: "variable.predefined", foreground: "4864AA" },
+    { token: "variable.parameter", foreground: "9CDCFE" },
+    { token: "constant", foreground: "A3D9C2" },
+    { token: "comment", foreground: "888888" },
+    { token: "number", foreground: "daa4da" },
+    { token: "number.math", foreground: "daa4da" },
+    { token: "number.hex", foreground: "D4D4D4" },
+    { token: "regexp", foreground: "B46695" },
+    { token: "annotation", foreground: "cc6666" },
+    { token: "type", foreground: "3DC9B0" },
+    { token: "delimiter", foreground: "DCDCDC" },
+    { token: "delimiter.alignment", foreground: "74B0DF" },
+    { token: "delimiter.html", foreground: "808080" },
+    { token: "delimiter.xml", foreground: "808080" },
+    { token: "tag", foreground: "A3D9C2" },
+    { token: "tag.id.pug", foreground: "4F76AC" },
+    { token: "tag.class.pug", foreground: "4F76AC" },
+    { token: "meta.scss", foreground: "A79873" },
+    { token: "meta.tag", foreground: "CE9178" },
+    { token: "metatag", foreground: "DD6A6F" },
+    { token: "metatag.content.html", foreground: "9CDCFE" },
+    { token: "metatag.html", foreground: "A3D9C2" },
+    { token: "metatag.xml", foreground: "A3D9C2" },
+    { token: "metatag.php", fontStyle: "bold" },
+    { token: "key", foreground: "9CDCFE" },
+    { token: "string.key.json", foreground: "9CDCFE" },
+    { token: "string.value.json", foreground: "CE9178" },
+    { token: "attribute.name", foreground: "9CDCFE" },
+    { token: "attribute.value", foreground: "CE9178" },
+    { token: "attribute.value.number.css", foreground: "B5CEA8" },
+    { token: "attribute.value.unit.css", foreground: "B5CEA8" },
+    { token: "attribute.value.hex.css", foreground: "D4D4D4" },
+    { token: "string.math", foreground: "daa4da" },
+    { token: "string", foreground: "D4D4D4" },
+    { token: "string.sql", foreground: "FF0000" },
+    { token: "keyword", foreground: "A3D9C2" },
+    { token: "keyword.heading", foreground: "A3D9C2", fontStyle: "bold" },
+    { token: "keyword.flow", foreground: "C586C0" },
+    { token: "keyword.json", foreground: "CE9178" },
+    { token: "keyword.math", foreground: "b54ab5" },
+    { token: "keyword.flow.scss", foreground: "A3D9C2" },
+    { token: "operator.scss", foreground: "909090" },
+    { token: "operator.sql", foreground: "778899" },
+    { token: "operator.swift", foreground: "909090" },
+    { token: "predefined.sql", foreground: "FF00FF" },
+    { token: "string.key", foreground: "679BD1" },
+    { token: "delimiter.equals", foreground: "A0A0A0" },
+    { token: "string.value", foreground: "D4D4D4" },
+    { token: "string.quote", foreground: "B0B0B0" },
+    { token: "constant.citekey", foreground: "FFBA58" },
+  ],
+  colors: {
+    "editor.background": "#000000",
+    "editor.foreground": "#D4D4D4",
+    "editor.inactiveSelectionBackground": "#3A3D41",
+    "editorIndentGuide.background1": "#404040",
+    "editorIndentGuide.activeBackground1": "#707070",
+    "editor.selectionHighlightBackground": "#ADD6FF26",
+    "list.hoverBackground": "#262626",
+    "list.hoverForeground": "#F5F5F5",
+    "diffEditor.insertedLineBackground": "#253329",
+    "diffEditor.insertedTextBackground": "#253329",
+    "diffEditor.removedLineBackground": "#351A22",
+    "diffEditor.removedTextBackground": "#351A22",
+  },
+} as const;
+
+const LIGHT = {
+  base: "vs" as const,
+  inherit: false,
+  rules: [
+    { token: "", foreground: "1F1F1F", background: "FFFFFF" },
+    { token: "invalid", foreground: "B91C1C" },
+    { token: "emphasis", fontStyle: "italic" },
+    { token: "strong", fontStyle: "bold" },
+    { token: "variable", foreground: "0B7285" },
+    { token: "variable.predefined", foreground: "264653" },
+    { token: "variable.parameter", foreground: "1D4ED8" },
+    { token: "constant", foreground: "2F6B5B" },
+    { token: "comment", foreground: "6B7280" },
+    { token: "number", foreground: "9B4DCA" },
+    { token: "number.math", foreground: "9B4DCA" },
+    { token: "number.hex", foreground: "1F1F1F" },
+    { token: "regexp", foreground: "B45309" },
+    { token: "annotation", foreground: "B91C1C" },
+    { token: "type", foreground: "0F766E" },
+    { token: "delimiter", foreground: "374151" },
+    { token: "delimiter.html", foreground: "6B7280" },
+    { token: "delimiter.xml", foreground: "6B7280" },
+    { token: "tag", foreground: "2F6B5B" },
+    { token: "tag.id.pug", foreground: "1D4ED8" },
+    { token: "tag.class.pug", foreground: "1D4ED8" },
+    { token: "meta.scss", foreground: "8B5E34" },
+    { token: "meta.tag", foreground: "B45309" },
+    { token: "metatag", foreground: "B91C1C" },
+    { token: "metatag.content.html", foreground: "1D4ED8" },
+    { token: "metatag.html", foreground: "2F6B5B" },
+    { token: "metatag.xml", foreground: "2F6B5B" },
+    { token: "metatag.php", fontStyle: "bold" },
+    { token: "key", foreground: "1D4ED8" },
+    { token: "string.key.json", foreground: "1D4ED8" },
+    { token: "string.value.json", foreground: "B45309" },
+    { token: "attribute.name", foreground: "1D4ED8" },
+    { token: "attribute.value", foreground: "B45309" },
+    { token: "attribute.value.number.css", foreground: "2F855A" },
+    { token: "attribute.value.unit.css", foreground: "2F855A" },
+    { token: "attribute.value.hex.css", foreground: "1F1F1F" },
+    { token: "string.math", foreground: "9B4DCA" },
+    { token: "string", foreground: "1F2937" },
+    { token: "string.sql", foreground: "B91C1C" },
+    { token: "keyword", foreground: "2F6B5B" },
+    { token: "keyword.heading", foreground: "2F6B5B", fontStyle: "bold" },
+    { token: "keyword.flow", foreground: "7C3AED" },
+    { token: "keyword.json", foreground: "B45309" },
+    { token: "keyword.math", foreground: "8B3A99" },
+    { token: "delimiter.alignment", foreground: "1D4ED8" },
+    { token: "keyword.flow.scss", foreground: "2F6B5B" },
+    { token: "operator.scss", foreground: "6B7280" },
+    { token: "operator.sql", foreground: "4B5563" },
+    { token: "operator.swift", foreground: "6B7280" },
+    { token: "predefined.sql", foreground: "A21CAF" },
+    { token: "string.key", foreground: "1D4ED8" },
+    { token: "delimiter.equals", foreground: "6B7280" },
+    { token: "string.value", foreground: "1F2937" },
+    { token: "string.quote", foreground: "6B7280" },
+    { token: "constant.citekey", foreground: "B45309" },
+  ],
+  colors: {
+    "editor.background": "#FFFFFF",
+    "editor.foreground": "#1F1F1F",
+    "editor.inactiveSelectionBackground": "#E5E7EB",
+    "editorIndentGuide.background1": "#D1D5DB",
+    "editorIndentGuide.activeBackground1": "#9CA3AF",
+    "editor.selectionHighlightBackground": "#2563EB1F",
+    "list.hoverBackground": "#E5E7EB",
+    "list.hoverForeground": "#111827",
+    "diffEditor.insertedLineBackground": "#E7F6EC",
+    "diffEditor.insertedTextBackground": "#E7F6EC",
+    "diffEditor.removedLineBackground": "#FDECEC",
+    "diffEditor.removedTextBackground": "#FDECEC",
+  },
+} as const;
+
+export const CRIXET_DARK: editor.IStandaloneThemeData = {
+  ...DARK,
+  rules: DARK.rules.map((r) => ({ ...r })),
+  colors: { ...DARK.colors },
+};
+
+export const CRIXET_LIGHT: editor.IStandaloneThemeData = {
+  ...LIGHT,
+  rules: LIGHT.rules.map((r) => ({ ...r })),
+  colors: { ...LIGHT.colors },
+};
+
+/** Number of tokenizer rules — the themes test pins it to the extract. */
+export function themeRuleCount(theme: editor.IStandaloneThemeData): number {
+  return theme.rules.length;
+}
+
+export function registerMonacoThemes(monaco: {
+  editor: { defineTheme(name: string, theme: editor.IStandaloneThemeData): void };
+}): void {
+  monaco.editor.defineTheme("crixet", CRIXET_DARK);
+  monaco.editor.defineTheme("crixet-light", CRIXET_LIGHT);
+}

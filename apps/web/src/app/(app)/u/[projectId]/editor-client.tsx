@@ -12,6 +12,7 @@
 
 import type { ReactElement } from "react";
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type {
   DocumentRecord,
@@ -30,27 +31,18 @@ import { RenameFileDialog } from "./dialogs/rename-file-dialog";
 import { DeleteFileDialog } from "./dialogs/delete-file-dialog";
 import { PdfPane } from "./pdf-pane";
 
+// Monaco is browser-only; the dynamic import (ssr: false) must come from this
+// client component, not the RSC page.
+const MonacoEditor = dynamic(
+  () => import("@/editor/monaco-editor").then((m) => m.MonacoEditor),
+  { ssr: false },
+);
+
 export interface EditorClientProps {
   project: { id: string; name: string };
   documents: DocumentSummary[];
   initialDocument: DocumentRecord | null;
   user: { name: string; email: string };
-}
-
-function Placeholder({
-  testId,
-  label,
-  className = "",
-}: {
-  testId: string;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <div data-testid={testId} className={className}>
-      <span className="text-xs text-fg-tertiary">{label}</span>
-    </div>
-  );
 }
 
 export function EditorClient({
@@ -73,6 +65,7 @@ export function EditorClient({
   const [activeSection, setActiveSection] = useState<"files" | "chats">("files");
   const [initialPath, setInitialPath] = useState(initialDocument?.path ?? null);
   const [docs, setDocs] = useState<DocumentSummary[]>(documents);
+  const [buffer, setBuffer] = useState(initialDocument?.content ?? "");
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
@@ -184,39 +177,45 @@ export function EditorClient({
       </div>
 
       {/* Centre column: header block (84 px), editor area, composer slot. */}
-      <div className="flex min-h-0 min-w-0 flex-col bg-bg-code">
-        {/* Header block: 64 px tab row + 2 px rule + 16 px icon strip + 2 px rule. */}
-        <div className="flex-none">
-          <div
-            data-testid="tab-strip-placeholder"
-            className="flex h-16 items-center gap-2 border-b-2 border-[color:var(--border-log)] px-4"
-          >
+        <div className="flex min-h-0 min-w-0 flex-col bg-bg-code">
+          {/* Header block: 64 px tab row + 2 px rule + 16 px icon strip + 2 px rule. */}
+          <div className="flex-none">
+            <div
+              data-testid="tab-strip-placeholder"
+              className="flex h-16 items-center gap-2 border-b-2 border-[color:var(--border-log)] px-4"
+            >
+              {initialPath ? (
+                <span
+                  role="tab"
+                  aria-selected="true"
+                  className="rounded bg-bg-app px-2 py-1 text-xs text-text-editor-primary"
+                >
+                  {initialPath}
+                </span>
+              ) : null}
+            </div>
+            <div
+              data-testid="editor-icon-strip"
+              className="h-4 border-b-2 border-[color:var(--border-log)]"
+            />
+          </div>
+          <div data-testid="editor-area-placeholder" className="min-h-0 flex-1 overflow-hidden bg-bg-code">
             {initialPath ? (
-              <span
-                role="tab"
-                aria-selected="true"
-                className="rounded bg-bg-app px-2 py-1 text-xs text-text-editor-primary"
-              >
-                {initialPath}
-              </span>
+              <MonacoEditor
+                path={initialPath}
+                value={buffer}
+                language={initialPath.endsWith(".bib") ? "bibtex" : "latex"}
+                theme={preferences.interfaceTheme === "light" ? "crixet-light" : "crixet"}
+                preferences={preferences}
+                onChange={setBuffer}
+              />
             ) : null}
           </div>
           <div
-            data-testid="editor-icon-strip"
-            className="h-4 border-b-2 border-[color:var(--border-log)]"
+            data-testid="composer-slot-placeholder"
+            className="h-22 flex-none border-t border-[color:var(--border-log)]"
           />
         </div>
-        <Placeholder
-          testId="editor-area-placeholder"
-          label=""
-          className="min-h-0 flex-1 overflow-hidden bg-bg-code"
-        />
-        <Placeholder
-          testId="composer-slot-placeholder"
-          label=""
-          className="h-22 flex-none border-t border-[color:var(--border-log)]"
-        />
-      </div>
 
       <PdfPane />
 
