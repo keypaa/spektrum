@@ -11,10 +11,14 @@
 // strip, Task 16 the composer and Task 12 the editor area.
 
 import type { ReactElement } from "react";
+import { useRef, useState } from "react";
 import type {
   DocumentRecord,
   DocumentSummary,
 } from "@/lib/documents";
+import { usePreferences } from "@/components/preferences-provider";
+import { ProjectSidebar } from "./sidebar/project-sidebar";
+import { SIDEBAR_STORAGE_KEY, useResizablePane } from "./sidebar/resizable";
 import { PdfPane } from "./pdf-pane";
 
 export interface EditorClientProps {
@@ -46,11 +50,23 @@ export function EditorClient({
   initialDocument,
   user,
 }: EditorClientProps): ReactElement {
-  const initialPath = initialDocument?.path ?? null;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { onPointerDown, dragging } = useResizablePane({
+    storageKey: SIDEBAR_STORAGE_KEY,
+    cssVar: "--sidebar-width",
+    initial: 442,
+    min: 240,
+    max: 480,
+    rootRef,
+  });
+  const { preferences } = usePreferences();
+  const [activeSection, setActiveSection] = useState<"files" | "chats">("files");
+  const [initialPath, setInitialPath] = useState(initialDocument?.path ?? null);
+
   return (
     <div
+      ref={rootRef}
       data-testid="editor-root"
-      // CSS vars overrid[...] by Task 10's resizable sidebar.
       style={
         {
           "--sidebar-width": "442px",
@@ -59,37 +75,32 @@ export function EditorClient({
       }
       className="grid h-screen grid-cols-[var(--sidebar-width)_minmax(480px,1fr)_var(--right-pane-width)] overflow-hidden pr-4"
     >
-      {/* Sidebar placeholder (Task 10): header + Files/Chats tabs + file list. */}
-      <div
-        data-testid="sidebar-placeholder"
-        className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-[color:var(--border-log)] bg-bg-sidepanel"
-      >
-        <div className="flex h-16 flex-none items-center px-4">
-          <span className="truncate text-sm font-medium text-text-nav-primary">
-            {project.name}
-          </span>
-        </div>
-        <div className="flex flex-none gap-4 px-4 text-sm">
-          <span className="border-b-2 border-text-editor-primary pb-1 text-text-editor-primary">
-            Files
-          </span>
-          <span className="pb-1 text-text-editor-secondary">Chats</span>
-        </div>
-        <div className="mt-3 min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex h-8 items-center rounded-lg px-3 text-sm text-text-editor-secondary"
-            >
-              {doc.path}
-            </div>
-          ))}
-        </div>
-        {/* Bottom user chip (spec §6.3; the account menu is Task 10). */}
-        <div className="flex h-14 flex-none items-center gap-2 border-t border-[color:var(--border-log)] px-4">
-          <span className="truncate text-xs text-text-nav-secondary">{user.name}</span>
-          <span className="truncate text-xs text-text-nav-tertiary">Personal workspace</span>
-        </div>
+      <div className="relative min-h-0 min-w-0">
+        <ProjectSidebar
+          project={project}
+          documents={documents}
+          activePath={initialPath}
+          activeSection={activeSection}
+          hiddenFiles={preferences.hiddenFiles}
+          onSectionChange={setActiveSection}
+          onOpenDocument={setInitialPath}
+          onNewFile={() => {}}
+          onRenameDocument={() => {}}
+          onDeleteDocument={() => {}}
+          onDownloadDocument={() => {}}
+          onOpenSettings={() => {}}
+          user={user}
+        />
+        {/* 1 px separator; drag to resize (240–480). */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          onPointerDown={onPointerDown}
+          className={`absolute inset-y-0 right-0 w-px cursor-col-resize bg-[color:var(--border-log)] ${
+            dragging ? "bg-[color:var(--border-brand)]" : ""
+          }`}
+        />
       </div>
 
       {/* Centre column: header block (84 px), editor area, composer slot. */}

@@ -98,26 +98,37 @@ plan's `48 px` placeholder is replaced by that.
 | Element | Physical | CSS | Note |
 |---|---|---|---|
 | Card top padding | y 62–79 | 16 | `bg-bg-sidepanel` starts at y=62 |
-| Project header row | y 80–160 | 71 | name + chevron at x 604–643, avatar at 1655–1738 |
-| `Files`/`Chats` row | y 161–224 | 56 | bundle: `h-10` (40) + `mt-3` (12) + `pt-1.5` |
-| Search input | y 227–265 | 34 | 32 px field + 2 px border, x 604–1712 |
-| File rows | 32 CSS pitch | 32 | bundle: `h-8` |
-| Bottom user chip | 56 CSS | 56 | bundle: `h-14` |
+| Project header row | y 80–160 | 71 | name + chevron at x ~88–100 (`pl-4` + 16 px chevron), 28 px avatar at x ~500–540 |
+| `Files`/`Chats` row | y 186–199 | ~12 label height | bundle: `h-10` (40) row; search + plus buttons at the right (x ~484) |
+| Search input | y 225–263 | 34 | box x 76–545, 32 px field + 2 px border |
+| File list | y 266–1307 | — | **Empty in both editor captures** (verified: zero non-bg pixels in x 66–562, y 266–1307). The capture's editor shows a tab + content while the list is empty — a Prism buffer-only state (unsaved `main.tex`), not a layout fact. The fixture seeds `main.tex` so the tab/editor match; the single file row is an accepted diff, recorded in the Task 20 ratio. |
+| Bottom user chip | y 1308–1364 | 56 | chip top border at y 1308 (full width), name text y 1329–1362 |
 
 Bundle quotes (offsets):
 
 - `@523301` `Personal workspace` — the chip's second line.
-- `@1270642` `Files` / `@1270794` `Chats` — the tab row:
+- `@1270642` `Files` / `@1270794` `Chats` — the tab row (`jh`):
   `"flex h-10 items-start pt-1.5 text-sm transition-colors cursor-pointer"`, active
   `text-text-editor-primary`, inactive `text-text-editor-secondary
   hover:text-text-editor-primary`; underline `"border-b-2 pb-1"` +
-  `border-text-editor-primary` / `border-transparent`; wrapper `"px-4 mt-3"`.
-- `@1272361` file row: `"group flex items-center gap-2 px-3 py-2 rounded-lg text-sm
-  text-left transition-colors cursor-pointer"`, active `bg-nav-bg-active
-  text-text-editor-primary`, idle `text-text-editor-secondary hover:text-text-editor-primary
-  hover:bg-[color:var(--nav-bg-hover-strong)]`.
-- `@1002108` settings list `overflow-x-auto`; the editor's file list is the
-  `overflow-y-auto px-4 pb-4` container at `@1272361`.
+  `border-text-editor-primary` / `border-transparent`; wrapper `"px-4 mt-3"` →
+  `"-mx-4 px-4"` → `"flex gap-3"`; right side `"-mr-2 ml-auto flex items-center gap-1
+  pb-2"` with the search `TertiaryButton` (`h-8 w-8 rounded-full shrink-0`, icon
+  `IconSearch`) and the add button.
+- `@1268228` the project header (`jm`): `"flex flex-row mx-3 mt-1 relative dark gap-2
+  items-center"`; trigger `"flex min-h-9 w-full min-w-0 items-center justify-between
+  gap-2 rounded-xl py-1.5 text-left text-sm"` with border classes, name span
+  `"min-w-0 flex-1 text-nowrap text-ellipsis overflow-hidden font-medium select-none"`,
+  chevron 16 px; right side collaborator avatars (28 px, `-space-x-1.5`).
+- `@1272361` file row (`TO` in the tree browser): wrapper `"transition-colors rounded-lg"` +
+  `bg-nav-bg-active` (selected) / `hover:bg-nav-bg-hover`; inner row `"flex items-center
+  gap-2 rounded-md pl-4 min-w-0 py-1"`; name span `"block min-w-0 truncate"` with
+  `text-sm font-light` (via tooltip wrapper). The row's overflow menu is a **context
+  menu** (right-click; `renameFile` / `downloadFile` / `deleteFile`), not a hover `⋯` —
+  the capture has no rows, so there is no counter-evidence; the plan's always-visible
+  overflow trigger is an addition and stays minimal.
+- `@1002108` settings list `overflow-x-auto`; the editor's file list shares the
+  `overflow-y-auto px-4 pb-4` shape of the chats list (`jf` @1272700).
 
 ### 1.7 Right pane (E1/E2, pre-compile state)
 
