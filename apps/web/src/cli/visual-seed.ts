@@ -1,5 +1,5 @@
 // Visual fixture seed — deterministic project list for the pixel-diff suite.
-// Run: pnpm --filter @spektrum/web visual:seed light|dark|empty
+// Run: pnpm --filter @spektrum/web visual:seed light|dark|empty|editor
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 const envLocal = resolve(import.meta.dirname, "../../.env.local");
@@ -7,7 +7,8 @@ if (existsSync(envLocal)) process.loadEnvFile(envLocal);
 
 import { eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
-import { folders, projects, users } from "@spektrum/db/schema";
+import { documents, folders, projects, userPreferences, users } from "@spektrum/db/schema";
+import { BLANK_MAIN_TEX } from "../lib/templates";
 import { createOwner } from "./create-owner";
 
 const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
@@ -55,6 +56,7 @@ const EMPTY: Array<[string, number]> = [];
 
 const arg = process.argv[2];
 const dataset = arg === "light" ? LIGHT : arg === "empty" ? EMPTY : DARK;
+const isEditor = arg === "editor";
 
 // Mirror ci-seed.ts: create the owner if it does not exist yet (CI runs this
 // seed without a prior ci-seed step).
@@ -88,6 +90,34 @@ if (!owner) {
 await db.update(users).set({ name: OWNER_NAME }).where(eq(users.id, owner.id));
 await db.delete(projects).where(eq(projects.ownerId, owner.id));
 await db.delete(folders).where(eq(folders.ownerId, owner.id));
+// The settings baselines assert control positions, so a preferences row left
+// over from an earlier run must not survive the re-seed.
+await db.delete(userPreferences).where(eq(userPreferences.userId, owner.id));
+
+if (isEditor) {
+  // Exactly one project named "New Project" with a single main.tex holding the
+  // blank template — this is what both editor baselines open.
+  const [project] = await db
+    .insert(projects)
+    .values({ ownerId: owner.id, name: "New Project" })
+    .returning({ id: projects.id });
+  const [doc] = await db
+    .insert(documents)
+    .values({
+      projectId: project!.id,
+      path: "main.tex",
+      kind: "tex",
+      content: BLANK_MAIN_TEX,
+    })
+    .returning({ id: documents.id });
+  await db
+    .update(projects)
+    .set({ mainDocumentId: doc!.id })
+    .where(eq(projects.id, project!.id));
+  console.log(`seeded editor fixture (project ${project!.id}) for ${OWNER_EMAIL}`);
+  await pool.end();
+  process.exit(0);
+}
 
 const now = Date.now();
 for (let i = 0; i < dataset.length; i++) {

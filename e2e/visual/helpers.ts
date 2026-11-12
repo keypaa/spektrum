@@ -7,6 +7,11 @@ export const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD ?? "owner-password-
 export const THEME_KEY = "crixet_light_mode_preference_v1";
 
 export async function login(page: Page): Promise<void> {
+  // The sign-in endpoint rate-limits per source IP (5 / 15 min). Give every
+  // test a fresh IP so a full-suite run never shares a bucket.
+  await page.setExtraHTTPHeaders({
+    "x-forwarded-for": `10.77.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`,
+  });
   await page.goto("/login");
   await page.getByLabel("Email").fill(OWNER_EMAIL);
   await page.getByLabel("Password").fill(OWNER_PASSWORD);

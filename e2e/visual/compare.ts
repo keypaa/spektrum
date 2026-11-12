@@ -20,6 +20,10 @@ export interface Mask {
   height: number;
 }
 
+// The settings modal as measured in `21-22-51`: x 753-1838, y 309-1124
+// (1085x815 physical = 960x721 CSS at DSF 1.13).
+const SETTINGS_MODAL = { x: 753, y: 309, width: 1085, height: 815 } as const;
+
 /** Per-baseline masks. Rectangles are full-capture physical coordinates as
  *  `{x, y, width, height}`; translated into app-region space at load time.
  *  See e2e/baselines/README.md for why each rectangle exists. */
@@ -40,7 +44,36 @@ const MASKS: Record<string, Mask[]> = {
   "dashboard--light--row-menu": [{ x: 100, y: 174, width: 70, height: 1123 }],
   // Signed-out capture: mask the `Sign in` chip in the bottom-left corner.
   "dashboard--light--empty--banner": [{ x: 64, y: 1290, width: 296, height: 90 }],
+  // Settings (Phase 2): everything outside the 960x720 modal is a blurred
+  // screenshot of Prism's dashboard; mask it. The OS toast (x 2107-2529,
+  // y 0-111) falls inside the top strip, so the four strips already cover it —
+  // do not add a fifth rect. Strips are disjoint: maskPng counts every
+  // rectangle independently, so an overlap would inflate `masked`.
+  // Coordinates are full-capture physical; maskPng subtracts APP_REGION.
+  "settings--editor--dark": outsideModal(),
+  "settings--pdf-viewer--dark": outsideModal(),
+  "settings--file-management--dark": outsideModal(),
+  "settings--data-controls--dark": outsideModal(),
+  "settings--beta--dark": outsideModal(),
+  "settings--integrations--dark": outsideModal(),
+  // Neither editor capture contains the "Screenshot saved" toast (verified by
+  // sampling x 2050-2530, y 0-120: chrome toolbar, then app header/PDF). An
+  // empty mask is correct; a toast rect here would blank the real header and
+  // PDF top.
+  "editor--dark--blank": [],
+  "editor--light--blank": [],
 };
+
+/** Four non-overlapping strips covering everything outside the modal. */
+function outsideModal(): Mask[] {
+  const m = SETTINGS_MODAL;
+  return [
+    { x: 0, y: 0, width: 2530, height: m.y }, // top
+    { x: 0, y: m.y + m.height, width: 2530, height: 1380 - (m.y + m.height) }, // bottom
+    { x: 0, y: m.y, width: m.x, height: m.height }, // left of modal
+    { x: m.x + m.width, y: m.y, width: 2530 - (m.x + m.width), height: m.height }, // right of modal
+  ];
+}
 
 function cropToAppRegion(png: PNG): PNG {
   const out = new PNG({ width: APP_REGION.width, height: APP_REGION.height });

@@ -18,6 +18,16 @@ Every capture is **2530×1380 physical**; the app region is **2466×1327 at DSF 
 | `reference/dashboard--light.png` | 39 | `screenshot-2026-11-07_21-01-02-google-chrome.png` | Dashboard, light, populated with project rows, search pill, list/grid toggle, Import + New buttons, user chip bottom-left (fixture `light`) |
 | `reference/dashboard--light--row-menu.png` | 46 | `screenshot-2026-11-07_21-06-09-google-chrome.png` | Dashboard, light, project list with the row `⋯` menu open: Rename / Duplicate / Delete (fixture `light`) |
 | `reference/dashboard--light--empty--banner.png` | 42 | `screenshot-2026-11-07_21-01-54-google-chrome.png` | Dashboard, light, empty state ("You don't have any projects yet") + shutdown banner, menu closed (server port 3100, `SHUTDOWN_BANNER=true`, fixture `empty`); doubles as the light-theme banner check, which row 1 cannot provide |
+| `reference/editor--dark--blank.png` | 18 | `screenshot-2026-11-05_21-28-32-google-chrome.png` | Editor, dark, blank `main.tex` open, pre-compile right pane (`Initializing...`), composer `Getting ready...` (fixture `editor`) |
+| `reference/editor--light--blank.png` | 40 | `screenshot-2026-11-07_13-04-25-google-chrome.png` | Editor, light, blank `main.tex` open, same pre-compile state (fixture `editor`) |
+| `reference/settings--editor--dark.png` | 2 | `screenshot-2026-11-05_21-22-51-google-chrome.png` | Settings modal, dark, Editor section (fixture `dark`) |
+| `reference/settings--pdf-viewer--dark.png` | 3 | `screenshot-2026-11-05_21-23-04-google-chrome.png` | Settings modal, dark, PDF Viewer section (fixture `dark`) |
+| `reference/settings--file-management--dark.png` | 4 | `screenshot-2026-11-05_21-23-08-google-chrome.png` | Settings modal, dark, File Management section (fixture `dark`) |
+| `reference/settings--data-controls--dark.png` | 5 | `screenshot-2026-11-05_21-23-21-google-chrome.png` | Settings modal, dark, Data Controls section (fixture `dark`) |
+| `reference/settings--beta--dark.png` | 6 | `screenshot-2026-11-05_21-24-32-google-chrome.png` | Settings modal, dark, Beta features section (fixture `dark`) |
+| `reference/settings--integrations--dark.png` | 7 | `screenshot-2026-11-05_21-24-36-google-chrome.png` | Settings modal, dark, Integrations section (fixture `dark`) |
+
+Phase 2 editor baselines show Prism's pre-compile state (`Initializing...`); the right pane is static until Phase 3.
 
 ### Deliberate exclusions
 
@@ -38,6 +48,8 @@ Rectangles are written **`x0,y0 → x1,y1`** (exclusive `x1`/`y1`), in **full-ca
 | `dashboard--light.png` | `100,174 → 170,1297` | row thumbnails |
 | `dashboard--light--row-menu.png` | `100,174 → 170,1297` | row thumbnails |
 | `dashboard--light--empty--banner.png` | `64,1290 → 360,1380` | the capture is **signed out**: its `Sign in` chip cannot match our account chip |
+| `settings--*--dark.png` (all six) | four disjoint strips around `753,309 → 1838,1124` | everything outside the 960×720 modal is a blurred dashboard screenshot; the OS toast (x 2107–2529, y 0–111) falls inside the top strip, so no fifth rect is needed |
+| `editor--dark--blank.png`, `editor--light--blank.png` | none | neither capture contains the OS toast (verified by sampling x 2050–2530, y 0–120); an empty mask is correct — a toast rect would blank the real header and PDF top |
 
 Three things about these rectangles are not arbitrary:
 
