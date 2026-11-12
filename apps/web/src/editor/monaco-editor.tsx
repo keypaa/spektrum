@@ -10,6 +10,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { editor } from "monaco-editor";
 import type { Preferences } from "@spektrum/shared/preferences";
 import { monaco, setupMonacoEnvironment } from "./monaco-environment";
+import { registerLanguages, languageForPath } from "./languages";
 import { createEditorOptions } from "./options";
 
 export interface MonacoEditorHandle {
@@ -38,13 +39,6 @@ function modelUri(path: string) {
   );
 }
 
-function languageForPath(path: string): string {
-  if (path.endsWith(".bib")) return "bibtex";
-  if (path.endsWith(".csv")) return "csv";
-  if (path.endsWith(".tex") || path.endsWith(".cls") || path.endsWith(".sty")) return "latex";
-  return "plaintext";
-}
-
 export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   function MonacoEditor(
     { path, value, language, theme, preferences, onChange, onReady },
@@ -60,6 +54,9 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     // Create the editor once; themes are registered by the environment setup.
     useEffect(() => {
       setupMonacoEnvironment();
+      // Grammars, configuration and folding must be registered before the
+      // first model is created.
+      registerLanguages(monaco);
       const el = hostRef.current;
       if (!el) return;
 
@@ -68,10 +65,14 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
         createEditorOptions(preferences, theme === "crixet"),
       );
       editorRef.current = editor;
+      // Debug/test hook: the page's own editor instance. Harmless (it is
+      // already reachable from the page) and the e2e folding check uses it.
+      (window as unknown as { __spektrum_editor?: unknown }).__spektrum_editor =
+        editor;
 
       const model = monaco.editor.createModel(
         value,
-        language || languageForPath(path),
+        languageForPath(path),
         modelUri(path),
       );
       modelsRef.current.set(path, model);
