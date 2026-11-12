@@ -14,13 +14,13 @@ import {
 
 export async function createBlankProject(): Promise<void> {
   const user = await requireUser();
-  await createProject(user.id, "New Project");
+  await createProject(user.id, "New Project", "blank");
   revalidatePath("/");
 }
 
 export async function createExampleProject(): Promise<void> {
   const user = await requireUser();
-  await createProject(user.id, "New Project");
+  await createProject(user.id, "New Project", "example");
   revalidatePath("/");
 }
 

@@ -1,12 +1,19 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@spektrum/db";
-import { folders, projects } from "@spektrum/db/schema";
+import { documents, folders, projects } from "@spektrum/db/schema";
+import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "./templates";
 
 export interface ProjectRow {
   id: string;
   name: string;
   folderId: string | null;
   createdAt: Date;
+}
+
+export interface ProjectSummary {
+  id: string;
+  name: string;
+  mainDocumentId: string | null;
 }
 
 export async function listProjects(ownerId: string): Promise<ProjectRow[]> {
@@ -22,17 +29,60 @@ export async function listProjects(ownerId: string): Promise<ProjectRow[]> {
     .orderBy(desc(projects.createdAt));
 }
 
-export async function createProject(ownerId: string, name: string): Promise<ProjectRow> {
+/**
+ * Create a project and seed its `main.tex` in one transaction, so a failed
+ * seed leaves no project row behind. The caller sees a project that is either
+ * fully usable or absent.
+ */
+export async function createProject(
+  ownerId: string,
+  name: string,
+  template: "blank" | "example" = "blank",
+): Promise<ProjectRow> {
+  const content = template === "example" ? EXAMPLE_MAIN_TEX : BLANK_MAIN_TEX;
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(projects)
+      .values({ ownerId, name })
+      .returning({
+        id: projects.id,
+        name: projects.name,
+        folderId: projects.folderId,
+        createdAt: projects.createdAt,
+      });
+    const [doc] = await tx
+      .insert(documents)
+      .values({ projectId: row!.id, path: "main.tex", kind: "tex", content })
+      .returning({ id: documents.id });
+    await tx
+      .update(projects)
+      .set({ mainDocumentId: doc!.id })
+      .where(eq(projects.id, row!.id));
+    return row!;
+  });
+}
+
+/** The owning user's view of one project, or null if not visible to them. */
+export async function getProject(
+  ownerId: string,
+  projectId: string,
+): Promise<ProjectSummary | null> {
   const [row] = await db
-    .insert(projects)
-    .values({ ownerId, name })
-    .returning({
+    .select({
       id: projects.id,
       name: projects.name,
-      folderId: projects.folderId,
-      createdAt: projects.createdAt,
-    });
-  return row!;
+      mainDocumentId: projects.mainDocumentId,
+    })
+    .from(projects)
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projects.ownerId, ownerId),
+        isNull(projects.deletedAt),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 export async function renameProject(ownerId: string, id: string, name: string): Promise<void> {
@@ -42,6 +92,11 @@ export async function renameProject(ownerId: string, id: string, name: string): 
     .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)));
 }
 
+/**
+ * Duplicate a project's documents. Text content is copied; `blob_key` is not
+ * (Phase 2 has no binary documents — see Appendix D). The duplicate's
+ * `main_document_id` points at the copy of the source's main document.
+ */
 export async function duplicateProject(
   ownerId: string,
   id: string,
@@ -53,7 +108,45 @@ export async function duplicateProject(
     .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
     .limit(1);
   if (!source) throw new Error("project not found");
-  return createProject(source.ownerId, name);
+
+  const sourceDocs = await db
+    .select({
+      path: documents.path,
+      kind: documents.kind,
+      content: documents.content,
+    })
+    .from(documents)
+    .where(eq(documents.projectId, id));
+
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(projects)
+      .values({ ownerId, name })
+      .returning({
+        id: projects.id,
+        name: projects.name,
+        folderId: projects.folderId,
+        createdAt: projects.createdAt,
+      });
+    let mainDocumentId: string | null = null;
+    for (const doc of sourceDocs) {
+      const [copy] = await tx
+        .insert(documents)
+        .values({
+          projectId: row!.id,
+          path: doc.path,
+          kind: doc.kind,
+          content: doc.content,
+        })
+        .returning({ id: documents.id });
+      if (doc.path === "main.tex") mainDocumentId = copy!.id;
+    }
+    await tx
+      .update(projects)
+      .set({ mainDocumentId })
+      .where(eq(projects.id, row!.id));
+    return row!;
+  });
 }
 
 export async function softDeleteProject(ownerId: string, id: string): Promise<void> {

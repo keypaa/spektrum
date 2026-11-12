@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { relativeTime } from "@/lib/relative-time";
 import type { ProjectRow as ProjectRowModel } from "@/lib/projects";
 import { RowMenu } from "./row-menu";
@@ -26,10 +27,9 @@ export function ProjectRow({
       style={{ height: `${h}px`, borderBottomWidth: `${1 / DPR}px`, boxSizing: "border-box" }}
     >
       <div className="flex h-full items-center gap-3 px-5 text-sm font-normal">
-        <button
-          type="button"
+        <Link
+          href={`/u/${project.id}`}
           className="flex h-full min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none"
-          onClick={() => onRename(project)}
         >
           <div className="relative h-10 w-[50px] flex-none cursor-pointer overflow-hidden">
             <span className="block h-full w-full" />
@@ -42,7 +42,7 @@ export function ProjectRow({
           <div className="w-20 flex-none py-2 text-right text-xs font-light text-nowrap text-text-nav-secondary">
             {relativeTime(project.createdAt, now)}
           </div>
-        </button>
+        </Link>
         <div className="flex-none py-2 text-fg-tertiary">
           <RowMenu project={project} onRename={onRename} />
         </div>

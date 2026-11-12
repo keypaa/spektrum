@@ -212,3 +212,13 @@ test("the account menu signs out and lands on /login", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/login/);
 });
+
+test.fixme("a project name opens the editor", async ({ page }) => {
+  seedProject("Open Me", "now()");
+  await login(page);
+
+  await page.getByRole("link", { name: "Open Me" }).click();
+  await expect(page).toHaveURL(/\/u\/[0-9a-f-]{36}/);
+  await expect(page.getByTestId("editor-root")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "main.tex" })).toBeVisible();
+});

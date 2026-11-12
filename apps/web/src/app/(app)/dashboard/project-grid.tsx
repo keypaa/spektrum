@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { relativeTime } from "@/lib/relative-time";
 import type { ProjectRow as ProjectRowModel } from "@/lib/projects";
 import { RowMenu } from "./row-menu";
@@ -21,9 +22,8 @@ export function ProjectGrid({
           data-testid={`project-card-${project.id}`}
           className="group relative flex h-[148px] w-full min-w-0 flex-col overflow-hidden rounded-lg hover:bg-[var(--project-list-hover-bg)]"
         >
-          <button
-            type="button"
-            onClick={() => onRename(project)}
+          <Link
+            href={`/u/${project.id}`}
             className="flex h-full w-full flex-col items-center gap-1.5 rounded-lg px-2 pb-2 pt-4 text-center"
           >
             <span className="h-[68px] w-[88px] flex-none overflow-hidden rounded-[5px] border border-[color:var(--project-list-divider)] bg-white p-1.5 shadow-[0_1px_2px_rgb(0_0_0/0.22)]" />
@@ -33,7 +33,7 @@ export function ProjectGrid({
             <span className="w-full truncate text-xs leading-4 text-fg-tertiary">
               {relativeTime(project.createdAt, now)}
             </span>
-          </button>
+          </Link>
           <RowMenu project={project} onRename={onRename} layout="grid" />
         </div>
       ))}
