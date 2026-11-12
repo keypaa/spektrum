@@ -1,43 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { setThemePreferenceAction } from "@/lib/actions";
+import { usePreferences } from "@/components/preferences-provider";
 import type { ThemePreference } from "@spektrum/ui";
 
-const KEY = "crixet_light_mode_preference_v1";
+export { THEME_STORAGE_KEY } from "./theme-script";
 
-function apply(value: ThemePreference): void {
-  const isDark =
-    value === "dark" ||
-    (value === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const html = document.documentElement;
-  html.classList.toggle("dark", isDark);
-  html.dataset.theme = isDark ? "dark" : "light";
-  html.dataset.themePreference = value;
-  html.style.colorScheme = isDark ? "dark" : "light";
-}
-
+/**
+ * The theme control, rewrapped over the preferences context (D38): the value
+ * comes from the server row, and a change goes through `setPreference`, which
+ * applies the DOM attributes and debounces the PUT.
+ */
 export function useThemePreference(): {
   value: ThemePreference;
   set: (value: ThemePreference) => void;
 } {
-  const [value, setValue] = useState<ThemePreference>("dark");
-
-  useEffect(() => {
-    const stored = localStorage.getItem(KEY);
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      setValue(stored);
-      apply(stored);
-    }
-  }, []);
-
-  const set = (next: ThemePreference) => {
-    setValue(next);
-    localStorage.setItem(KEY, next);
-    apply(next);
-    void setThemePreferenceAction(next);
+  const { preferences, setPreference } = usePreferences();
+  return {
+    value: preferences.interfaceTheme,
+    set: (value) => setPreference("interfaceTheme", value),
   };
-
-  return { value, set };
 }
