@@ -721,15 +721,25 @@ below the project card (§6.2).
 └────────────────────┴──────────────────────────────────┴──────────────┘
 ```
 
-Measurements at a 1440 px viewport (derived from the 2530-wide captures at DPR 1.319):
+Measurements at a 2182×1174 CSS viewport (DSF 1.13, app region 2466×1327 physical).
+These supersede the earlier DPR-1.319 figures; see `zenno/recon/extracted/editor-ui.md`.
 
 | Region | Size |
 |---|---|
-| Project sidebar | 370 px default, resizable 240–480, `--bg-sidepanel` |
+| Project sidebar | 442 px default, resizable 240–480, `--bg-sidepanel` |
 | Centre | flex, minimum 480 px |
-| Right pane | 600 px default, resizable 360–900, `--bg-preview` |
-| Tab strip | 48 px |
-| Composer block | 88 px (input 64 px + 24 px margins) |
+| Right pane content | 677 px (the grid reserves a 16 px page-scrollbar strip at the right edge) |
+| Header block | 84 px = 64 px tab row + 2 px rule + 16 px icon strip + 2 px rule |
+| Composer slot | 88 px (the resting composer block inside it is ≈57 CSS) |
+
+The route is `/u/[projectId]` with the active document in `?p=<url-encoded path>`
+(Prism's URL shape: `/u/25749baa-…?p=main.tex`). The sidebar is resizable
+240–480 (default 442), clamped and persisted per browser in
+`spektrum_editor_layout_v1`. The captured layout also contains a 16 px page
+scrollbar strip at the right edge; the fixed-height editor must reserve it (or
+the pane will sit 16 px too far right). The right pane is 677 px wide; its
+360–900 resize arrives with the Phase 3 viewer, which is the first thing that
+can actually use it.
 
 Phase 1 removed the rail (see §6.1); the editor plan re-states the remaining three-column layout.
 
@@ -737,6 +747,7 @@ Phase 1 removed the rail (see §6.1); the editor plan re-states the remaining th
 
 - Header row 48 px: project name in a dropdown trigger (13/18 weight 500, chevron),
   right side a 28 px circular avatar stack (collaborators; v1 shows only you).
+  Measured card top is y 80–160 physical ≈ 71 CSS including the 16 px card padding.
 - Segmented tabs `Files` / `Chats`, underline indicator in `--border-brand`, right side
   an `IconSearch` and an `IconPlus` (new file / new chat depending on the active tab).
 - File list rows 32 px: filename 12/16, active row `--nav-bg-active` with 8 px radius.
@@ -747,19 +758,23 @@ Phase 1 removed the rail (see §6.1); the editor plan re-states the remaining th
 - Bottom: 56 px user chip (`--bg-sidepanel-secondary` top border) — avatar, name,
   `Personal workspace`. Click opens the account menu (see §10.7).
 
-**Tab strip.**
+**Header block (tab strip + icon strip).** 84 px total: a 64 px tab row, a 2 px rule,
+a 16 px icon strip, a 2 px rule. (The earlier "48 px tab strip" came from the wrong DPR;
+the capture shows two rows.)
 
-- One tab per open file and per open chat, in open order, 48 px tall.
+- One tab per open file and per open chat, in open order, 64 px row.
 - Active tab: `--bg-code` background, 1 px `--tabs-border-active` top rule, text
   `--fg-primary`. Inactive: transparent, text `--fg-tertiary`.
 - Tab content: 14 px icon (file-type glyph or chat glyph) + filename 12/16 + close `×`
   on hover/active.
 - Tabs are horizontally scrollable; no drag reorder in v1.
-- Left edge of the strip: `IconPanelLeftClose` (collapse sidebar) and `IconRefresh`
-  (recompile) icon buttons.
+- Left of the tab row: `IconPanelLeftClose` (collapse sidebar) and `IconRefresh`
+  (recompile) icon buttons, in a 68 CSS icon column.
 - Right edge: `Tools` pill button (`--button-primary-bg`, 12/16 weight 500, with a small
   `IconTools` glyph) opening the tools menu (Project Info, Versions, Comments, Logs,
   Share, Export).
+- The 16 px icon strip below the tab row is empty in the blank captures; its icon is
+  undetermined (see `zenno/recon/extracted/editor-ui.md` §1.4).
 
 **Right pane.** Exactly one of: PDF viewer (§8) or info panel (§9). The `Tools` menu
 switches it. Closing the info panel returns to the PDF; closing the PDF is not allowed
@@ -769,7 +784,8 @@ in v1 (Prism keeps the PDF mounted).
 
 Docked at the bottom of the centre pane, 24 px inset, `--ai-bg`, 1 px `--ai-border`,
 `--radius-3xl` (24 px) — a wide pill in the empty state, a 64 px rounded rect once a
-thread exists.
+thread exists. The slot is 88 px; the resting composer block measures ≈57 CSS inside it
+(`zenno/recon/extracted/editor-ui.md` §1.5).
 
 Row: textarea (`Ask anything`, 12/16, `--text-editor-placeholder`) with autogrow to
 5 lines, then a bottom control row:
@@ -923,8 +939,12 @@ Definition", "Find All References" and "Select All", none of which appear here.
 ```
 
 **Example project** `main.tex` — the "What is Prism?" document from screenshot 18,
-verbatim, plus `diagram.jpg`. Copy it from `recon/extracted/` during Phase 2; it is the
-demo content and is also our visual-regression fixture.
+verbatim, plus `diagram.jpg`. Both templates live in `zenno/recon/extracted/`
+(`blank-main.tex`, `example-main.tex`) and are copied by `apps/web/src/lib/templates.ts`;
+they are the demo content and the visual-regression fixture. Phase 2 seeds **`main.tex`
+only** — `diagram.jpg` is a binary document and binary documents arrive with object
+storage in Phase 5. The `diagram.jpg` row in the reference captures is masked
+(`zenno/plans/2026-11-07-02-editor.md` Task 2).
 
 ---
 
@@ -1037,12 +1057,18 @@ v1 keeps the dialog but `Invite` is disabled with helper text `Sharing arrives i
 
 ### 9.6 Settings modal
 
-Centred 820×560 (`max-height: 90vh`), `--modal-bg`, `--radius-2xl`, backdrop
-`rgb(0 0 0 / .5)` plus 8 px blur. Two columns: left nav 240 px (rows 36 px, icon 16 px,
-label 12/16, active `--nav-bg-active`), right content with 18/24 title and `IconClose`.
+Centred **960×720** (`max-w-[960px]`, `h-[min(720px,calc(100vh-32px))]`), `--modal-bg`,
+`rounded-2xl` (24 px at `md`), backdrop `rgb(0 0 0 / .5)` plus 8 px blur. Two columns:
+left nav **240 px** on `--bg-app` (rows 36 px, icon 16 px, label 12/16, active
+`--nav-bg-active`), right content on `--modal-bg` (`p-8` at `md`, inner `max-w-2xl`) with
+an 18/24 title and `IconClose`.
 
-Rows: label 13/18 weight 500, description 12/16 `--fg-tertiary`, control right-aligned
-(Select 160 px, Toggle 36×20, pill buttons, or inputs).
+The earlier 820×560 came from a measurement at the wrong DPR; the bundle pins the size
+at `zenno/recon/js/36qcv_qj-yoz-.js` offsets 1001313 (size) and 1001500 (nav 240).
+
+Rows: label 16/24 weight 400 (`text-base font-normal`), description 14/20 `--fg-tertiary`
+(`text-sm text-text-editor-secondary`), control right-aligned (Select 160 px, Toggle 36×20,
+pill buttons, or inputs).
 
 **Editor** — Interface Theme (`System default` / `Dark` / `Light`); Language
 (`System default`, …); Font size (`Small`/`Normal`/`Large`, maps to 12/13/15 px);
@@ -1066,6 +1092,40 @@ node_modules, .next`.
 box.
 
 **Integrations** — Zotero card with `Connect` (deferred; renders `Coming soon`).
+
+**Control descriptions** (verbatim from the shipped `en` bundle, embedded in
+`zenno/recon/html/index.html`; these are product copy and were previously missing):
+
+| Control | Description |
+|---|---|
+| Interface Theme | `Select your interface color scheme.` |
+| Language | `Choose the interface language. System default follows your browser settings.` |
+| Font size | `Adjust the editor font size.` |
+| Auto Formatting | `Automatically add the correct number of spaces before each code command` |
+| Realtime compilation | `Automatically compile the document as you type` |
+| Vim Mode | `Enable vim mode in the editor` |
+| Equation hover | `Show live equation previews when hovering LaTeX math.` |
+| Disable Word Wrap | `Prevents lines from wrapping, requiring horizontal scrolling for long lines.` |
+| Disable Sticky Scroll | `Keeps parent structures (sections, environments) visible while scrolling. Disable to stop headers from sticking to the top.` |
+| Editor spellcheck | `Underline possible misspellings for supported dictionary languages. Unsupported locales currently fall back to English.` |
+| Personal spellcheck dictionary | `Add words to your personal spellcheck dictionary. These words are stored in local settings and ignored across projects in this browser.` |
+| Highlight ambiguous Unicode characters | `Warn when a character looks like another character.` |
+| Highlight invisible Unicode characters | `Warn about invisible characters such as zero-width spaces.` |
+| Allowed Unicode characters | `Add one character at a time. Allowed characters are saved across projects in this browser.` |
+| PDF Dark Mode | `Enable "Dark Mode" for the PDF viewer by inverting the colors.` |
+| PDF Zoom Shortcuts | `Override the browser's zoom shortcuts (Cmd/Ctrl +/-/0) to zoom the PDF viewer instead.` |
+| Reveal sidebar on hover | `Open the hidden sidebar when the pointer reaches the left edge.` |
+| Hide files from file tree | `Define which types of files should be hidden from the file tree` |
+| Join the beta program | `Get early access to Prism features that are still in development.` |
+| Beta disclaimer | `Beta features may change or be removed. Some features are released gradually, even after you opt in.` |
+| Integrations | `Integrate a variety of third-party tools to enhance functionality and streamline user experience.` |
+| Zotero card | `With the Zotero integration, you can import your references into your project.` |
+
+Row metrics from the bundle (offsets 1030400–1031000):
+`k$` = `flex w-full items-center justify-between gap-6 py-4` (row),
+`kz` = `flex grow flex-col gap-1` (label + description),
+`kF` = `text-base font-normal text-text-editor-primary` (label **16/24 normal**, not 13/18
+weight 500), `kq` = `text-sm text-text-editor-secondary` (description **14/20**).
 
 ### 9.7 Preferences object
 
@@ -1094,6 +1154,13 @@ type Preferences = {
 
 Stored per user in Postgres, mirrored to `localStorage` under
 `spektrum_preferences_v1` for instant boot, synced on change (`PATCH /api/user-preferences`).
+
+> **Amended (Phase 2, §18 D38):** the database row is authoritative. The only browser
+> mirror is the pre-paint theme key `crixet_light_mode_preference_v1`, which
+> `apps/web/src/components/theme-script.tsx` already reads; only `interfaceTheme` is
+> written there. The full object is **not** mirrored under `spektrum_preferences_v1` —
+> adopting a stale local copy would overwrite a newer server value, contradicting §11.0.
+> The endpoint is `GET/PUT /api/user/preferences` (repo `user/...` path convention).
 
 ---
 
@@ -1714,6 +1781,17 @@ user menu, Comments/Logs menus, PDF ⋯/zoom menus, share dialog, project-info t
 menu, the Comments/Logs filter menus) are reviewed by hand from a checklist in
 `e2e/baselines/manual-review.md`; they are not gated by pixel diff.
 
+**Phase 2 additions** (spec change, §18 D33/D36):
+
+- Two editor baselines (`editor--dark--blank`, `editor--light--blank`) and six settings
+  baselines (`settings--{editor,pdf-viewer,file-management,data-controls,beta,integrations}--dark`).
+- Mask rule: the PDF pane is a Phase 3 placeholder, so the editor diffs gate the sidebar,
+  header block, editor field and composer; the settings diffs mask the blurred dashboard
+  outside the modal (four non-overlapping strips) and the OS toast.
+- The ≤ 0.15 % ratio is **recorded, not enforced**: the `visual` CI job stays
+  `continue-on-error: true`, and the shortfall is documented rather than re-calibrated
+  (`zenno/plans/2026-11-07-01-shell-dashboard.md` Appendix A).
+
 The four screens that used to have no reference — **sign-in, project row menu, editor
 context menu, PDF search** — are now captured (§2.1 rows 44–46, 40, 41) and are
 pixel-diff gated like any other screen.
@@ -1814,6 +1892,24 @@ them and the spec changes accordingly.
 | D22 | No icon rail | The dark strip at the left of every capture is Chrome's vertical tab strip — it carries Chrome's tab-search buttons and tab favicons and is identical on the signed-out capture. Spec §6.1 deleted |
 | D23 | The account chip sits below the project card, not inside it | Refs 12 and 39 show the card ending ~76 CSS above the viewport bottom with the chip on the page background underneath |
 | D24 | Row-menu `Delete` is not red and `IconMoreHorizontal` is always visible | Ref 46 is the only row-menu capture: three near-black items, no pointer, and `⋯` on every row |
+| D26 | New-file dialog copy and the `.tex` default extension | No capture; `main.tex` must stay editable |
+| D27 | Rename-file dialog copy | No capture; mirrors the project dialog |
+| D28 | Delete-file confirmation copy | Destructive; no capture |
+| D29 | `Save failed` transient chip; retry on the next edit | Autosave failures must be visible without inventing a toast system |
+| D30 | `No chats yet` for the empty Chats tab | The tab ships before threads exist |
+| D31 | File-search overlay copy | No capture; mirrors Phase 1's search copy |
+| D32 | Phase 2 composer placeholder is `Getting ready...` | Both Phase 2 editor captures show it; `Ask anything` returns with the AI in Phase 4 |
+| D33 | Phase 2 right pane is the captured `Initializing...` shell | Gives Phase 3 a mount point and matches both editor baselines |
+| D34 | Tab-strip and composer icon aria labels | Icon-only controls need names |
+| D35 | Composer icon aria labels | Same |
+| D36 | Settings modal is 960×720, not 820×560 | Measured from refs 2–11; the bundle pins `max-w-[960px] h-[min(720px,…)]` |
+| D37 | Editor panel defaults 442/677 | Measured; the spec's 370/600 came from the wrong DPR. 677 is the pane **content**; the grid reserves the capture's 16 px scrollbar strip. The right pane's 360–900 resize is deferred to Phase 3. |
+| D38 | Preferences use `GET/PUT` with the full §9.7 object | The DB row is authoritative; only `interfaceTheme` is mirrored to `crixet_light_mode_preference_v1` for the pre-paint script, never the full object. |
+| D39 | Rename is `POST …/rename`, not a second `PATCH` body | Keeps §19.2's save contract unambiguous |
+| D40 | Beta opt-in lives in `spektrum_beta_opt_in_v1`, not the preferences row | §9.7 has no field for it; adding one is a later spec change |
+| D41 | File-management `Remove` is amber (`--fg-warning`), not red | The capture is amber; D24's "Delete is not red" logic applies |
+| D42 | Monaco loading path (ESM worker vs AMD public copy) | Recorded after the Phase 2 spike; the component API is identical either way |
+| D43 | Shortcuts dialog lists §7.5's ten rows plus `Find` and `Save` | The spec names the dialog but gives no row list; the two additions cover the Phase 2 shortcuts |
 
 ### 18.1 Repo reset (Phase 0, first action)
 
@@ -1854,6 +1950,20 @@ The implementation of each is planned in the phase that owns it.
   the cache key for `pdf_renders`.
 - Document read: `GET /api/projects/:projectId/documents?path=…` and
   `GET /api/projects/:projectId/tree`.
+
+Phase 2 additions (spec change, §18 D26–D43):
+
+- Tree: `GET /api/projects/:projectId/tree` → `{ documents: [{ id, path, kind, updatedAt }] }`.
+- Create: `POST /api/projects/:projectId/documents` body `{ path }` → 201
+  `{ document: { id, path, kind, content, updatedAt } }`; 409 on duplicate path.
+- Rename: `POST /api/projects/:projectId/documents/:documentId/rename` body
+  `{ path }` → `{ document: { id, path, kind, updatedAt } }`; 409 on duplicate path.
+- Delete: `DELETE /api/projects/:projectId/documents/:documentId` → 204.
+- Download: `GET /api/projects/:projectId/documents/:documentId/download` → the
+  document content as `text/plain; charset=utf-8` with `Content-Disposition: attachment`.
+- Save stays exactly as pinned above: 409 with `{ error: "conflict", document }` on a
+  stale baseline.
+- Unknown project/document → 404 `{ error: "not_found" }` (not 403).
 
 ### 19.3 Compile
 
