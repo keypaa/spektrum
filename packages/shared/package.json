@@ -10,9 +10,12 @@
     "./http/guard": "./src/http/guard.ts",
     "./crypto/envelope": "./src/crypto/envelope.ts",
     "./log/redact": "./src/log/redact.ts",
-    "./rate-limit": "./src/rate-limit.ts"
+    "./rate-limit": "./src/rate-limit.ts",
+    "./preferences": "./src/preferences.ts"
   },
-  "scripts": { "build": "tsc --noEmit" },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
   "dependencies": {
     "ioredis": "6.0.0",
     "zod": "4.6.7"
