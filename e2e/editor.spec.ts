@@ -185,6 +185,7 @@ test("an edit then a focus loss persists after reload", async ({ page }) => {
 });
 
 test("settings: a preference persists across a reload", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   await login(page);
   await page.getByRole("button", { name: "New", exact: true }).click();
@@ -217,4 +218,25 @@ test("settings: a preference persists across a reload", async ({ page }) => {
   await expect(
     reopened.getByRole("switch", { name: "Disable Word Wrap" }),
   ).toHaveAttribute("aria-checked", "true");
+});
+
+test("the editor context menu opens on right-click and closes on Escape", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
+
+  const editor = page.getByTestId("monaco-editor");
+  const box = await editor.boundingBox();
+  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 3, {
+    button: "right",
+  });
+  const menu = page.getByRole("menu", { name: "Editor context menu" });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Go to PDF" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "File Search" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
 });

@@ -31,6 +31,8 @@ export interface MonacoEditorProps {
   preferences: Preferences;
   onChange(value: string): void;
   onReady?(): void;
+  /** Right-click inside the editor (viewport coordinates). */
+  onContextMenu?(point: { x: number; y: number }): void;
 }
 
 function modelUri(path: string) {
@@ -41,7 +43,7 @@ function modelUri(path: string) {
 
 export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   function MonacoEditor(
-    { path, value, language, theme, preferences, onChange, onReady },
+    { path, value, language, theme, preferences, onChange, onReady, onContextMenu },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement>(null);
@@ -65,6 +67,13 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
         createEditorOptions(preferences, theme === "crixet"),
       );
       editorRef.current = editor;
+      // Suppress Monaco's own context menu; the app renders a custom one.
+      editor.updateOptions({ contextmenu: false });
+      const onContextMenuEvent = (e: MouseEvent) => {
+        e.preventDefault();
+        onContextMenu?.({ x: e.clientX, y: e.clientY });
+      };
+      el.addEventListener("contextmenu", onContextMenuEvent);
       // Debug/test hook: the page's own editor instance. Harmless (it is
       // already reachable from the page) and the e2e folding check uses it.
       (window as unknown as { __spektrum_editor?: unknown }).__spektrum_editor =
@@ -84,6 +93,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       onReady?.();
 
       return () => {
+        el.removeEventListener("contextmenu", onContextMenuEvent);
         editor.dispose();
         for (const m of modelsRef.current.values()) m.dispose();
         modelsRef.current.clear();

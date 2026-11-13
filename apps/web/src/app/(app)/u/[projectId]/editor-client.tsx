@@ -24,6 +24,7 @@ import type { SaveResult } from "@/lib/save-document";
 import { usePreferences } from "@/components/preferences-provider";
 import { ProjectSidebar } from "./sidebar/project-sidebar";
 import { SIDEBAR_STORAGE_KEY, useResizablePane } from "./sidebar/resizable";
+import { EditorContextMenu } from "./editor/editor-context-menu";
 import { NewFileDialog } from "./dialogs/new-file-dialog";
 import { RenameFileDialog } from "./dialogs/rename-file-dialog";
 import { DeleteFileDialog } from "./dialogs/delete-file-dialog";
@@ -85,6 +86,7 @@ export function EditorClient({
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const [tabs, dispatch] = useReducer(tabsReducer, null, (): TabsState => {
     // SSR-safe: the first render is identical on server and client (the RSC
@@ -348,6 +350,7 @@ export function EditorClient({
               theme={preferences.interfaceTheme === "light" ? "crixet-light" : "crixet"}
               preferences={preferences}
               onChange={onBufferChange}
+              onContextMenu={(point) => setContextMenu(point)}
             />
           ) : null}
         </div>
@@ -360,6 +363,20 @@ export function EditorClient({
       </div>
 
       <PdfPane />
+
+      {contextMenu ? (
+        <EditorContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          editor={editorRef.current?.getEditor() ?? null}
+          documents={docs}
+          onClose={() => setContextMenu(null)}
+          onOpenDocument={(path) => {
+            setContextMenu(null);
+            void openDocument(path);
+          }}
+        />
+      ) : null}
 
       <NewFileDialog
         open={newFileOpen}
