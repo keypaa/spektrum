@@ -158,7 +158,9 @@ export function normalizeDocumentPath(input: string): string {
 
   const segments = input.split("/");
   for (const segment of segments) {
-    if (segment === "..") throw new DocumentPathError("traversal");
+    if (segment === ".." || segment === ".") {
+      throw new DocumentPathError("traversal");
+    }
   }
 
   const normalised = segments.filter((s) => s !== "").join("/");
@@ -313,7 +315,7 @@ export async function saveDocument(
 ): Promise<{ documentId: string; updatedAt: string; revisionHash: string }> {
   const base = new Date(baseUpdatedAt);
   if (Number.isNaN(base.getTime())) {
-    throw new DocumentPathError("characters");
+    throw new Error("invalid baseUpdatedAt");
   }
 
   const updated = await db

@@ -125,6 +125,56 @@ test("tabs survive a reload with the last active tab", async ({ page }) => {
   );
 });
 
+test("switching tabs loads the other document's content", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("project-sidebar")).toBeVisible();
+
+  const edit = async (text: string) => {
+    // The hook is set in the editor's create effect; wait for it.
+    await page.waitForFunction(
+      () => Boolean((window as unknown as Record<string, unknown>).__spektrum_editor),
+    );
+    await page.evaluate((t) => {
+      const win = window as unknown as {
+        __spektrum_editor: { getValue(): string; setValue(v: string): void };
+      };
+      const ed = win.__spektrum_editor;
+      ed.setValue(ed.getValue() + t);
+    }, text);
+  };
+
+  // Type into main.tex, then create notes.tex with distinct content.
+  await edit("MAIN_MARKER");
+  await page.waitForTimeout(900);
+  await page.getByRole("button", { name: "New file" }).click();
+  const dialog = page.getByRole("dialog", { name: "New file" });
+  await dialog.getByRole("textbox", { name: "File name" }).fill("notes");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(dialog).toHaveCount(0);
+  // Let the model swap for the new tab commit before editing.
+  await page.waitForTimeout(300);
+  await edit("NOTES_MARKER");
+  await page.waitForTimeout(900);
+
+  const editorText = () =>
+    page.evaluate(
+      () =>
+        document.querySelector("[data-testid='monaco-editor']")?.textContent ?? "",
+    );
+
+  // Switch back to main.tex: its content must load, not an empty buffer.
+  await page.getByTestId("tab-main.tex").click();
+  await expect.poll(editorText, { timeout: 15_000 }).toContain("MAIN_MARKER");
+  // And back to notes.tex.
+  await page.getByTestId("tab-notes.tex").click();
+  await expect.poll(editorText, { timeout: 15_000 }).toContain("NOTES_MARKER");
+});
+
 test("an edit autosaves and survives a reload", async ({ page }) => {
   await page.goto("/");
   await login(page);

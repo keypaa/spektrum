@@ -7,8 +7,7 @@ import { login, movePointerAway, setTheme } from "./helpers";
 // the blank `main.tex` open, so each case seeds the "editor" fixture (one
 // `New Project` / `main.tex` pair), opens the project and compares.
 //
-// Fused off until Task 20 performs the single visual pass: the editor shell
-// does not exist yet, so these cannot pass.
+// Phase 2 baselines (unskipped in Task 20).
 
 const CASES = [
   { name: "editor--dark--blank", theme: "dark" },

@@ -16,6 +16,9 @@ import { createEditorOptions } from "./options";
 export interface MonacoEditorHandle {
   getValue(): string;
   setValue(value: string): void;
+  /** Replace the content without scheduling a save (loading a document,
+   *  conflict recovery — the content comes from the server). */
+  loadValue(value: string): void;
   focus(): void;
   getPosition(): { lineNumber: number; column: number } | null;
   setPosition(position: { lineNumber: number; column: number }): void;
@@ -52,6 +55,10 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     const viewStatesRef = useRef(new Map<string, editor.ICodeEditorViewState | null>());
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
+  // Suppress the change event for programmatic value replacement (loading a
+  // document, conflict recovery) — those must not schedule a save of content
+  // the server already has.
+  const applyingExternal = useRef(false);
 
     // Create the editor once; themes are registered by the environment setup.
     useEffect(() => {
@@ -74,10 +81,12 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
         onContextMenu?.({ x: e.clientX, y: e.clientY });
       };
       el.addEventListener("contextmenu", onContextMenuEvent);
-      // Debug/test hook: the page's own editor instance. Harmless (it is
-      // already reachable from the page) and the e2e folding check uses it.
-      (window as unknown as { __spektrum_editor?: unknown }).__spektrum_editor =
-        editor;
+      // Debug/test seam (non-production only): the page's own editor
+      // instance. The e2e folding/autosave checks use it.
+      if (process.env.NODE_ENV !== "production") {
+        (window as unknown as { __spektrum_editor?: unknown }).__spektrum_editor =
+          editor;
+      }
 
       const model = monaco.editor.createModel(
         value,
@@ -87,6 +96,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       modelsRef.current.set(path, model);
       editor.setModel(model);
       editor.onDidChangeModelContent(() => {
+        if (applyingExternal.current) return;
         const current = editor.getModel();
         if (current) onChangeRef.current(current.getValue());
       });
@@ -165,6 +175,21 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
               () => null,
             );
             editor.pushUndoStop();
+          }
+        },
+        loadValue: (v) => {
+          const editor = editorRef.current;
+          const model = editor?.getModel();
+          if (editor && model) {
+            applyingExternal.current = true;
+            editor.pushUndoStop();
+            model.pushEditOperations(
+              [],
+              [{ range: model.getFullModelRange(), text: v }],
+              () => null,
+            );
+            editor.pushUndoStop();
+            applyingExternal.current = false;
           }
         },
         focus: () => editorRef.current?.focus(),

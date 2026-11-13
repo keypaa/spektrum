@@ -47,6 +47,11 @@ export function errorResponse(e: unknown): NextResponse {
       { status: 400 },
     );
   }
+  // A malformed JSON body (`req.json()` throws SyntaxError) is a client error,
+  // not an internal one.
+  if (e instanceof SyntaxError) {
+    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
   console.error("unhandled route error:", e);
   return NextResponse.json({ error: "internal_error" }, { status: 500 });
 }

@@ -18,6 +18,7 @@ import type {
 import {
   createDocumentRequest,
   deleteDocumentRequest,
+  getDocumentRequest,
   renameDocumentRequest,
 } from "@/lib/document-client";
 import type { SaveResult } from "@/lib/save-document";
@@ -89,6 +90,11 @@ export function EditorClient({
   const [buffer, setBuffer] = useState(initialDocument?.content ?? "");
   const [baseline, setBaseline] = useState(initialDocument?.updatedAt ?? "");
   const [loadedId, setLoadedId] = useState(initialDocument?.id ?? null);
+  // The path whose content was last applied to the editor model (Task 14 owns
+  // tab state; this is the buffer cache's key).
+  const [loadedPath, setLoadedPath] = useState<string | null>(
+    initialDocument?.path ?? null,
+  );
   const [saveNote, setSaveNote] = useState<"saving" | "error" | null>(null);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<MonacoEditorHandle>(null);
@@ -145,6 +151,49 @@ export function EditorClient({
       setBaseline(initialDocument.updatedAt);
     }
   }, [initialDocument, loadedId]);
+
+  // Load the content of the active document. The RSC only ships the initial
+  // document; switching tabs fetches the rest (spec §11.0: the DB is the
+  // source of truth, the browser buffer is a cache). `loadedPath` tracks which
+  // document the editor model currently holds — the RSC initial doc is a
+  // starting value only; a later switch overwrites the buffer, so the guard
+  // must compare paths, not the RSC record.
+  useEffect(() => {
+    if (!activePath || activePath === loadedPath) return;
+    let cancelled = false;
+    // Snapshot the model's value when the fetch starts: if the user types
+    // before it resolves, the fetched (older) content must not clobber the
+    // newer local buffer.
+    const valueAtStart = editorRef.current?.getValue() ?? "";
+    getDocumentRequest(project.id, activePath)
+      .then((doc) => {
+        if (cancelled) return;
+        const editedSince = (editorRef.current?.getValue() ?? "") !== valueAtStart;
+        if (!editedSince) {
+          setBuffer(doc.content ?? "");
+          setBaseline(doc.updatedAt);
+          setLoadedId(doc.id);
+          setLoadedPath(activePath);
+          // The Monaco model swap already created the (empty) model for this
+          // path synchronously; the fetch resolves after it, so setValue hits
+          // the right model. `applyExternal` suppresses the onChange round-trip.
+          applyExternal(doc.content ?? "");
+        } else {
+          // The user typed while the fetch was in flight; the baseline still
+          // advances so the next save targets the right revision.
+          setBaseline(doc.updatedAt);
+          setLoadedId(doc.id);
+          setLoadedPath(activePath);
+        }
+      })
+      .catch(() => {
+        // A missing document leaves the empty buffer; the next edit surfaces
+        // the error through the save path.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePath, loadedPath, project.id]);
 
   const flashSaveNote = useCallback((kind: "saving" | "error") => {
     setSaveNote(kind);
@@ -217,6 +266,12 @@ export function EditorClient({
   const tabDocs = tabs.open
     .map((path) => docs.find((d) => d.path === path))
     .filter((d): d is DocumentSummary => Boolean(d));
+
+  // Replace the editor's content without re-triggering autosave (used when a
+  // document is loaded or a conflict is resolved).
+  const applyExternal = useCallback((content: string) => {
+    editorRef.current?.loadValue(content);
+  }, []);
 
   const openDocument = useCallback(
     async (path: string) => {

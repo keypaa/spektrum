@@ -4,7 +4,7 @@
 // persisted to localStorage on pointerup only (not on every move). The stored
 // value is a plain JSON number under a versioned key.
 
-import { useCallback, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 export const SIDEBAR_STORAGE_KEY = "spektrum_editor_layout_v1";
 
@@ -64,13 +64,17 @@ export function useResizablePane(options: ResizablePaneOptions): {
     [cssVar, min, max, rootRef],
   );
 
-  // Apply the stored/initial width once the root exists.
+  // Apply the stored/initial width when the root mounts.
   const applied = useRef(false);
   const ensureApplied = useCallback(() => {
     if (applied.current || !rootRef.current) return;
     applied.current = true;
     apply(width.current);
   }, [apply, rootRef]);
+
+  useEffect(() => {
+    ensureApplied();
+  }, [ensureApplied]);
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {

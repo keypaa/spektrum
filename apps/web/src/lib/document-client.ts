@@ -26,6 +26,19 @@ export async function createDocumentRequest(
   return body.document;
 }
 
+/** Read one document's content by path (spec §19.2's GET ?path=). */
+export async function getDocumentRequest(
+  projectId: string,
+  path: string,
+): Promise<DocumentRecord> {
+  const res = await fetch(
+    `/api/projects/${projectId}/documents?path=${encodeURIComponent(path)}`,
+  );
+  if (!res.ok) throw new Error(await readError(res));
+  const body = (await res.json()) as { document: DocumentRecord };
+  return body.document;
+}
+
 export async function renameDocumentRequest(
   projectId: string,
   documentId: string,

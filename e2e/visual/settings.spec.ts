@@ -8,8 +8,7 @@ import { login, movePointerAway, setTheme } from "./helpers";
 // opens Settings, clicks the section's nav item and compares. The mask strips
 // everything outside the modal (the blurred dashboard behind it).
 //
-// Fused off until Task 20 performs the single visual pass: the settings modal
-// does not exist yet, so these cannot pass.
+// Phase 2 baselines (unskipped in Task 20).
 
 const SECTIONS = [
   { name: "settings--editor--dark", nav: "Editor" },

@@ -24,11 +24,20 @@ const saveSchema = z.object({
 
 type Ctx = { params: Promise<{ projectId: string; documentId: string }> };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   try {
     const user = await requireUser();
     assertSameOrigin(req, loadWebEnv().authUrl);
     const { projectId, documentId } = await ctx.params;
+    if (!isUuid(projectId) || !isUuid(documentId)) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     const body = saveSchema.parse(await req.json());
     const result = await saveDocument(
       user.id,
@@ -63,6 +72,9 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
     const user = await requireUser();
     assertSameOrigin(_req, loadWebEnv().authUrl);
     const { projectId, documentId } = await ctx.params;
+    if (!isUuid(projectId) || !isUuid(documentId)) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     const existing = await getDocumentById(user.id, projectId, documentId);
     if (!existing) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

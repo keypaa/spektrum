@@ -17,6 +17,12 @@ const renameSchema = z.object({
   path: z.string().min(1).max(200),
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ projectId: string; documentId: string }> },
@@ -25,6 +31,9 @@ export async function POST(
     const user = await requireUser();
     assertSameOrigin(req, loadWebEnv().authUrl);
     const { projectId, documentId } = await ctx.params;
+    if (!isUuid(projectId) || !isUuid(documentId)) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     const body = renameSchema.parse(await req.json());
     const document = await renameDocument(user.id, projectId, documentId, body.path);
     return NextResponse.json({ document });
