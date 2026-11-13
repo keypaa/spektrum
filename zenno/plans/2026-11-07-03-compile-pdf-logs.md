@@ -153,8 +153,9 @@ describe("compile contracts", () => {
 - [ ] **Step 2: Run it and watch it fail** — `pnpm exec vitest run packages/shared` → FAIL (module not found).
 - [ ] **Step 3: Implement `packages/shared/src/compile.ts`** with the schemas in the Interfaces block (`z.discriminatedUnion("event", …)` for `RenderEvent`: `status { state, revision }`, `log { line }`, `result { pdfUrl, diagnostics, stats, durationMs }`, `conflict { revision }`).
 - [ ] **Step 4: Extend the DB schema** — `renderStatusEnum` gains `"running"` and `"superseded"`; `pdfRenders` gains `stats: jsonb("stats")` (nullable). Run `pnpm db:generate && pnpm db:migrate`, then `pnpm --filter @spektrum/db test`.
-- [ ] **Step 5: Run the tests and typecheck** — `pnpm exec vitest run packages/shared packages/db && pnpm typecheck` → PASS.
-- [ ] **Step 6: Commit** — `feat(compile): add shared render contracts and the running status`.
+- [ ] **Step 5: Register the new Vitest projects** — `vitest.config.ts` enumerates projects explicitly (`shared`, `ui`, `web`, `db`), so a test in a new package silently never runs. Add `latex` (`packages/latex/**/*.test.ts`), `storage` (`packages/storage/**/*.test.ts`) and `worker` (`apps/worker/**/*.test.ts`) with the same env as `web` (`DATABASE_URL`, `REDIS_URL`, auth secrets); `apps/worker` also needs the `@` alias only if a test imports it. Verify with `pnpm exec vitest run --project latex` → "no test files found" before the package exists, then the new tests after Task 3.
+- [ ] **Step 6: Run the tests and typecheck** — `pnpm exec vitest run packages/shared packages/db && pnpm typecheck` → PASS.
+- [ ] **Step 7: Commit** — `feat(compile): add shared render contracts and the running status`.
 
 ### Task 2: The texlive image and a real compile smoke test
 
@@ -167,7 +168,7 @@ describe("compile contracts", () => {
 
 - [ ] **Step 1: Write the Dockerfile** from spec §11.5: `debian:bookworm-slim`, `texlive-latex-base`, `texlive-latex-extra`, `texlive-fonts-recommended`, `texlive-science`, `texlive-pictures`, `texlive-xetex`, `texlive-luatex`, `texlive-bibtex-extra`, `texlive-lang-english`, `texlive-lang-french`, `latexmk`; create a non-root user; `ENV DEBIAN_FRONTEND=noninteractive`. Keep the package list in one block with a comment citing §11.5.
 - [ ] **Step 2: Build and record the digest** — `scripts/build-texlive.sh` runs `docker build -t spektrum-texlive:dev docker/texlive` and prints `spektrum-texlive:dev sha256:…`. Expected: build succeeds (20–60 min, one time) and `docker run --rm spektrum-texlive:dev latexmk --version` prints a version.
-- [ ] **Step 3: Write the smoke script** — materialise `zenno/recon/extracted/example-main.tex` into a temp dir and run the exact command the worker will use:
+- [ ] **Step 3: Write the smoke script** — materialise `zenno/recon/extracted/example-main.tex` **plus its `diagram.jpg`** into a temp dir and run the exact command the worker will use. The capture's example document has `\includegraphics[width=\linewidth]{diagram.jpg}` (line 59) and `diagram.jpg` is not in the repo: add a small generated JPEG at `packages/latex/fixtures/src/diagram.jpg` and copy it next to `main.tex` (without it, latexmk errors on a missing file and the smoke test is meaningless).
 
 ```bash
 docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
@@ -191,7 +192,7 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 - Consumes: `Diagnostic` from `@spektrum/shared`.
 - Produces: `parseLog(raw: string): Diagnostic[]`.
 
-- [ ] **Step 1: Generate the 12 fixtures** — extend `scripts/gen-latex-fixtures.ts` to compile the 12 broken documents listed in Appendix B inside `spektrum-texlive:dev`, copy each `main.log` to `packages/latex/fixtures/<name>.log`, and print the list. Expected: 12 files, each non-empty, each containing at least one `!` or warning line.
+- [ ] **Step 1: Generate the 12 fixtures** — add the 12 broken sources under `packages/latex/fixtures/src/<name>.tex` (Appendix B), then extend `scripts/gen-latex-fixtures.ts` to compile each inside `spektrum-texlive:dev`, copy `out/main.log` to `packages/latex/fixtures/<name>.log`, and print the list. Expected: 12 non-empty logs. `timeout` and `partial-render` cannot come from a normal compile: synthesise them by truncating a real log at a `! LaTeX Error` block (`timeout` has no `l.<n>` line; `partial-render` stops after the first page's warnings).
 - [ ] **Step 2: Write the failing tests** — one `it` per rule in spec §11.3, using the fixtures: `! LaTeX Error`, `! Emergency stop.`, `! Undefined control sequence.`, `file.tex:12:` prefix, `Overfull \hbox … at lines A--B` → warning at `A` with message `Overfull \hbox (Xpt too wide) detected at line A`, `Underfull \hbox`/`\vbox`, `LaTeX Warning:`, `Package xyz Warning:`, `Missing character:` → info, 79-column unwrapping, duplicate suppression by `(severity, message, file, line)`, and `raw` carrying the original block.
 - [ ] **Step 3: Run the tests and watch them fail** — `pnpm exec vitest run packages/latex` → FAIL.
 - [ ] **Step 4: Implement `parseLog`** — unwrap at 79 columns first; match the rules in order; `file:line:` prefix wins over `l.<n>`; convert TeX's 1-based line to the model's 0-based (`line = n - 1`); suppress duplicates; keep the multi-line block as `raw`.
@@ -227,19 +228,19 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 - [ ] **Step 1: Copy the captured map** — copy `out/main.synctex.gz` from Task 2's smoke run to the fixture path.
 - [ ] **Step 2: Write the failing tests** — assert the forward map has an entry for `main.tex`, that a known editor line maps to a page and 0–1 fractions, that `backward` anchors are ordered by `y`, that coordinates are zoom-independent (the fractions do not depend on any page size), and that a file with no SyncTeX records degrades to an empty map rather than throwing.
 - [ ] **Step 3: Run and watch it fail** — `pnpm exec vitest run packages/latex/src/synctex.test.ts`.
-- [ ] **Step 4: Implement `parseSyncTex`** — gunzip (`node:zlib`), parse the `Input:`/`Output:`/`{`/`}` records, convert `sp` (65536/inch) → PDF points (72/inch) → page-relative fractions using the page's `Content:`/`尺` size from the file's `PAGE`/`Content` records; produce the exact `SyncTexMap` shape from spec §11.6.
+- [ ] **Step 4: Implement `parseSyncTex`** — gunzip (`node:zlib`), parse the `Input:`/`Output:`/`{`/`}` records, convert `sp` (65536/inch) → PDF points (72/inch) → page-relative fractions using the page's `Content:` box size from the file's `PAGE`/`Content` records; produce the exact `SyncTexMap` shape from spec §11.6.
 - [ ] **Step 5: Run, typecheck, commit** — `feat(latex): parse SyncTeX maps for two-way sync`.
 
 ### Task 6: Storage package
 
 **Files:**
-- Create: `packages/storage/{package.json,src/index.ts}`
+- Create: `packages/storage/{package.json,src/index.ts}` (package name `@spektrum/storage`)
 - Test: `packages/storage/src/index.test.ts` (against MinIO; skipped when `S3_ENDPOINT` is unset)
 
 **Interfaces:**
 - Produces: `putObject(key, body, contentType)`, `getObject(key)`, `getObjectRange(key, start, end)`, `deleteObject(key)`, `bucket()`.
 
-- [ ] **Step 1: Write the failing test** — with `docker compose -f docker/compose.dev.yml up -d minio createbuckets` running, put a small object, read it back, read a byte range, delete it. `pnpm exec vitest run packages/storage` → FAIL.
+- [ ] **Step 1: Write the failing test** — gate the suite on `process.env.STORAGE_IT === "1"` (a developer/CI run without MinIO must not fail `pnpm test`). With `docker compose -f docker/compose.dev.yml up -d minio createbuckets` running, `STORAGE_IT=1 pnpm exec vitest run --project storage` puts a small object, reads it back, reads a byte range and deletes it → FAIL.
 - [ ] **Step 2: Implement the client** — `@aws-sdk/client-s3` with `forcePathStyle: true` and the `S3_*` env vars; throw a typed `StorageError` on a missing object so callers can map it to 404.
 - [ ] **Step 3: Run the test and commit** — `feat(storage): add the S3-backed render store`.
 
@@ -269,9 +270,9 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 - Consumes: `CompileJob`, `listRevisionDocuments`, `parseLog`, `parseSyncTex`, `parseTexcount`, `putObject`.
 - Produces: `runCompile(job: CompileJob): Promise<{ status: "ok" | "error"; durationMs: number }>`.
 
-- [ ] **Step 1: Write the failing integration test** — enqueue the example project's revision, run `runCompile`, assert the `pdf_renders` row is `ok`, the PDF object exists in MinIO, `diagnostics` is `[]` for the clean document, `durationMs` is a number, and a Redis `result` event was published.
-- [ ] **Step 2: Implement materialise + container** — write every document row to a temp dir (`fs.mkdtemp`), then the exact `docker run` from Task 2 with a 30 s timeout, `--network none`, caps, non-root; on timeout `docker kill` and return `error` with `Compilation timed out after 30s`.
-- [ ] **Step 3: Implement `runCompile`** — insert/update the `pdf_renders` row (`running`, `mainFile`), publish `status: running`, stream stdout lines as `log` events (cap 200), then parse `out/main.log` → diagnostics, `out/main.synctex.gz` → map, texcount → stats; upload `pdf/<projectId>/<revision>.pdf` and `synctex/<projectId>/<revision>.json`; update the row to `ok` (or `error` with the tail of stderr); publish `result` (with the route-relative `pdfUrl`, diagnostics, stats, durationMs). If the revision already has an `ok` row, return it without a container (spec §11.2 step 2). Before writing the row, re-check `compile:current:<projectId>`; if it no longer equals `job.revisionHash`, mark the row `superseded` and write nothing (a newer revision won).
+- [ ] **Step 1: Write the failing integration test** — gate it on `RUN_COMPILE_IT=1` (the texlive image, MinIO and Redis are not present in the default CI test job; a gated suite keeps `pnpm test` green everywhere). It enqueues the example project's revision, runs `runCompile`, and asserts the `pdf_renders` row is `ok`, the PDF object exists in MinIO, `diagnostics` is `[]` for the clean document, `durationMs` is a number, and a Redis `result` event was published.
+- [ ] **Step 2: Implement materialise + container** — write every document row to a temp dir (`fs.mkdtemp`), resolving each path with `normalizeDocumentPath` and asserting the result stays inside the temp dir (a crafted `path` must not escape). A row with `content === null` is an S3 blob (images, large files): fetch it with the `blobKey`; only `content` rows are written directly. Copy `diagram.jpg` from `packages/latex/fixtures/src` when the main file references it and no document row provides it. Then the exact `docker run` from Task 2 with a 30 s timeout, `--network none`, caps, non-root; on timeout `docker kill` and return `error` with `Compilation timed out after 30s`.
+- [ ] **Step 3: Implement `runCompile`** — choose the program before the run: `% !TEX program = xelatex|lualatex|pdflatex` in the main file wins, else `pdflatex` (spec §11.2 step 4), and pass `-xelatex`/`-lualatex`/`-pdf` accordingly. Insert/update the `pdf_renders` row (`running`, `mainFile`), publish `status: running`, stream stdout lines as `log` events (cap 200), then parse `out/main.log` → diagnostics, `out/main.synctex.gz` → map, texcount → stats; store the last 2 000 lines of `main.log` in `pdf_renders.log` (the Raw logs view); upload `pdf/<projectId>/<revision>.pdf` and `synctex/<projectId>/<revision>.json`; update the row to `ok` (or `error` with the tail of stderr); publish `result` (with the route-relative `pdfUrl`, diagnostics, stats, durationMs). If the revision already has an `ok` row, return it without a container (spec §11.2 step 2). Before writing the row, re-check `compile:current:<projectId>`; if it no longer equals `job.revisionHash`, mark the row `superseded` and write nothing (a newer revision won).
 - [ ] **Step 4: Test the failure path** — compile a document with a deliberate error; assert the row is `error`, `diagnostics` contains the error at the right line, and no PDF object is written. Add the test to `compile.test.ts`.
 - [ ] **Step 5: Run the integration test and commit** — `pnpm exec vitest run apps/worker` → PASS; `feat(worker): run latexmk in the texlive container and record the render`.
 
@@ -283,7 +284,7 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 
 **Interfaces:**
 - Consumes: `getObject`, `getObjectRange`, `requireUser`, `getProject`.
-- Produces: `GET /api/projects/:id/render/:revision/pdf` (206 for `Range`, `Content-Type: application/pdf`, `Accept-Ranges: bytes`), `GET .../synctex`, `GET .../render/latest` → `{ render }` (latest row by `createdAt`, any status), `GET .../render/:revision/pdf` 404 for another owner.
+- Produces: `GET /api/projects/:id/render/:revision/pdf` (206 for `Range`, `Content-Type: application/pdf`, `Accept-Ranges: bytes`), `GET .../synctex`, `GET .../render/latest` → `{ render }` where render is `{ revision, status, mainFile, stats, diagnostics, durationMs, createdAt }` (latest row by `createdAt`, any status; no bytes), `GET .../render/:revision/pdf` 404 for another owner.
 
 - [ ] **Step 1: Write the failing tests** — (a) the owner gets 200 and the PDF bytes; (b) a `Range: bytes=0-99` request gets 206 with 100 bytes and `Content-Range`; (c) a second user gets 404; (d) an unknown revision gets 404; (e) the latest route returns the newest row.
 - [ ] **Step 2: Run and watch them fail** — `pnpm exec vitest run apps/web/src/lib/render-store.test.ts`.
@@ -310,18 +311,18 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 
 **Files:**
 - Create: `apps/web/src/components/pdf/{pdf-viewer.tsx,use-pdf-document.ts}`, `public/pdf.worker.min.mjs` (copied), `scripts/copy-pdf-worker.mjs`
-- Modify: `apps/web/package.json` (`pdfjs-dist`, `predev`/`prebuild` copy), `editor-client.tsx` (replace `PdfPane` with the viewer)
+- Modify: `apps/web/package.json` (`pdfjs-dist`, `predev`/`prebuild` copy), `.gitignore` (the copied worker), `editor-client.tsx` (replace `PdfPane` with the viewer)
 - Test: `apps/web/src/components/pdf/use-pdf-document.test.ts` (document loading, page count, failure → null)
 
 **Interfaces:**
 - Consumes: the render stream's `pdfUrl` and `revision`; `pdfjs-dist`.
 - Produces: `<PdfViewer pdfUrl revision zoom pageCount onPageChange />` rendering one canvas per visible page, re-rendering on zoom/DPR change, and exposing the page count upward.
 
-- [ ] **Step 1: Decide the worker loading path** — a throwaway check that `GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"` works with Next 16 + Turbopack; if the bundler path fails, use `new Worker(new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url), { type: "module" })`. Record the chosen path in Appendix E. Add `scripts/copy-pdf-worker.mjs` to `predev`/`prebuild`.
+- [ ] **Step 1: Pin `pdfjs-dist`** — install the current release, record the exact version in Appendix E (like `monaco-editor 0.57.0`), and do not use a range. Then decide the worker loading path — a throwaway check that `GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs"` works with Next 16 + Turbopack; if the bundler path fails, use `new Worker(new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url), { type: "module" })`. Record the chosen path in Appendix E. Add `scripts/copy-pdf-worker.mjs` to `predev`/`prebuild`.
 - [ ] **Step 2: Write the failing test** — load the example PDF from the fixture store (or the render route in a node test), assert `numPages` and that a page renders to a canvas with non-zero size; a 404 URL resolves to `null`, not a throw.
 - [ ] **Step 3: Run and watch it fail** — `pnpm exec vitest run apps/web/src/components/pdf`.
 - [ ] **Step 4: Implement the viewer** — virtualise by page with an `IntersectionObserver`; render at `devicePixelRatio`; cancel in-flight renders on zoom; white sheet, `--bg-preview` page background, `0 1px 3px rgb(0 0 0 / .3)`; clean up the document and observers on unmount.
-- [ ] **Step 5: Replace the placeholder** — delete the inert body of `pdf-pane.tsx` and mount `<PdfViewer>`; keep the `data-testid="pdf-pane"` wrapper and the `Initializing...` state for the no-render case.
+- [ ] **Step 5: Replace the placeholder** — delete the inert body of `pdf-pane.tsx` and mount `<PdfViewer>`; keep the `data-testid="pdf-pane"` wrapper and the `Initializing...` state for the no-render case. The two Phase 2 editor baselines (`editor--dark--blank`, `editor--light--blank`) now legitimately show a real PDF and will fail until Task 17 re-shoots them — expected, not a regression.
 - [ ] **Step 6: Run, typecheck, commit** — `feat(pdf): render the compiled PDF with pdfjs`.
 
 ### Task 12: PDF chrome and search
@@ -366,10 +367,11 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 - Consumes: `Diagnostic[]`, the render state, `revealLine` from Task 13.
 - Produces: `<InfoPanel tab onTabChange … />` with the four tabs in capture order (`Project Info`, `Versions`, `Comments`, `Logs`), 44 px tab bar, `--border-brand` underline, close button; the Logs filter menu (`Warnings and Errors`, `Warnings only`, `Errors only`, `Raw logs`); each entry card with severity rule/icon, message, `file:line`, and a disabled `Fix with AI`; clicking the card calls `revealLine(line)`.
 
-- [ ] **Step 1: Write the failing tests** — the default filter is `Warnings and Errors`; `Errors only` hides warnings; `Raw logs` shows the monospace tail; a card click calls `revealLine` with the 1-based line converted back to the editor's line; the empty state renders when there are no diagnostics.
-- [ ] **Step 2: Run and watch them fail** — `pnpm exec vitest run apps/web/src/components/info-panel`.
-- [ ] **Step 3: Implement the panel** — the trigger is an `IconInfo` button in the centre column's 16 px icon strip (`aria-label="Project info"`), the panel overlays the right pane at 360 px; `Escape` closes; the panel state survives a tab switch but not a reload.
-- [ ] **Step 4: Run, typecheck, commit** — `feat(info-panel): add the panel shell and the Logs tab`.
+- [ ] **Step 1: Measure the panel from the captures** — open `~/Pictures/Screenshots/screenshot-2026-11-05_21-26-13-google-chrome.png` (Project Info) and `…21-26-50…png` (Logs), and record the panel width, tab height, tab labels/order and card padding in Appendix A. The plan assumes 360 px wide and 44 px tabs; if the capture differs, use the capture and note it here before building.
+- [ ] **Step 2: Write the failing tests** — the default filter is `Warnings and Errors`; `Errors only` hides warnings; `Raw logs` shows the monospace tail on `--bg-code`; a card click calls `revealLine` with the 1-based line converted back to the editor's line; the empty state renders when there is no render at all (Project Info shows zeroed cards, Logs shows `No errors or warnings`); the header `Fix all with AI` button exists and is disabled.
+- [ ] **Step 3: Run and watch them fail** — `pnpm exec vitest run apps/web/src/components/info-panel`.
+- [ ] **Step 4: Implement the panel** — the trigger is an `IconInfo` button in the centre column's 16 px icon strip (`aria-label="Project info"`), the panel overlays the right pane at 360 px; `Escape` closes; the panel state survives a tab switch but not a reload.
+- [ ] **Step 5: Run, typecheck, commit** — `feat(info-panel): add the panel shell and the Logs tab`.
 
 ### Task 15: Project Info, Versions, Comments and Share
 
@@ -380,12 +382,12 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 
 **Interfaces:**
 - Consumes: `ProjectStats` (from the `result` event), `snapshots` table, `documents`.
-- Produces: `snapshotAfterCompile(projectId, userId, changedPaths)`, `pruneSnapshots(projectId, keep = 50)`, `restoreSnapshot(userId, projectId, snapshotId)`, `GET /snapshots`, `POST /snapshots/:id/restore`.
+- Produces: `snapshotAfterCompile(projectId, userId, changedPaths)`, `pruneSnapshots(projectId, keep = 50)`, `restoreSnapshot(userId, projectId, snapshotId)`, `GET /snapshots`, `POST /snapshots/:id/restore`. `changedPaths` is computed inside `snapshotAfterCompile`: for each document, compare `sha256(content)` with the newest snapshot's content hash for that document; only differing documents are inserted (spec §9.2 "when content changed").
 
 - [ ] **Step 1: Write the failing snapshot tests** — after a successful compile, one snapshot per changed document; a second compile with no change creates none; the 51st snapshot deletes the oldest; restore writes the snapshot content back and bumps `updatedAt`; another owner's restore is 404.
 - [ ] **Step 2: Run and watch them fail** — `pnpm exec vitest run apps/web/src/lib/snapshots.test.ts`.
 - [ ] **Step 3: Implement the snapshot logic + routes** — snapshot rows share `createdAt` per compile; the Versions list groups by day and labels each row `Edited workspace` with the relative time; restore returns the updated document.
-- [ ] **Step 4: Implement the three tabs + Share** — Project Info cards from `ProjectStats` (11/14 tertiary labels, 20/28 values); Comments: filter dropdown + search + `No comments yet`; Share: 480 px dialog, email + disabled `Invite` with helper `Sharing arrives in v2`, `Only invited users` disabled, `Copy link` + `Done`; open it from the project menu (`Open project menu` → `Share`).
+- [ ] **Step 4: Implement the three tabs + Share** — Project Info cards from `ProjectStats` (11/14 tertiary labels, 20/28 values; zeroed when no render exists); Versions: 28 px thumbnail, title `Edited workspace`, relative time, `⋯` menu with `Restore`, a 28 px author avatar with a red ring, footer `Showing N of M versions`; Comments: filter dropdown + search + `No comments yet`; Share: 480 px dialog, email + disabled `Invite` with helper `Sharing arrives in v2`, `People with access`, `Only invited users` disabled, `Copy link` + `Done`; open it from the project menu (`Open project menu` → `Share`).
 - [ ] **Step 5: Run, typecheck, commit** — `feat(info-panel): add project info, versions, comments and share`.
 
 ### Task 16: Behavioural e2e and the performance gate
@@ -397,7 +399,7 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 **Interfaces:**
 - Consumes: the whole pipeline; the example document from `zenno/recon/extracted/example-main.tex`.
 
-- [ ] **Step 1: Write the failing specs** — (a) open a project → a PDF appears within 3 s of the last keystroke (measure `performance.now()` from the PATCH response to the `result` event, then assert `< 3000`); (b) a deliberate error puts an error card in Logs and clicking it moves the cursor to the right line; (c) a newer edit supersedes the running compile (the final PDF matches the newest revision); (d) a failing compile keeps the last good PDF and the pill reads `Failed`; (e) another user's render URL is 404.
+- [ ] **Step 1: Write the failing specs** — a global setup starts `pnpm --filter @spektrum/worker dev` (the behavioural `webServer` only starts Next; the worker, Redis, MinIO and the texlive image are prerequisites) and tears it down. (a) open a project → warm the pipeline with one compile, then measure the second: `Date.now()` at the autosave `PATCH` response to the `result` SSE event, assert `< 3000` (the cold first compile includes queue/worker warm-up and is not the gate); (b) a deliberate error puts an error card in Logs and clicking it moves the cursor to the right line; (c) a newer edit supersedes the running compile (the final PDF matches the newest revision); (d) a failing compile keeps the last good PDF and the pill reads `Failed`; (e) another user's render URL is 404.
 - [ ] **Step 2: Run and watch them fail** — `pnpm exec playwright test e2e/compile.spec.ts` (serial, `workers: 1`).
 - [ ] **Step 3: Implement whatever the tests expose** — no new features; fix the pipeline until all five pass twice in a row (the timing test is the release gate; record both runs in the ledger).
 - [ ] **Step 4: Run the full behavioural suite** — `pnpm exec playwright test e2e` → all green.
@@ -414,9 +416,9 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 - Consumes: `compareAgainstReference`, `VISUAL_BUDGET` (0.0015), `seedEditorFixture`.
 
 - [ ] **Step 1: Measure the panel geometry** — open `~/Pictures/Screenshots/screenshot-2026-11-05_21-26-13-google-chrome.png` and `…21-26-50…png`, record the Info panel width, tab height and card metrics in Appendix A; adjust Task 14/15 if they differ.
-- [ ] **Step 2: Write the cases** — `pdf--dark--compiled` (capture 18), `logs--dark--default`, `logs--dark--filter-menu` (29–30), `pdf--dark--more-menu`, `pdf--dark--zoom-menu` (31–32), `editor--light--context-menu` (40), `pdf--light--search` (41).
-- [ ] **Step 3: Run and watch them fail** — `pnpm test:visual` → FAIL (no baselines yet).
-- [ ] **Step 4: Generate the baselines and inspect the ratios** — run once with the update flag, open each diff, confirm the only differences are the intended ones; record the ratios in Appendix A (the budget is a measurement, not a gate).
+- [ ] **Step 2: Write the cases** — `pdf--dark--compiled` (capture 18), `logs--dark--default`, `logs--dark--filter-menu` (29–30), `pdf--dark--more-menu`, `pdf--dark--zoom-menu` (31–32), `editor--light--context-menu` (40), `pdf--light--search` (41). Each case seeds a project whose `pdf_renders` row is `ok` and whose PDF is already in MinIO (upload the Task 2 artefact with `@spektrum/storage` from a `scripts/seed-render.ts` run in a global setup; no worker is needed for a visual diff). The visual `webServer` env gains `S3_*` and the compose stack must be up.
+- [ ] **Step 3: Run and watch them fail** — `pnpm test:visual` → FAIL (no baselines yet); `compare.ts` writes `actual.png` and `diff.png` under `test-results/`.
+- [ ] **Step 4: Generate the baselines** — for each case, crop `actual.png` to the app region (2182×1174) and copy it to `e2e/baselines/reference/<name>.png`, exactly as Phase 1/2 did (there is no update flag); add the mapping row to `e2e/baselines/README.md` with the source capture. Re-run and record the ratios in Appendix A (the budget is a measurement, not a gate).
 - [ ] **Step 5: Re-shoot the two Phase 2 editor baselines** — the real viewer replaces the `Initializing...` placeholder, so `editor--dark--blank` and `editor--light--blank` change legitimately; update them in the same commit and note it in the ledger.
 - [ ] **Step 6: Verify CI** — `pnpm typecheck && pnpm lint && pnpm test && pnpm build`; the `visual` job stays `continue-on-error: true`; the `compile` e2e job is required.
 - [ ] **Step 7: Commit** — `test(visual): add the Phase 3 PDF and Logs baselines`.
@@ -456,6 +458,8 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 | Production TeX image registry | 5 | CI builds and caches the image; the digest is pinned here |
 | Vim mode | post-v1 | Phase 2 D42 (monaco-vim cannot resolve against monaco-editor 0.57) |
 | PDF text selection/copy | v1.x | Search and SyncTeX ship; selection is not in the captures |
+| Project-level TeX program setting | post-v1 | Spec §11.2 step 4 mentions it, but no schema column and no §9.6 row exist; the magic comment and the `pdflatex` default ship |
+| Sign-in / project-row-menu baselines | Phase 1 debt | §15.1 gates them; `e2e/baselines/reference` has the row menu but no sign-in baseline. Not Phase 3's scope; fix in a Phase 1 follow-up |
 
 ## Appendix E — Decision log additions
 
@@ -466,3 +470,5 @@ docker run --rm --network none --memory 2g --cpus 2 --cap-drop ALL \
 - **D48 — Info panel: all four tabs in Phase 3.** Project Info and Versions need the compile pass, Comments is the empty state, Share is the disabled dialog; deferring them would leave Phase 4/5 without a home (user ruling, 2026-11-13).
 - **D49 — `texcount` + a small figure/math scanner.** §9.1 says "TeXcount-equivalent, not a client tokenizer"; texcount covers words/headers, the scanner covers figures/math, both run in the worker and are stored on `pdf_renders.stats`.
 - **D50 — Coalescing by "newest wins", not by killing the running container.** The per-project lock serialises jobs; a job whose revision is no longer `compile:current:<projectId>` returns `superseded` at the start and its result is discarded at the end. The container is capped at 30 s, so waiting out the old compile is cheaper and safer than racing `docker kill` against the upload; the observable behaviour the spec wants (never show a stale PDF as current) is preserved.
+- **D51 — The worker shells out to the Docker CLI.** Dev uses the host daemon (`/var/run/docker.sock`) and `docker run`; Phase 5 replaces this with the Engine API or a socket mount when the worker is containerised.
+- **D52 — Visual baselines use a pre-rendered fixture PDF.** The visual harness seeds an `ok` render and uploads the Task 2 artefact to MinIO; it does not run a compile, so the diff measures the viewer, not the container.
