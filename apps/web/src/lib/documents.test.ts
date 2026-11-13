@@ -20,7 +20,7 @@ import {
   saveDocument,
   seedProjectDocuments,
 } from "./documents";
-import { revisionHash } from "./revision";
+import { revisionHash } from "@spektrum/shared/revision";
 import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "./templates";
 
 const createdOwners = new Set<string>();

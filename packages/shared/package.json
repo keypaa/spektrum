@@ -11,7 +11,9 @@
     "./crypto/envelope": "./src/crypto/envelope.ts",
     "./log/redact": "./src/log/redact.ts",
     "./rate-limit": "./src/rate-limit.ts",
-    "./preferences": "./src/preferences.ts"
+    "./preferences": "./src/preferences.ts",
+    "./revision": "./src/revision.ts",
+    "./paths": "./src/paths.ts"
   },
   "scripts": {
     "build": "tsc --noEmit"

@@ -2,3 +2,4 @@
 export const SHARED_PACKAGE = "@spektrum/shared" as const;
 
 export * from "./preferences";
+export * from "./compile";

@@ -15,6 +15,7 @@ import {
   inet,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import type { Diagnostic, ProjectStats } from "@spektrum/shared";
 import { citext } from "./citext";
 import { users } from "./auth-schema";
 
@@ -38,7 +39,13 @@ export const memberRoleEnum = pgEnum("member_role", [
   "viewer",
 ]);
 
-export const renderStatusEnum = pgEnum("render_status", ["queued", "ok", "error"]);
+export const renderStatusEnum = pgEnum("render_status", [
+  "queued",
+  "running",
+  "ok",
+  "error",
+  "superseded",
+]);
 
 export const chatRoleEnum = pgEnum("chat_role", [
   "user",
@@ -189,6 +196,8 @@ export const snapshots = pgTable("snapshots", {
     .notNull()
     .references(() => documents.id, { onDelete: "cascade" }),
   content: text("content").notNull(),
+  /** All snapshots written by one compile share this id (the pdf_renders.id). */
+  batchId: uuid("batch_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -205,11 +214,15 @@ export const pdfRenders = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     revisionHash: text("revision_hash").notNull(),
+    /** The file that was compiled, for the status-pill popover. */
+    mainFile: text("main_file"),
     pdfKey: text("pdf_key"),
     synctexKey: text("synctex_key"),
     status: renderStatusEnum("status").notNull().default("queued"),
     log: text("log"),
-    diagnostics: jsonb("diagnostics"),
+    diagnostics: jsonb("diagnostics").$type<Diagnostic[]>(),
+    /** texcount + figure/math counts for the Project Info cards. */
+    stats: jsonb("stats").$type<ProjectStats>(),
     durationMs: integer("duration_ms"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

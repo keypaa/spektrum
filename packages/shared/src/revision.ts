@@ -1,17 +1,21 @@
-// Revision hash — the cache key for `pdf_renders` (spec §19.2).
+// Revision hash — the cache key for `pdf_renders` (spec §19.2, as amended).
 //
-//   revisionHash = sha256 over `path || contentHash` of every document,
-//   sorted by path.
+//   revisionHash = sha256 over `path || sha256(content ?? blobKey)` of every
+//   document, sorted by path.
 //
 // `contentHash` is fixed-width (a hex sha256), so concatenating it directly
 // after the path needs no separator: "ab" + hash("c") can never collide with
 // "a" + hash("bc"), because the boundary is always at the same offset.
+//
+// A blob document has `content: null` and a content-addressed `blobKey`
+// (the sha256 of its bytes), so replacing an image still changes the hash.
 
 import { createHash } from "node:crypto";
 
 export interface RevisionDocument {
   path: string;
   content: string | null;
+  blobKey: string | null;
 }
 
 /** sha256 of the document's UTF-8 bytes; `null` hashes the empty string. */
@@ -29,7 +33,7 @@ export function revisionHash(documents: RevisionDocument[]): string {
   const joined = documents
     .slice()
     .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
-    .map((d) => `${d.path}${contentHash(d.content)}`)
+    .map((d) => `${d.path}${contentHash(d.content ?? d.blobKey)}`)
     .join("");
   return createHash("sha256").update(joined, "utf8").digest("hex");
 }

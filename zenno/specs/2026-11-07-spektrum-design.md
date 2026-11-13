@@ -168,8 +168,8 @@ web  (Next.js server: RSC, route handlers, auth)
                            no network, CPU/mem/time capped, non-root
 ```
 
-**Nothing is compiled client-side.** The client sends the document set (or a project
-revision) and receives a PDF URL + diagnostics.
+**Nothing is compiled client-side.** The route path carries `projectId`, the body carries
+`mainFile`, and the client receives a PDF URL + diagnostics.
 
 ### 3.2 Stack decisions (pinned, stated so they can be overruled)
 
@@ -194,7 +194,7 @@ pinned and §3.5 for the Next.js 16 behaviours an implementer must not get wrong
 | Auth adapter | `@better-auth/drizzle-adapter` | **1.7.18** | First-class Drizzle support; the adapter follows Better Auth's own versioning, so it is pinned at the same version as `better-auth` |
 | Queue | Redis 7 + BullMQ | latest | Compile jobs |
 | Storage | S3-compatible (MinIO dev, R2/S3 prod) | latest | Prism uploads/downloads archives |
-| Realtime | None in v1 (SSE for AI streaming only) | — | Collaboration deferred |
+| Realtime | SSE for compile progress and AI streaming | — | Collaboration deferred |
 | Tests | Vitest **5.1.0**, Playwright **1.65.0** | — | Visual regression against screenshots |
 | Hashing | `@node-rs/argon2` | **2.2.2** | N-API prebuilt binaries, no toolchain |
 
@@ -209,6 +209,7 @@ spektrum/
 │  ├─ db/             Drizzle schema + migrations
 │  ├─ ui/             design system components + SVG icon registry
 │  ├─ latex/          log parser, diagnostics model, template files
+│  ├─ storage/        S3 client (rendered PDFs + blobs)
 │  └─ shared/         zod contracts shared by web + worker
 ├─ docker/
 │  ├─ texlive/        Dockerfile for the compile image
@@ -303,9 +304,10 @@ documents        id uuid pk, project_id fk, path text, kind enum(tex,bib,img,csv
                  content text null, blob_key text null, updated_at,
                  unique (project_id, path)
 project_members  project_id, user_id, role enum(owner,editor,viewer)   -- v1: owner only
-snapshots        id, project_id, document_id, content, created_at, author_id
-pdf_renders      id, project_id, revision_hash, pdf_key, synctex_key null,
-                 status enum(ok,error), log text, diagnostics jsonb,
+snapshots        id, project_id, document_id, content, batch_id null, created_at, author_id
+pdf_renders      id, project_id, revision_hash, main_file text null, pdf_key,
+                 synctex_key null, status enum(queued,running,ok,error,superseded),
+                 log text, diagnostics jsonb, stats jsonb null,
                  duration_ms, created_at
                  unique (project_id, revision_hash)
 chat_threads     id, project_id, user_id, title, title_source text default 'fallback',
@@ -1019,8 +1021,9 @@ compile/analysis pass (TeXcount-equivalent), not from a client tokenizer.
 
 Grouped by date (`Nov 5, 2026`), rows: thumbnail 28 px, title (`Edited workspace`),
 `1 minute ago`, `IconMoreHorizontal` menu, avatar with a red ring for the author. Footer
-`Showing 1 of 1 versions`. v1: create a snapshot every successful compile when content
-changed, retain 50 per project, expose restore only.
+`Showing 1 of 1 versions`. v1: create a snapshot every successful compile when the content
+changed (text documents only; blob documents are skipped because `snapshots.content` is
+`NOT NULL`), retain 50 per project, expose restore only.
 
 ### 9.3 Comments
 
@@ -1268,7 +1271,8 @@ depth on top of that:
   `requireEmailVerification` / `autoSignIn: false` synthetic-response behaviour is used
   where it applies).
 - **Application routes**: our Redis sliding-window limiter by user id, with per-route
-  budgets (compile: 6/min burst 12; AI: 30/min; upload: 20/min).
+  budgets (compile: 6/min burst 12 plus 60/hour with a visible notice; AI: 30/min;
+  upload: 20/min).
 - **Ban ladder**, enforced at the edge of every authenticated route:
   `ban_expires > now()` → `429` with `Retry-After`; permanent ban → `403` with a support
   address. Both revoke active sessions through `auth.api.revokeUserSessions`.
@@ -1351,11 +1355,11 @@ The **database is the source of truth**; the browser buffer is a cache.
 - Every edit schedules an autosave: 400 ms debounce, coalesced per document, plus a
   forced save on tab switch, blur, and `Cmd/Ctrl+S`. Autosave writes
   `documents.content` and bumps `projects.updated_at`.
-- `revision_hash = sha256( concat(sorted(path + "\0" + sha256(content)) for each
-  non-hidden file) )`, computed server-side from the persisted state. The client never
+- `revision_hash = sha256( concat(sorted(path + sha256(content ?? blobKey)) for each
+  document) )`, computed server-side from the persisted state. The client never
   computes it.
 - Compile requests carry only `{ projectId, mainFile }`; the worker reads the
-  revision that is persisted at that moment and records its own `revision_hash`.
+  revision that is persisted at that moment and records the **same** hash.
 - Consequence: the editor can be up to 400 ms ahead of what is compiled. The status
   pill shows `Unsaved changes` when a local buffer is dirty and compilation is
   suppressed until the save lands, so a compile never renders stale text without
@@ -1379,24 +1383,24 @@ The **database is the source of truth**; the browser buffer is a cache.
 1. Worker receives `{ projectId, revisionHash, mainFile }`.
 2. If `pdf_renders` already has this `(projectId, revisionHash)` with status `ok`,
    return the cached PDF key (no container).
-3. Materialise the project's non-hidden files into `/work`.
+3. Materialise every document into `/work` (text from `content`, blobs from S3 by `blobKey`).
 4. Run `latexmk` with:
-   - program from the document's magic comment (`% !TEX program = xelatex`), else
-     project setting, else `pdflatex`;
+   - program from the main file's magic comment (`% !TEX program = xelatex`), else
+     `pdflatex` (no project-level setting in v1);
    - `-interaction=nonstopmode -halt-on-error -file-line-error -synctex=1`;
    - `-pdf` for pdflatex, `-xelatex` / `-lualatex` as appropriate;
    - `-outdir=/work/out`.
-5. Collect `out/main.pdf`, `out/main.synctex.gz`, and `out/main.log`.
+5. Collect `out/<job>.pdf`, `out/<job>.synctex.gz`, and `out/<job>.log` (`<job>` is the main file's basename).
 6. Parse the log (§11.3) into diagnostics.
 7. Parse `.synctex.gz` into a compact map (§11.6), upload both to S3 under
    `pdf/<projectId>/<revisionHash>.pdf` and `synctex/<projectId>/<revisionHash>.json`;
    insert a `pdf_renders` row; publish progress over SSE.
 8. On timeout or crash: status `error`, diagnostic `Compilation timed out after 30s` or
-   the tail of stderr.
+   the tail of stderr, published as a `status: error` SSE event.
 
 Coalescing: at most one job per project runs. A newer revision arriving while a job is
-running marks the running job `superseded`, aborts its container, and queues the newest
-revision only (drop intermediate ones).
+running supersedes it: the running job's result is discarded (newest wins, no container
+abort — D50) and only the newest revision is queued.
 
 Partial renders: on failure, if a previous successful PDF exists for the same project,
 keep showing it and mark the status pill `Failed` with a link to Logs (Prism behaves
@@ -1437,9 +1441,10 @@ Rules (each becomes a unit test with a captured log fixture):
 `GET /api/projects/:id/render/stream` (SSE):
 
 ```
-event: status   data: {"state":"queued"|"running"|"ok"|"error","revision":"…"}
+event: status   data: {"state":"queued"|"running"|"ok"|"error"|"superseded","revision":"…"}
 event: log      data: {"line":"…"}                 // only while running, capped 200 lines
-event: result   data: {"pdfUrl":"…","diagnostics":[...],"durationMs":1234}
+event: result   data: {"pdfUrl":"…","diagnostics":[...],"stats":{...},"durationMs":1234}
+event: conflict data: {"revision":"…","documentId":"…"}
 ```
 
 The client keeps the last successful `pdfUrl` until a new `ok` arrives.
@@ -1778,8 +1783,9 @@ excluded from both images before diffing.
 user menu, Comments/Logs menus, PDF ⋯/zoom menus, share dialog, project-info tabs.
 
 **No-reference screens** (popover internals — the tooltips, the `+` menu, the voicemode
-menu, the Comments/Logs filter menus) are reviewed by hand from a checklist in
-`e2e/baselines/manual-review.md`; they are not gated by pixel diff.
+menu) are reviewed by hand from a checklist in `e2e/baselines/manual-review.md`; they are
+not gated by pixel diff. The Comments filter menu (row 28) and the Logs filter menu
+(row 30) **are** captured and are gated.
 
 **Phase 2 additions** (spec change, §18 D33/D36):
 
@@ -1807,8 +1813,8 @@ gates: PRs gate on correctness and visuals. The one exception is Phase 3's
 ### 15.2 Behavioural
 
 - Compile: golden tests over 12 captured `.log` files (clean, one error, missing
-  package, overfull, undefined control sequence, xelatex unicode, bibtex failure,
-  timeout, partial render).
+  package, overfull, underfull, undefined control sequence, latex warning, package
+  warning, xelatex unicode, bibtex failure, timeout, partial render).
 - AI: the system prompt is snapshot-tested; tool calls are validated with zod; the SSE
   parser has tests for interleaved thinking/text/diff.
 - Auth: attempts lockout, session rotation, CSRF rejection, OAuth linking.
@@ -1833,7 +1839,7 @@ gates: PRs gate on correctness and visuals. The one exception is Phase 3's
 | **0** Foundations | Backup + wipe of the old repo, monorepo scaffold, tokens.css from recon, fonts, Tailwind, CI, DB schema, auth (credentials + Google + invites + ban ladder), docker compose | `pnpm dev` runs; owner can sign in; invite flow works; tokens test passes |
 | **1** Shell + dashboard | Rail, dashboard container, project rows, menus, empty states, light/dark switcher, account menu | Visual diff vs screenshots 1, 12–15 < tolerance |
 | **2** Editor | Monaco + themes + LaTeX grammar + folding, tabs, sidebar, file CRUD, composer shell, settings modal | Open a project, edit, switch tabs, hard refresh preserves state |
-| **3** Compile + PDF + logs | Worker, texlive image, latexmk, log parser, PDF viewer, Logs panel, SyncTeX | Type → PDF in < 3 s; errors land in Logs with correct line; visual diff vs 18, 29–32 |
+| **3** Compile + PDF + logs | Worker, texlive image, latexmk, log parser, PDF viewer, Logs panel, SyncTeX | Type → PDF in < 3 s; errors land in Logs with correct line; visual diff vs 18, 23–32, 35, 40, 41 |
 | **4** AI | Proxy, context builder, tools, diffs, Fix with AI, Review paper, threads, model-generated thread titles | Accept/reject edits; Fix with AI repairs a broken document; thread titles are generated and regenerable |
 | **5** Ship | Import/export, production deploy, hardening, rate limits, monitoring, backups | Production URL with TLS; a real paper authored end to end |
 
@@ -1910,6 +1916,30 @@ them and the spec changes accordingly.
 | D41 | File-management `Remove` is amber (`--fg-warning`), not red | The capture is amber; D24's "Delete is not red" logic applies |
 | D42 | Monaco loading path (ESM worker vs AMD public copy) | Recorded after the Phase 2 spike; the component API is identical either way |
 | D43 | Shortcuts dialog lists §7.5's ten rows plus `Find` and `Save` | The spec names the dialog but gives no row list; the two additions cover the Phase 2 shortcuts |
+| D44 | Render bytes stream through the web app, not presigned URLs | Ownership stays checked on every byte; pdfjs can still use Range |
+| D45 | One container per compile, no warm pool | The example document compiles cold in well under 3 s; a pool is added only if the gate fails |
+| D46 | Redis pub/sub behind SSE | The worker and web do not share memory; the route resends the latest row on connect |
+| D47 | The worker is a separate app | Keeps texlive/docker out of the Next runtime (spec §3.1) |
+| D48 | Info panel: all four tabs in Phase 3 | Project Info/Versions need the compile pass; Comments is the empty state; Share is the disabled dialog |
+| D49 | texcount + a small figure/math scanner | §9.1 says "TeXcount-equivalent, not a client tokenizer" |
+| D50 | Coalescing by newest wins, no container abort | The container is capped at 30 s; waiting is safer than racing docker kill |
+| D51 | The worker shells out to the Docker CLI | Dev uses the host daemon; Phase 5 moves to the Engine API |
+| D52 | Visual baselines use a pre-rendered fixture PDF | The visual diff measures the viewer, not the container |
+| D53 | The compile API amends §19.3 | §19.3's client-computed `revisionHash` contradicts §11.0 |
+| D54 | The revision hash covers blob documents | `content` is null for images; the hash uses `content ?? blobKey` |
+| D55 | The §10.6 sandbox wins over the bind mount | read-only root + tmpfs /work requires docker cp in/out |
+| D56 | Visual baselines mask the PDF sheet | Our render can never match Prism's PDF pixels |
+| D57 | `pdf_renders.main_file` | The pill popover needs the compiled file |
+| D58 | texcount runs in the compile container | Project Info needs real counts, not a client tokenizer |
+| D59 | The Info panel replaces the PDF pane | §6.3: exactly one of PDF/info, switched by the Tools menu |
+| D60 | Versions snapshots text documents only | `snapshots.content` is NOT NULL |
+| D61 | Visual references are the full captures, masked at diff time | `actual.png` is masked and cannot be a reference |
+| D62 | The compile e2e is a separate Playwright project | The default e2e job has no Docker/MinIO/texlive |
+| D63 | `texmf.cnf` lives in `/etc/texmf` | Debian's kpathsea reads that path; the sandbox must be real |
+| D68 | Snapshots carry a `batch_id` | Grouping/restore/prune are per compile |
+| D69 | Queue/channel/key names live in `@spektrum/shared/compile` | Web and worker cannot drift |
+| D70 | Compile e2e config + default testIgnore | The compile spec cannot run in the blocking e2e job |
+| D71 | `login(page, opts?)` | Keeps the existing call sites unchanged |
 
 ### 18.1 Repo reset (Phase 0, first action)
 
@@ -1946,8 +1976,8 @@ The implementation of each is planned in the phase that owns it.
 - Save: `PATCH /api/projects/:projectId/documents/:documentId`
   body `{ content: string, baseUpdatedAt: string }` →
   `{ documentId, updatedAt, revisionHash }` (409 on stale `baseUpdatedAt`).
-- `revisionHash = sha256` over `path || contentHash` of every document, sorted by path —
-  the cache key for `pdf_renders`.
+- `revisionHash = sha256` over `path || sha256(content ?? blobKey)` of every document,
+  sorted by path — the cache key for `pdf_renders`.
 - Document read: `GET /api/projects/:projectId/documents?path=…` and
   `GET /api/projects/:projectId/tree`.
 
@@ -1967,13 +1997,16 @@ Phase 2 additions (spec change, §18 D26–D43):
 
 ### 19.3 Compile
 
-- Enqueue: `POST /api/projects/:projectId/compile` body `{ revisionHash }` →
-  `{ jobId, status }`. Idempotent per `revisionHash`.
-- Progress: `GET /api/jobs/:jobId/events` — SSE, event names
-  `queued | building | rendered | error`, JSON payloads with a schema in `packages/shared`.
-- Result: `GET /api/projects/:projectId/pdf?revision=…` → PDF bytes;
-  `GET /api/projects/:projectId/logs?revision=…` → parsed diagnostics.
-- SyncTeX: `GET /api/projects/:projectId/synctex?revision=…` → JSON map, parsed server-side.
+- Enqueue: `POST /api/projects/:projectId/compile` body `{ mainFile }` →
+  `202 { revision }` (`200 { revision, cached: true }` when the revision is already `ok`).
+- Progress: `GET /api/projects/:projectId/render/stream` — SSE, event names
+  `status | log | result | conflict`, JSON payloads with a schema in `packages/shared`.
+- Result: `GET /api/projects/:projectId/render/:revision/pdf` → PDF bytes (Range);
+  `GET /api/projects/:projectId/render/:revision/log` → the stored log tail.
+- Diagnostics: `GET /api/projects/:projectId/render/latest` → the latest render row
+  (including the last `ok` PDF and `isCurrent`).
+- SyncTeX: `GET /api/projects/:projectId/render/:revision/synctex` → JSON map, parsed
+  server-side.
 
 ### 19.4 AI
 

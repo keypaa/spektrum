@@ -12,7 +12,17 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@spektrum/db";
 import { documents, projects } from "@spektrum/db/schema";
-import { revisionHash, type RevisionDocument } from "./revision";
+import { revisionHash } from "@spektrum/shared/revision";
+import {
+  DocumentPathError,
+  normalizeDocumentPath,
+  type DocumentPathErrorCode,
+} from "@spektrum/shared/paths";
+import { listRevisionDocuments } from "@spektrum/db/documents";
+
+// Re-exported for the route handlers and tests that import them from here.
+export { DocumentPathError, normalizeDocumentPath, type DocumentPathErrorCode };
+export { listRevisionDocuments };
 import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "./templates";
 
 export type DocumentKind = "tex" | "bib" | "img" | "csv" | "other";
@@ -26,23 +36,6 @@ export interface DocumentSummary {
 
 export interface DocumentRecord extends DocumentSummary {
   content: string | null;
-}
-
-export type DocumentPathErrorCode =
-  | "empty"
-  | "absolute"
-  | "traversal"
-  | "separator"
-  | "characters"
-  | "too_long";
-
-export class DocumentPathError extends Error {
-  code: DocumentPathErrorCode;
-  constructor(code: DocumentPathErrorCode) {
-    super(`invalid document path: ${code}`);
-    this.name = "DocumentPathError";
-    this.code = code;
-  }
 }
 
 export class DuplicatePathError extends Error {
@@ -68,8 +61,6 @@ export class ProjectNotFoundError extends Error {
     this.name = "ProjectNotFoundError";
   }
 }
-
-const MAX_PATH_LENGTH = 200;
 
 const summaryColumns = {
   id: documents.id,
@@ -139,36 +130,6 @@ export function kindForPath(path: string): DocumentKind {
     default:
       return "other";
   }
-}
-
-/**
- * Validate and normalise a client-supplied path.
- *
- * Rejects absolute paths, `..` traversal, backslashes, control characters and
- * over-long names; collapses duplicate separators. There is no `path.resolve`
- * here on purpose — anything that could escape the project root is refused
- * rather than rewritten.
- */
-export function normalizeDocumentPath(input: string): string {
-  if (input.trim() === "") throw new DocumentPathError("empty");
-  if (input.length > MAX_PATH_LENGTH) throw new DocumentPathError("too_long");
-  if (input.startsWith("/")) throw new DocumentPathError("absolute");
-  if (input.includes("\\")) throw new DocumentPathError("separator");
-  if (/[\u0000-\u001f]/.test(input)) throw new DocumentPathError("characters");
-
-  const segments = input.split("/");
-  for (const segment of segments) {
-    if (segment === ".." || segment === ".") {
-      throw new DocumentPathError("traversal");
-    }
-  }
-
-  const normalised = segments.filter((s) => s !== "").join("/");
-  if (normalised === "") throw new DocumentPathError("empty");
-  if (normalised.length > MAX_PATH_LENGTH) {
-    throw new DocumentPathError("too_long");
-  }
-  return normalised;
 }
 
 /**
@@ -442,15 +403,4 @@ export async function deleteDocument(
       and(eq(documents.id, documentId), eq(documents.projectId, projectId)),
     );
   await touchProject(ownerId, projectId);
-}
-
-export async function listRevisionDocuments(
-  projectId: string,
-): Promise<RevisionDocument[]> {
-  const rows = await db
-    .select({ path: documents.path, content: documents.content })
-    .from(documents)
-    .where(eq(documents.projectId, projectId))
-    .orderBy(asc(documents.path));
-  return rows;
 }
