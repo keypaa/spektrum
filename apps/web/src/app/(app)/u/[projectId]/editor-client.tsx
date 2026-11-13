@@ -71,6 +71,19 @@ export function EditorClient({
   });
   const { preferences } = usePreferences();
   const router = useRouter();
+  // Resolve "system" against the theme the pre-paint script actually applied
+  // (the html class), and follow live theme changes.
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+  useEffect(() => {
+    const el = document.documentElement;
+    const sync = () => setIsDark(el.classList.contains("dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
   const [activeSection, setActiveSection] = useState<"files" | "chats">("files");
   const [docs, setDocs] = useState<DocumentSummary[]>(documents);
   const [buffer, setBuffer] = useState(initialDocument?.content ?? "");
@@ -347,7 +360,7 @@ export function EditorClient({
               path={activePath}
               value={buffer}
               language={activePath.endsWith(".bib") ? "bibtex" : "latex"}
-              theme={preferences.interfaceTheme === "light" ? "crixet-light" : "crixet"}
+              theme={isDark ? "crixet" : "crixet-light"}
               preferences={preferences}
               onChange={onBufferChange}
               onContextMenu={(point) => setContextMenu(point)}

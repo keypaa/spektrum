@@ -51,6 +51,21 @@ Rectangles are written **`x0,y0 → x1,y1`** (exclusive `x1`/`y1`), in **full-ca
 | `settings--*--dark.png` (all six) | four disjoint strips around `753,309 → 1838,1124` | everything outside the 960×720 modal is a blurred dashboard screenshot; the OS toast (x 2107–2529, y 0–111) falls inside the top strip, so no fifth rect is needed |
 | `editor--dark--blank.png`, `editor--light--blank.png` | none | neither capture contains the OS toast (verified by sampling x 2050–2530, y 0–120); an empty mask is correct — a toast rect would blank the real header and PDF top |
 
+## Phase 2 ratios (single geometry pass, 2026-11-13)
+
+| Baseline | Ratio | Budget | Result |
+|---|---|---|---|
+| `editor--dark--blank` | 1.778 % | ≤ 0.150 % | not met |
+| `editor--light--blank` | 1.474 % | ≤ 0.150 % | not met |
+| `settings--editor--dark` | 3.180 % | ≤ 0.150 % | not met |
+| `settings--pdf-viewer--dark` | 1.369 % | ≤ 0.150 % | not met |
+| `settings--file-management--dark` | 2.457 % | ≤ 0.150 % | not met |
+| `settings--data-controls--dark` | 1.119 % | ≤ 0.150 % | not met |
+| `settings--beta--dark` | 1.478 % | ≤ 0.150 % | not met |
+| `settings--integrations--dark` | 1.483 % | ≤ 0.150 % | not met |
+
+All eight are above the 0.15 % budget; the target is a recorded measurement, not a CI gate (`visual` stays `continue-on-error`). The pass fixed one structural defect — the editor resolved `interfaceTheme: "system"` as dark, rendering a black Monaco surface in the light baseline (40.8 %); resolving the theme from the applied `html` class brought the light editor to 1.474 %.
+
 Three things about these rectangles are not arbitrary:
 
 - **The toast really is only 62 px tall inside the app region.** The browser chrome ends at y=53; the toast panel is x 2107–2529, y 0–102 with a shadow to y≈111, so `y1=115` covers it with a little slack. Do not mask the whole top-right: the Import/New buttons and the segmented control are the point of this baseline.

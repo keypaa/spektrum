@@ -21,7 +21,7 @@ const SECTIONS = [
 ] as const;
 
 for (const c of SECTIONS) {
-  test.fixme(c.name, async ({ page }) => {
+  test(c.name, async ({ page }) => {
     seedVisualFixture("dark");
     await setTheme(page, "dark");
     await login(page);

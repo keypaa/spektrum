@@ -16,7 +16,7 @@ const CASES = [
 ] as const;
 
 for (const c of CASES) {
-  test.fixme(c.name, async ({ page }) => {
+  test(c.name, async ({ page }) => {
     seedEditorFixture();
     await setTheme(page, c.theme);
     await login(page);
