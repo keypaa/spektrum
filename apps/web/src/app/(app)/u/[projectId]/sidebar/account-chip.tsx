@@ -1,26 +1,18 @@
 "use client";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@spektrum/ui";
+import { AccountMenu } from "@/app/(app)/dashboard/account-menu";
 
-/** The bottom user chip (spec §6.3). The account menu reuses the dashboard's
- *  menu items; only Settings is wired in Phase 2 (the shortcuts dialog arrives
- *  with Task 17, feedback/sign-out keep the dashboard behaviour). */
+/** The editor's bottom user chip: the same account menu as the dashboard. */
 export function AccountChip({
   user,
-  onOpenSettings,
 }: {
   user: { name: string; email: string };
-  onOpenSettings(): void;
 }) {
   return (
     <div className="flex h-14 flex-none items-center border-t border-[color:var(--border-log)] px-4">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <AccountMenu
+        userEmail={user.email}
+        trigger={
           <button
             type="button"
             aria-label={`${user.name} account`}
@@ -34,11 +26,8 @@ export function AccountChip({
               <span className="truncate text-xs text-text-nav-tertiary">Personal workspace</span>
             </span>
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" sideOffset={8} align="start" className="max-w-[300px]">
-          <DropdownMenuItem onSelect={onOpenSettings}>Settings</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        }
+      />
     </div>
   );
 }

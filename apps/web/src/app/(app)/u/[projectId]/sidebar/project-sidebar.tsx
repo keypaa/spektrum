@@ -11,15 +11,10 @@ import {
   IconPlus,
   IconSearch,
 } from "@spektrum/ui/icons";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@spektrum/ui";
 import type { DocumentSummary, DocumentKind } from "@/lib/documents";
 import { matchHiddenFile } from "@/lib/hidden-files";
 import { FileRow } from "./file-row";
+import { AccountChip } from "./account-chip";
 
 export interface ProjectSidebarProps {
   project: { id: string; name: string };
@@ -33,7 +28,6 @@ export interface ProjectSidebarProps {
   onRenameDocument(doc: DocumentSummary): void;
   onDeleteDocument(doc: DocumentSummary): void;
   onDownloadDocument(doc: DocumentSummary): void;
-  onOpenSettings(): void;
   user: { name: string; email: string };
 }
 
@@ -64,7 +58,6 @@ export function ProjectSidebar({
   onRenameDocument,
   onDeleteDocument,
   onDownloadDocument,
-  onOpenSettings,
   user,
 }: ProjectSidebarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -194,30 +187,8 @@ export function ProjectSidebar({
         )}
       </div>
 
-      {/* Bottom user chip: opens the account menu in Task 10+; here it opens
-          settings via the account menu (wired in Task 17). */}
-      <div className="flex h-14 flex-none items-center gap-2 border-t border-[color:var(--border-log)] px-4">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={`${user.name} account`}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-[color:var(--nav-bg-hover-strong)]"
-            >
-              <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-button-secondary-bg text-sm font-medium text-button-secondary-text ring-2 ring-bg-app">
-                {user.name.charAt(0).toUpperCase()}
-              </span>
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-xs text-text-nav-primary">{user.name}</span>
-                <span className="truncate text-xs text-text-nav-tertiary">Personal workspace</span>
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" sideOffset={8} align="start" className="max-w-[300px]">
-            <DropdownMenuItem onSelect={onOpenSettings}>Settings</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      {/* Bottom user chip: the account menu (settings, shortcuts, sign out). */}
+      <AccountChip user={user} />
     </div>
   );
 }

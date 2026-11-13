@@ -281,7 +281,6 @@ export function EditorClient({
           onRenameDocument={setRenameTarget}
           onDeleteDocument={setDeleteTarget}
           onDownloadDocument={download}
-          onOpenSettings={() => {}}
           user={user}
         />
         {/* 1 px separator; drag to resize (240–480). */}

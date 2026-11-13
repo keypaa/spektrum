@@ -6,6 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectSidebar } from "./project-sidebar";
 import type { DocumentSummary } from "@/lib/documents";
 
+// The account chip's menu uses the Next router (sign-out); jsdom has none.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+}));
+
 afterEach(cleanup);
 
 const DOCS: DocumentSummary[] = [

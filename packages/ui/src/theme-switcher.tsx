@@ -9,9 +9,12 @@ export const THEME_STORAGE_KEY = "crixet_light_mode_preference_v1";
 export function ThemeSwitcher({
   value,
   onChange,
+  systemLabel = "System",
 }: {
   value: ThemePreference;
   onChange: (value: ThemePreference) => void;
+  /** Settings labels the third option `System default` (§9.6); login says `System`. */
+  systemLabel?: string;
 }) {
   return (
     <div
@@ -33,7 +36,7 @@ export function ThemeSwitcher({
               : "text-fg-tertiary hover:text-fg-secondary",
           )}
         >
-          {option === "light" ? "Light" : option === "dark" ? "Dark" : "System"}
+          {option === "light" ? "Light" : option === "dark" ? "Dark" : systemLabel}
         </button>
       ))}
     </div>

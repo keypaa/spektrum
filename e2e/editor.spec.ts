@@ -183,3 +183,38 @@ test("an edit then a focus loss persists after reload", async ({ page }) => {
   });
   expect(value).toContain("FLUSH_MARKER");
 });
+
+test("settings: a preference persists across a reload", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("project-sidebar")).toBeVisible();
+
+  // Open settings from the editor account chip.
+  await page.getByRole("button", { name: /account$/i }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Disable Word Wrap")).toBeVisible();
+
+  await dialog.getByRole("switch", { name: "Disable Word Wrap" }).click();
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[aria-label="Disable Word Wrap"]')
+        ?.getAttribute("aria-checked") === "true",
+  );
+  // Let the provider's 300 ms debounce send the PUT before reloading.
+  await page.waitForTimeout(700);
+  await page.reload();
+  await expect(page.getByTestId("project-sidebar")).toBeVisible();
+  await page.getByRole("button", { name: /account$/i }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const reopened = page.getByRole("dialog", { name: "Settings" });
+  await expect(reopened.getByText("Disable Word Wrap")).toBeVisible();
+  await expect(
+    reopened.getByRole("switch", { name: "Disable Word Wrap" }),
+  ).toHaveAttribute("aria-checked", "true");
+});
