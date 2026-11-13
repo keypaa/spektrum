@@ -17,6 +17,8 @@ export interface TabStripProps {
   onCollapseSidebar(): void;
   onRecompile(): void;
   tools: ReactNode;
+  /** Transient autosave status (spec D29); rendered when set. */
+  status?: ReactNode;
 }
 
 export function TabStrip({
@@ -27,6 +29,7 @@ export function TabStrip({
   onCollapseSidebar,
   onRecompile,
   tools,
+  status,
 }: TabStripProps): ReactElement {
   return (
     <div
@@ -93,6 +96,7 @@ export function TabStrip({
           );
         })}
       </div>
+      {status}
       {tools}
     </div>
   );

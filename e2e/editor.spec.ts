@@ -112,14 +112,74 @@ test("tabs survive a reload with the last active tab", async ({ page }) => {
   await expect(page.getByTestId("tab-notes.tex")).toBeVisible();
 
   // Activate main.tex, then reload: both tabs restore with main.tex active.
-  await page.getByRole("tab", { name: "main.tex" }).click();
+  await expect(page.getByTestId("tab-main.tex")).toBeVisible();
+  await page.getByTestId("tab-main.tex").click();
   await expect(page).toHaveURL(/p=main\.tex/);
   await page.reload();
 
   await expect(page.getByTestId("tab-main.tex")).toBeVisible();
   await expect(page.getByTestId("tab-notes.tex")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "main.tex" })).toHaveAttribute(
+  await expect(page.getByTestId("tab-main.tex")).toHaveAttribute(
     "aria-selected",
     "true",
   );
+});
+
+test("an edit autosaves and survives a reload", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
+
+  // Type through the editor's own API: the model's content-change fires the
+  // same onChange path a keystroke takes (Playwright cannot click Monaco's
+  // transparent textarea in this environment).
+  await page.evaluate(() => {
+    const win = window as unknown as {
+      __spektrum_editor: { getValue(): string; setValue(v: string): void };
+    };
+    const ed = win.__spektrum_editor;
+    ed.setValue(ed.getValue() + "AUTOSAVE_MARKER\n");
+  });
+  await page.waitForTimeout(900);
+  await page.reload();
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
+  const value = await page.evaluate(() => {
+    const win = window as unknown as {
+      __spektrum_editor: { getValue(): string };
+    };
+    return win.__spektrum_editor.getValue();
+  });
+  expect(value).toContain("AUTOSAVE_MARKER");
+});
+
+test("an edit then a focus loss persists after reload", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
+
+  await page.evaluate(() => {
+    const win = window as unknown as {
+      __spektrum_editor: { getValue(): string; setValue(v: string): void };
+    };
+    const ed = win.__spektrum_editor;
+    ed.setValue(ed.getValue() + "FLUSH_MARKER");
+  });
+  // Leaving the editor flushes immediately (blur), before the debounce.
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await page.waitForTimeout(400);
+  await page.reload();
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
+  const value = await page.evaluate(() => {
+    const win = window as unknown as {
+      __spektrum_editor: { getValue(): string };
+    };
+    return win.__spektrum_editor.getValue();
+  });
+  expect(value).toContain("FLUSH_MARKER");
 });
