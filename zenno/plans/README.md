@@ -14,7 +14,7 @@ previous one's exit criteria pass.
 | 00 | `2026-11-07-00-foundations.md` | Repo reset, monorepo, tokens + fonts, DB schema, auth (credentials, invites, Google, ban ladder, BYOK), rate limits, dev compose, CI | Owner signs in; invite redeemed; tokens test green; CI green |
 | 01 | `2026-11-07-01-shell-dashboard.md` | Dashboard shell, project rows, menus, dialogs, theme switcher component, account menu | Visual diff vs dashboard references ≤ 0.15 % |
 | 02 | `2026-11-07-02-editor.md` | Monaco + both themes, LaTeX grammar, folding, tabs, sidebar, file CRUD, composer shell, settings modal | **Complete (2026-11-13).** Open a project, edit, switch tabs, hard refresh preserves state; settings persist. Visual ratios recorded (1.1–3.2 %; ≤ 0.15 % not met, accepted and non-blocking) |
-| 03 | `2026-11-07-03-compile-pdf-logs.md` | Worker, TeX image, latexmk, log parser, PDF viewer, SyncTeX, Logs panel | Type → PDF < 3 s; errors in Logs at the right line |
+| 03 | `2026-11-07-03-compile-pdf-logs.md` | Worker, TeX image, latexmk, log parser, PDF viewer, SyncTeX, Logs panel, Info panel (Project Info, Versions, Comments, Share) | **Planned (2026-11-13).** Type → PDF < 3 s; errors in Logs at the right line; visual diff vs 18, 29–32, 40, 41 |
 | 04 | `2026-11-07-04-ai.md` | LLM proxy, BYOK resolution, context builder, tools, diffs, Fix with AI, Review paper, threads | Accept/reject edits; Fix with AI repairs a broken document |
 | 05 | `2026-11-07-05-ship.md` | Import/export, VPS provisioning, TLS, backups, monitoring, hardening | Live URL; real paper authored end to end |
 
