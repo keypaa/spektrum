@@ -221,8 +221,12 @@ test("an edit then a focus loss persists after reload", async ({ page }) => {
     ed.setValue(ed.getValue() + "FLUSH_MARKER");
   });
   // Leaving the editor flushes immediately (blur), before the debounce.
+  const saved = page.waitForResponse(
+    (r) => r.url().includes("/documents/") && r.request().method() === "PATCH",
+    { timeout: 10_000 },
+  );
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await page.waitForTimeout(400);
+  await saved;
   await page.reload();
   await expect(page.getByTestId("monaco-editor")).toBeVisible();
   const value = await page.evaluate(() => {
