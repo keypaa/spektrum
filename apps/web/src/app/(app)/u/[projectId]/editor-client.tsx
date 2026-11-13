@@ -28,6 +28,7 @@ import { NewFileDialog } from "./dialogs/new-file-dialog";
 import { RenameFileDialog } from "./dialogs/rename-file-dialog";
 import { DeleteFileDialog } from "./dialogs/delete-file-dialog";
 import { PdfPane } from "./pdf-pane";
+import { Composer } from "./composer/composer";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
 import { useAutosave } from "./use-autosave";
@@ -353,8 +354,10 @@ export function EditorClient({
         </div>
         <div
           data-testid="composer-slot-placeholder"
-          className="h-22 flex-none border-t border-[color:var(--border-log)]"
-        />
+          className="flex-none border-t border-[color:var(--border-log)]"
+        >
+          <Composer />
+        </div>
       </div>
 
       <PdfPane />
