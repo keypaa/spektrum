@@ -289,6 +289,22 @@ importers:
         specifier: 5.1.0
         version: 5.1.0(@types/node@26.6.6)(jsdom@31.0.0(@noble/hashes@2.4.0))(vite@8.3.6(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
+  packages/latex:
+    dependencies:
+      '@spektrum/shared':
+        specifier: workspace:*
+        version: link:../shared
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.6.6
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   packages/shared:
     dependencies:
       ioredis:
