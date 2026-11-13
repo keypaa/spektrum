@@ -193,19 +193,24 @@ test("settings: a preference persists across a reload", async ({ page }) => {
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
 
-  // Open settings from the editor account chip.
   await page.getByRole("button", { name: /account$/i }).click();
   await page.getByRole("menuitem", { name: "Settings" }).click();
   const dialog = page.getByRole("dialog", { name: "Settings" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Disable Word Wrap")).toBeVisible();
 
-  await dialog.getByRole("switch", { name: "Disable Word Wrap" }).click();
+  // Order-independent: flip whatever the current value is, then expect the
+  // opposite after a reload (a previous run may have left it on).
+  const sw = dialog.getByRole("switch", { name: "Disable Word Wrap" });
+  const before = await sw.getAttribute("aria-checked");
+  await sw.click();
+  const after = before === "true" ? "false" : "true";
   await page.waitForFunction(
-    () =>
+    (expected) =>
       document
         .querySelector('[aria-label="Disable Word Wrap"]')
-        ?.getAttribute("aria-checked") === "true",
+        ?.getAttribute("aria-checked") === expected,
+    after,
   );
   // Let the provider's 300 ms debounce send the PUT before reloading.
   await page.waitForTimeout(700);
@@ -217,7 +222,7 @@ test("settings: a preference persists across a reload", async ({ page }) => {
   await expect(reopened.getByText("Disable Word Wrap")).toBeVisible();
   await expect(
     reopened.getByRole("switch", { name: "Disable Word Wrap" }),
-  ).toHaveAttribute("aria-checked", "true");
+  ).toHaveAttribute("aria-checked", after);
 });
 
 test("the editor context menu opens on right-click and closes on Escape", async ({ page }) => {
@@ -239,4 +244,74 @@ test("the editor context menu opens on right-click and closes on Escape", async 
   await expect(menu.getByRole("menuitem", { name: "File Search" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
+});
+
+const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{2BFF}]/u;
+
+async function assertIconDom(page: import("@playwright/test").Page): Promise<void> {
+  const result = await page.evaluate((emoji) => {
+    const re = new RegExp(emoji, "u");
+    const svgs = [...document.querySelectorAll("svg")]
+      .filter((svg) => !svg.closest(".monaco-editor"))
+      .map((svg) => ({
+        viewBox: svg.getAttribute("viewBox"),
+        fills: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("fill")),
+        strokes: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("stroke")),
+      }));
+    return { hasEmoji: re.test(document.body.innerText), svgs };
+  }, EMOJI.source);
+  expect(result.hasEmoji).toBe(false);
+  for (const svg of result.svgs) {
+    expect(svg.viewBox).toBe("0 0 16 16");
+    for (const fill of svg.fills) expect([null, "none", "currentColor"]).toContain(fill);
+    for (const stroke of svg.strokes) expect([null, "currentColor"]).toContain(stroke);
+  }
+}
+
+test("the editor DOM has no emoji and only 16x16 currentColor icons", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("editor-root")).toBeVisible();
+  await assertIconDom(page);
+
+  // Settings modal: chrome icons only (the modal has no Monaco surface).
+  await page.getByRole("button", { name: /account$/i }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+  await assertIconDom(page);
+});
+
+test("hidden files disappear from the tree and stay hidden after reload", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("project-sidebar")).toBeVisible();
+
+  // Hide *.aux in Settings → File Management.
+  await page.getByRole("button", { name: /account$/i }).click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
+  await dialog.getByRole("button", { name: "File Management" }).click();
+  await dialog.getByLabel("Hide files from file tree").fill("*.aux");
+  await dialog.getByRole("button", { name: "Add" }).click();
+  await expect(dialog.getByText("*.aux")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Create main.aux; it must not appear in the tree.
+  await page.getByRole("button", { name: "New file" }).click();
+  const newDialog = page.getByRole("dialog", { name: "New file" });
+  await newDialog.getByRole("textbox", { name: "File name" }).fill("main.aux");
+  await newDialog.getByRole("button", { name: "Create" }).click();
+  await expect(newDialog).toHaveCount(0);
+  await expect(page.getByTestId("file-row-main.aux")).toHaveCount(0);
+  await expect(page.getByTestId("file-row-main.tex")).toBeVisible();
+
+  // Still hidden after a reload (the preference is server-side).
+  await page.reload();
+  await expect(page.getByTestId("file-row-main.aux")).toHaveCount(0);
 });

@@ -6,6 +6,10 @@ export default defineConfig({
   // own two-server setup; the behavioural suite must never pick it up.
   testIgnore: "**/visual/**",
   timeout: 30_000,
+  // Every spec drives the same owner account and database; parallel workers
+  // race on project counts and the sign-in rate limit. The suite is small
+  // enough to run serially.
+  workers: 1,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     // Fresh source IP per run so the sign-in rate limit (5 / 15 min / IP,
