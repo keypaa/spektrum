@@ -95,3 +95,31 @@ test("create a file, reload, rename it, delete it", async ({ page }) => {
   expect(documentCount()).toBe(1);
   await expect(page.getByTestId("file-row-main.tex")).toBeVisible();
 });
+test("tabs survive a reload with the last active tab", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("project-sidebar")).toBeVisible();
+
+  // Create a second file so there are two tabs.
+  await page.getByRole("button", { name: "New file" }).click();
+  const dialog = page.getByRole("dialog", { name: "New file" });
+  await dialog.getByRole("textbox", { name: "File name" }).fill("notes");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId("tab-notes.tex")).toBeVisible();
+
+  // Activate main.tex, then reload: both tabs restore with main.tex active.
+  await page.getByRole("tab", { name: "main.tex" }).click();
+  await expect(page).toHaveURL(/p=main\.tex/);
+  await page.reload();
+
+  await expect(page.getByTestId("tab-main.tex")).toBeVisible();
+  await expect(page.getByTestId("tab-notes.tex")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "main.tex" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});

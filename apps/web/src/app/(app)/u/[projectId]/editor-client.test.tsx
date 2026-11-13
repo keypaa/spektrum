@@ -54,7 +54,7 @@ describe("EditorClient", () => {
     expect(screen.getByText("My Project")).toBeTruthy();
     expect(screen.getByText("Files")).toBeTruthy();
     expect(screen.getByText("Chats")).toBeTruthy();
-    expect(screen.getByTestId("tab-strip-placeholder").textContent).toContain("main.tex");
+    expect(screen.getByTestId("tab-main.tex").textContent).toContain("main.tex");
     // Right pane's captured pre-compile state.
     expect(screen.getByTestId("pdf-pane")).toBeTruthy();
     expect(screen.getAllByText("Initializing...").length).toBeGreaterThanOrEqual(1);
@@ -66,7 +66,7 @@ describe("EditorClient", () => {
   it("renders without crashing and with no tab when there are no documents", () => {
     renderShell({ documents: [], initialDocument: null });
     expect(screen.getByTestId("editor-root")).toBeTruthy();
-    expect(screen.getByTestId("tab-strip-placeholder").textContent).not.toContain("main.tex");
+    expect(screen.queryByTestId("tab-main.tex")).toBeNull();
     expect(screen.getByTestId("pdf-pane")).toBeTruthy();
   });
 });

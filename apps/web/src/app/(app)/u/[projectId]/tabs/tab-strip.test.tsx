@@ -1,0 +1,84 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { TabStrip } from "./tab-strip";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const TABS = [
+  { path: "main.tex", kind: "tex" as const },
+  { path: "refs.bib", kind: "bib" as const },
+];
+
+function renderStrip(overrides: Partial<React.ComponentProps<typeof TabStrip>> = {}) {
+  const props: React.ComponentProps<typeof TabStrip> = {
+    tabs: TABS,
+    active: "main.tex",
+    onActivate: vi.fn(),
+    onClose: vi.fn(),
+    onCollapseSidebar: vi.fn(),
+    onRecompile: vi.fn(),
+    tools: (
+      <button type="button" aria-label="Tools">
+        Tools
+      </button>
+    ),
+    ...overrides,
+  };
+  return { ...render(<TabStrip {...props} />), props };
+}
+
+describe("TabStrip", () => {
+  it("renders one tab per path in open order", () => {
+    renderStrip();
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["main.tex", "refs.bib"]);
+  });
+
+  it("marks the active tab with aria-selected and the code background", () => {
+    renderStrip();
+    const active = screen.getByTestId("tab-main.tex");
+    expect(active.getAttribute("aria-selected")).toBe("true");
+    expect(active.className).toContain("bg-bg-code");
+    expect(screen.getByTestId("tab-refs.bib").getAttribute("aria-selected")).toBe(
+      "false",
+    );
+  });
+
+  it("clicking a tab activates it; the close button closes without activating", async () => {
+    const { props } = renderStrip();
+    await userEvent.click(screen.getByText("refs.bib"));
+    expect(props.onActivate).toHaveBeenCalledWith("refs.bib");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close main.tex" }));
+    expect(props.onClose).toHaveBeenCalledWith("main.tex");
+    expect(props.onActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("middle-click closes the tab", async () => {
+    const { props } = renderStrip();
+    screen.getByTestId("tab-main.tex").dispatchEvent(
+      new MouseEvent("auxclick", { button: 1, bubbles: true }),
+    );
+    expect(props.onClose).toHaveBeenCalledWith("main.tex");
+  });
+
+  it("labels the icon buttons and renders the tools node", () => {
+    const { props } = renderStrip();
+    expect(screen.getByRole("button", { name: "Collapse sidebar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Recompile" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Tools" })).toBeTruthy();
+    expect(props.onRecompile).not.toHaveBeenCalled();
+  });
+
+  it("the tab list scrolls horizontally without wrapping", () => {
+    renderStrip();
+    const list = screen.getByRole("tablist");
+    expect(list.className).toContain("overflow-x-auto");
+    expect(list.className).toContain("min-w-0");
+  });
+});
