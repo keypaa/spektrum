@@ -5,12 +5,14 @@
 // of truth: every request carries the last known `updatedAt` as the baseline,
 // and a 409 hands the authoritative document back to the caller.
 //
-// The unload path is best-effort BY CONSTRUCTION: Chromium caps a keepalive
-// fetch at 64 KiB, while a document may be 512 KiB. So the immediate unload
-// save only runs when the encoded body fits comfortably (60 KiB); otherwise it
-// is skipped and a hard reload inside the 400 ms window can lose the tail (the
-// ordinary debounce still saves everything else). `sendBeacon` is deliberately
-// not used: it cannot carry the Origin-checked JSON request cleanly.
+// The unload path is best-effort BY CONSTRUCTION and the residual risk is
+// LOW: Chromium caps a keepalive fetch at 64 KiB, while a document may be
+// 512 KiB. So the immediate unload save only runs when the encoded body fits
+// comfortably (60 KiB). The only loss case is a hard reload/close inside the
+// 400 ms debounce with no blur first — a narrow window with small stakes
+// (the user is mid-keystroke; the debounced save covers everything else, and
+// the next edit re-saves the tail). `sendBeacon` is deliberately not used:
+// it cannot carry the Origin-checked JSON request cleanly.
 
 import { useCallback, useEffect, useRef } from "react";
 import { ConflictError, saveDocumentRequest, type SaveResult } from "@/lib/save-document";

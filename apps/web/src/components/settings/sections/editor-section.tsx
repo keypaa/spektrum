@@ -82,13 +82,6 @@ export function EditorSection() {
         onChange={(v) => setPreference("realtimeCompilation", v)}
       />
       <ToggleRow
-        label="Vim Mode"
-        description="Enable vim mode in the editor"
-        checked={preferences.vimMode}
-        onChange={(v) => setPreference("vimMode", v)}
-        disabled
-      />
-      <ToggleRow
         label="Equation hover"
         description="Show live equation previews when hovering LaTeX math."
         checked={preferences.equationHover}
