@@ -58,6 +58,9 @@ const root = resolve(import.meta.dirname, "../../../..");
 await ensureBucket("pdf");
 await ensureBucket("uploads");
 
+// Recreate the owner each run: the compile budget is per user id, and the
+// seven cases together exceed 6 compiles/minute on one id.
+await db.delete(users).where(eq(users.email, OWNER_EMAIL));
 const ownerId = await ensureUser(OWNER_EMAIL, OWNER_PASSWORD, "E2E Owner", "owner");
 await db
   .delete(projects)
