@@ -67,7 +67,7 @@ export async function* streamGateway(input: {
         max_tokens: maxOutput,
         ...(tools?.length ? { tools, tool_choice: "auto" } : {}),
       }),
-      signal,
+      ...(signal ? { signal } : {}),
     });
   } catch (error) {
     throw new GatewayNetworkError(

@@ -42,7 +42,7 @@ const SSE = [
 ];
 
 function mockFetch(body = SSE, status = 200) {
-  const fetchMock = vi.fn(async () => {
+  const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const encoder = new TextEncoder();
@@ -94,7 +94,7 @@ describe("streamGateway", () => {
       .join("");
     expect(JSON.parse(args)).toEqual({ path: "main.tex" });
 
-    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const init = fetchMock.mock.calls[0]![1]!;
     const headers = new Headers(init.headers);
     const body = JSON.parse(String(init.body));
     expect(body.stream).toBe(true);
@@ -115,7 +115,7 @@ describe("streamGateway", () => {
       const fetchMock = mockFetch();
       await collect(thinking);
       const body = JSON.parse(
-        String((fetchMock.mock.calls[0]?.[1] as RequestInit).body),
+        String(fetchMock.mock.calls[0]![1]!.body),
       );
       expect(body.reasoning_effort).toBe(effort);
       expect(body.max_tokens).toBe(max);
