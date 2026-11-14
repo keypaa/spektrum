@@ -46,9 +46,11 @@ export async function* streamGateway(input: {
   messages: GatewayMessage[];
   tools?: unknown[];
   signal?: AbortSignal;
+  maxOutput?: number;
 }): AsyncGenerator<GatewayEvent> {
   const { baseUrl, apiKey, model, thinking, messages, tools, signal } = input;
-  const { effort, maxOutput } = THINKING[thinking];
+  const { effort } = THINKING[thinking];
+  const maxTokens = input.maxOutput ?? THINKING[thinking].maxOutput;
 
   let response: Response;
   try {
@@ -64,7 +66,7 @@ export async function* streamGateway(input: {
         stream: true,
         stream_options: { include_usage: true },
         reasoning_effort: effort,
-        max_tokens: maxOutput,
+        max_tokens: maxTokens,
         ...(tools?.length ? { tools, tool_choice: "auto" } : {}),
       }),
       ...(signal ? { signal } : {}),
