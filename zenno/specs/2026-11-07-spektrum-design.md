@@ -865,12 +865,14 @@ Three providers, in this order (matching Prism):
 
 ### 7.4 Editor-side affordances
 
-- Inline diff widget: when the AI proposes a change, the target range is replaced by a
-  read-only embedded Monaco diff with a floating action pill
-  (`--inline-diff-action-*`), 30 px tall, `border-radius: 24px`, buttons 28 px,
-  12/16 weight 500: **Accept**, **Reject**, and (for multi-hunk) **Accept all**.
-- Line-number colouring during a diff: inserts `--inline-diff-action-accept-fg` weight
-  600, deletes the reject colour.
+- Inline diff widget: an overlay Monaco diff over the editor area (`absolute inset-0`,
+  `--modal-bg`, 24 px radius) with a floating action pill (`--inline-diff-action-*`),
+  30 px tall, `border-radius: 24px`, buttons 28 px, 12/16 weight 500: **Accept**,
+  **Reject**, and **Accept all**. The widget is a path-targeted overlay, not a range
+  replacement (D86).
+- Line-number colouring during a diff (inserts `--inline-diff-action-accept-fg` weight
+  600, deletes the reject colour) is **deferred** (D91); the diff editor uses the
+  default theme.
 - Selection context: the current selection is sent to the AI when the user opens a chat
   from a selection (Prism highlights the selection in the chat context chip).
 
@@ -1534,7 +1536,7 @@ For every turn, build the context in this fixed order (and label it to the model
 7. Conversation history (last 20 turns).
 8. Retrieved text from user-provided files when the prompt mentions one.
 
-Hard cap: 120 000 tokens; drop in reverse order 7 → 4 → 3, never drop 1, 2, 5.
+Hard cap: 120 000 tokens (4 characters per token); drop in reverse order 7 (history) → 4 (bib) → 3 (touched), never drop 1, 2, 5. The block is labelled (`<manifest>`, `<main>`, `<files>`, `<bib_keys>`, `<selection>`, `<diagnostics>`, `<history>`); history lives only in `<history>` (D76).
 
 ### 12.4 Tools
 
@@ -1546,13 +1548,15 @@ edit_file(path, oldText, newText, reason)     -> diff proposal (requires accept)
 create_file(path, content)                    -> diff proposal
 delete_file(path)                             -> confirmation proposal
 compile()                                     -> {status, diagnostics[]}
+get_logs()                                    -> last 10 diagnostics
 search_project(query)                         -> [{path, line, text}]
 ```
 
-`write_file` / `edit_file` do **not** mutate immediately: they produce a proposed diff
-that the editor renders with Accept/Reject. Inline suggestions (`edit_file` with
-`mode:"inline"`) are applied only on Accept; Prism additionally supports
-auto-apply streaming, which we gate behind a preference (`inlineAutoApply`, default off).
+`write_file` / `edit_file` / `create_file` / `delete_file` do **not** mutate
+immediately: they produce a proposed diff that the editor renders with Accept/Reject
+(D82). Inline auto-apply streaming is **deferred** (D87); no `inlineAutoApply`
+preference exists in Phase 4. `compile` is enqueued through the same path as the
+manual compile and shares its per-user budget (D84).
 
 ### 12.5 System prompt (v1, exact text)
 
@@ -1601,18 +1605,23 @@ the document unless asked.
 
 ### 12.6 Streaming protocol
 
-`POST /api/llm/chat` → SSE:
+`POST /api/projects/:projectId/chat` (D73) → SSE:
 
 ```
-event: meta        data: {"threadId":"…","messageId":"…","model":"…"}
+event: meta        data: {"threadId":"…","userMessageId":"…","model":"…"}
 event: thinking    data: {"delta":"…"}          // reasoning summary, collapsed by default
 event: text        data: {"delta":"…"}
 event: tool_call   data: {"id":"…","name":"edit_file","args":{…}}
 event: tool_result data: {"id":"…","ok":true,"summary":"…"}
-event: diff        data: {"id":"…","path":"main.tex","hunks":[…],"originalHash":"…"}
+event: diff        data: {"id":"…","messageId":"…","path":"main.tex","kind":"replace","hunks":[…],"originalHash":"…","proposedContent":"…","reason":"…"}
+event: title       data: {"threadId":"…","title":"…","titleSource":"llm"}
 event: done        data: {"usage":{"in":…,"out":…}}
 event: error       data: {"message":"…","retryable":true}
 ```
+
+Each assistant message row is written one per model step with an explicit id; the
+`diff` part is persisted in that message's `content.parts` before the `diff` event,
+and `diff`/`messageId` name the owning row so Accept can PATCH the decision.
 
 Diffs carry `originalHash`; if the buffer changed since, the client shows
 `The document changed since this suggestion — re-run?` instead of a stale patch.
@@ -1629,7 +1638,7 @@ refresh restores history, matching Prism.
   strip and the transcript never show an empty title.
 - **Model-generated title.** When the first assistant response of that thread completes,
   the server sends one extra, cheap call to the fast model
-  (`LLM_MODEL_FAST`, no tools, no project context, ~20 output tokens) and replaces the
+  (`LLM_MODEL_FAST`, no tools, no project context, `max_tokens: 64`) and replaces the
   title with the result. The call is **fire-and-forget**: the chat never waits for it,
   and a failure leaves the fallback title in place with no error shown and no retry
   loop.
@@ -1943,6 +1952,29 @@ them and the spec changes accordingly.
 | D72 | TypeScript 6.0.3 stays for Phase 4 | The TS 7 native compiler is a separate spike; switching now would put the AI phase's deadline at risk for no user-visible gain |
 | D73 | The chat route is project-scoped and emits `title` | It needs `projectId` for context, ownership and persistence; a generic `/api/llm/chat` cannot enforce any of them. Adds `get_logs`/`search_project` and reconciles §12.4 with §19.4 |
 | D74 | Edits are client-applied proposals | The server never writes document content from a tool call; Accept applies hunks to the editor buffer and saves through the existing PATCH (409 on stale) |
+| D75 | The gateway is called with `fetch`, not an SDK | The OpenAI-compatible SSE shape is small, pinned by tests, and avoids a new dependency tree; the only new runtime dependency is `diff` |
+| D76 | Context is a labelled block, not native chat turns | A single labelled `<history>` block keeps the drop order and the token budget testable; the Accept gate (D74) and the verbatim system prompt contain prompt injection |
+| D77 | Title generation is fire-and-forget after `done` | The title call uses `maxOutput:64`; the route sends `done` when the reply is persisted, then runs `generateTitle` (2 s cap) and sends `title`; the client reads until EOF |
+| D78 | The AI e2e uses a local mock gateway on port 4010 | `playwright.ai.config.ts` starts it; CI never needs a real key |
+| D79 | The e2e owner uses the server key (`LLM_API_KEY`) | The server key is owner-only (§12.2); the member-without-key case proves the disabled surface and the 403 |
+| D80 | Composer/thread/diff visual baselines are measurements, not gates | `continue-on-error: true` (§15.1); the phase exit criteria are behavioural |
+| D81 | `diff` is `9.0.0` | It ships its own types and `structuredPatch`; `@types/diff` is a deprecated stub and is not added |
+| D82 | Accept is per kind | `replace` applies hunks and saves; `create` creates then patches; `delete` deletes. The server never writes document content from a tool call |
+| D83 | The chat route reads history before appending the new message | The final user message is the last model message and is never dropped by the budget |
+| D84 | The AI e2e is a separate Playwright config | `playwright.ai.config.ts` + `pnpm test:ai`, `reuseExistingServer: false`, an S3-free seed, and a seeded failed `pdf_renders` row; the default config ignores `ai.spec.ts` |
+| D85 | `/api/inference/models` is rate-limited and cached | It consumes `BUDGETS.ai` per user and caches the gateway result for 60 s |
+| D86 | Composer slot amendment | Empty state keeps the 88 px slot; a thread with parts uses a 64 px composer rect (§6.4) inside a `min(45vh, 420px)` transcript area |
+| D87 | Deferred: streaming auto-apply | No `inlineAutoApply` preference exists; adding it is a later spec change |
+| D88 | Deferred: context item 8 (retrieved text from user files) | There is no upload surface in Phase 4; the labelled section is reserved |
+| D89 | Deferred: opening a chat from a selection | `buildContext` accepts a selection, but there is no "chat from selection" control; the chip is deferred |
+| D90 | Deferred: the conversation tab strip | The shell has document tabs, not chat tabs; the title updates the sidebar row only |
+| D91 | Deferred: §7.4 line-number colouring during a diff | The diff editor uses the default theme |
+| D92 | Deferred: splitting a file over the 512 KB PATCH cap | A proposal whose result exceeds it shows the too-large copy; splitting is a later feature |
+| D93 | Deferred: voice mode and composer file upload | `IconMic` and `Upload files & photos` stay disabled |
+| D94 | Deferred: a model picker | The chat uses `LLM_MODEL_CHAT`; `/api/inference/models` exists for a later picker |
+| D95 | Deferred: pinning files from a context menu | The open editor tabs are the `pinnedPaths` |
+| D96 | Deferred: Prism conversation import/export | Phase 5 |
+| D97 | Deferred: a real gateway account and key-rotation runbook | Phase 5 |
 
 ### 18.1 Repo reset (Phase 0, first action)
 

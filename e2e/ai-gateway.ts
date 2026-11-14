@@ -61,6 +61,7 @@ function sse(res: ServerResponse, frames: unknown[]): void {
 const text = (content: string): unknown[] => [
   { choices: [{ delta: { content } }] },
   { choices: [{ delta: {}, finish_reason: "stop" }] },
+  { choices: [], usage: { prompt_tokens: 12, completion_tokens: 5 } },
 ];
 
 const toolCall = (name: string, args: unknown): unknown[] => [
@@ -80,6 +81,7 @@ const toolCall = (name: string, args: unknown): unknown[] => [
     ],
   },
   { choices: [{ delta: {}, finish_reason: "tool_calls" }] },
+  { choices: [], usage: { prompt_tokens: 20, completion_tokens: 8 } },
 ];
 
 function lastUserText(messages: Array<{ role?: string; content?: unknown }>): string {

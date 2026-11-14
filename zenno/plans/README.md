@@ -15,7 +15,7 @@ previous one's exit criteria pass.
 | 01 | `2026-11-07-01-shell-dashboard.md` | Dashboard shell, project rows, menus, dialogs, theme switcher component, account menu | Visual diff vs dashboard references ≤ 0.15 % |
 | 02 | `2026-11-07-02-editor.md` | Monaco + both themes, LaTeX grammar, folding, tabs, sidebar, file CRUD, composer shell, settings modal | **Complete (2026-11-13).** Open a project, edit, switch tabs, hard refresh preserves state; settings persist. Visual ratios recorded (1.1–3.2 %; ≤ 0.15 % not met, accepted and non-blocking) |
 | 03 | `2026-11-07-03-compile-pdf-logs.md` | Worker, TeX image, latexmk, log parser, PDF viewer, SyncTeX, Logs panel, Info panel (Project Info, Versions, Comments, Share) | **Complete (2026-11-14, merged `1a4fe66`).** Type → PDF < 3 s (gate 1498 ms); errors in Logs at the right line; compile e2e 7/7; visual ratios recorded (non-blocking) |
-| 04 | `2026-11-07-04-ai.md` | LLM proxy, BYOK resolution, context builder, tools, diffs, Fix with AI, Review paper, threads, model-generated thread titles | Accept/reject edits; Fix with AI repairs a broken document; thread titles are generated and regenerable |
+| 04 | `2026-11-07-04-ai.md` | LLM proxy, BYOK resolution, context builder, tools, diffs, Fix with AI, Review paper, threads, model-generated thread titles | **Complete (2026-11-14).** Typecheck/lint clean; `pnpm test` 611 passed / 5 skipped (101 files); build green; default e2e 25/25; AI e2e 9/9; composer/thread/diff visual baselines recorded (non-blocking) |
 | 05 | `2026-11-07-05-ship.md` | Import/export, VPS provisioning, TLS, backups, monitoring, hardening | Live URL; real paper authored end to end |
 
 ## Phase 1–5 task outline
