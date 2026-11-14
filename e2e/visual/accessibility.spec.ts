@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { login, seedPdfFixture, seedVisualFixture, setTheme } from "./helpers";
+import {
+  login,
+  seedAiFixture,
+  seedEditorFixture,
+  seedPdfFixture,
+  seedVisualFixture,
+  setTheme,
+} from "./helpers";
 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{2BFF}]/u;
 
@@ -56,7 +63,10 @@ test("editor chrome: no emoji, registry icons only, controls labelled", async ({
   const result = await page.evaluate((emoji) => {
     const re = new RegExp(emoji, "u");
     const svgs = [...document.querySelectorAll("svg")]
-      .filter((svg) => !svg.closest(".monaco-editor"))
+      .filter(
+        (svg) =>
+          !svg.closest(".monaco-editor") && !svg.closest(".monaco-diff-editor"),
+      )
       .map((svg) => ({
         viewBox: svg.getAttribute("viewBox"),
         fills: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("fill")),
@@ -76,7 +86,53 @@ test("editor chrome: no emoji, registry icons only, controls labelled", async ({
   await expect(page.getByRole("tab", { name: "Files" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Recompile" })).toBeVisible();
-  await expect(page.getByPlaceholderText("Getting ready...")).toBeVisible();
+  await expect(page.getByLabel("Ask anything")).toBeVisible();
+});
+
+test("AI composer/transcript/diff: no emoji, 16x16 currentColor icons", async ({ page }) => {
+  seedEditorFixture();
+  seedAiFixture();
+  await setTheme(page, "dark");
+  await login(page);
+
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("editor-root")).toBeVisible();
+  const projectId = new URL(page.url()).pathname.split("/")[2]!;
+  const res = await page.request.get(`/api/projects/${projectId}/threads`);
+  const body = (await res.json()) as { threads: Array<{ id: string }> };
+  const threadId = body.threads[0]!.id;
+  await page.goto(`/u/${projectId}?thread=${threadId}`);
+  await expect(page.getByTestId("editor-root")).toBeVisible();
+
+  // The transcript and the inline diff render from the seeded thread.
+  await expect(page.getByText("Rename the introduction").first()).toBeVisible();
+  await expect(page.getByTestId("diff-widget")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Accept", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reject" })).toBeVisible();
+
+  const result = await page.evaluate((emoji) => {
+    const re = new RegExp(emoji, "u");
+    const svgs = [...document.querySelectorAll("svg")]
+      .filter(
+        (svg) =>
+          !svg.closest(".monaco-editor") && !svg.closest(".monaco-diff-editor"),
+      )
+      .map((svg) => ({
+        viewBox: svg.getAttribute("viewBox"),
+        fills: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("fill")),
+        strokes: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("stroke")),
+      }));
+    return { hasEmoji: re.test(document.body.innerText), svgs };
+  }, EMOJI.source);
+
+  expect(result.hasEmoji).toBe(false);
+  for (const svg of result.svgs) {
+    expect(svg.viewBox).toBe("0 0 16 16");
+    for (const fill of svg.fills) expect([null, "none", "currentColor"]).toContain(fill);
+    for (const stroke of svg.strokes) {
+      expect([null, "currentColor"]).toContain(stroke);
+    }
+  }
 });
 
 test("settings chrome: dialog semantics, nav and switches", async ({ page }) => {

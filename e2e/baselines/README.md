@@ -55,14 +55,14 @@ Rectangles are written **`x0,y0 → x1,y1`** (exclusive `x1`/`y1`), in **full-ca
 
 | Baseline | Ratio | Budget | Result |
 |---|---|---|---|
-| `editor--dark--blank` | 1.778 % | ≤ 0.150 % | not met |
-| `editor--light--blank` | 1.474 % | ≤ 0.150 % | not met |
-| `settings--editor--dark` | 3.180 % | ≤ 0.150 % | not met |
+| `editor--dark--blank` | 1.883 % | ≤ 0.150 % | not met |
+| `editor--light--blank` | 1.579 % | ≤ 0.150 % | not met |
+| `settings--editor--dark` | 3.310 % | ≤ 0.150 % | not met |
 | `settings--pdf-viewer--dark` | 1.369 % | ≤ 0.150 % | not met |
 | `settings--file-management--dark` | 2.457 % | ≤ 0.150 % | not met |
 | `settings--data-controls--dark` | 1.119 % | ≤ 0.150 % | not met |
-| `settings--beta--dark` | 1.478 % | ≤ 0.150 % | not met |
-| `settings--integrations--dark` | 1.483 % | ≤ 0.150 % | not met |
+| `settings--beta--dark` | 1.479 % | ≤ 0.150 % | not met |
+| `settings--integrations--dark` | 1.875 % | ≤ 0.150 % | not met |
 
 All eight are above the 0.15 % budget; the target is a recorded measurement, not a CI gate (`visual` stays `continue-on-error`). The pass fixed one structural defect — the editor resolved `interfaceTheme: "system"` as dark, rendering a black Monaco surface in the light baseline (40.8 %); resolving the theme from the applied `html` class brought the light editor to 1.474 %.
 
@@ -77,16 +77,38 @@ Three things about these rectangles are not arbitrary:
 
 | Baseline | Capture | What it shows | Ratio (2026-11-14) |
 |---|---|---|---|
-| `pdf--dark--compiled` | 18 | Editor + compiled PDF | 4.562 % |
-| `pdf--light--search` | 41 | Light editor, PDF search pill | 3.535 % |
-| `pdf--dark--more-menu` | 31 | PDF ⋯ menu | 4.579 % |
-| `pdf--dark--zoom-menu` | 32 | PDF zoom menu | 4.568 % |
-| `editor--light--context-menu` | 40 | Light editor context menu | 3.607 % |
-| `logs--dark--default` | 29 | Logs panel | 31.551 % |
-| `logs--dark--filter-menu` | 30 | Logs filter menu (custom dropdown; the case currently times out on the item locator) | — |
-| `info--dark--project-info` | 23 | Project Info cards | 13.851 % |
-| `info--dark--versions` | 26 | Versions list | 14.663 % |
-| `info--dark--comments` | 28 | Comments empty state | 32.366 % |
+| `pdf--dark--compiled` | 18 | Editor + compiled PDF | 4.706 % |
+| `pdf--light--search` | 41 | Light editor, PDF search pill | 3.681 % |
+| `pdf--dark--more-menu` | 31 | PDF ⋯ menu | 4.758 % |
+| `pdf--dark--zoom-menu` | 32 | PDF zoom menu | 4.747 % |
+| `editor--light--context-menu` | 40 | Light editor context menu | 3.833 % |
+| `logs--dark--default` | 29 | Logs panel | 31.691 % |
+| `logs--dark--filter-menu` | 30 | Logs filter menu (custom dropdown; the case currently times out on the item locator) | 30.889 % |
+| `info--dark--project-info` | 23 | Project Info cards | 13.943 % |
+| `info--dark--versions` | 26 | Versions list | 14.755 % |
+| `info--dark--comments` | 28 | Comments empty state | 32.439 % |
 | `share--dark` | 35 | Share dialog | 91.300 % |
 
+Re-measured after the Phase 4 composer/placeholder change (2026-11-14); the baseline images are unchanged (references are immutable), only these ratios moved.
+
 Masks (full-capture physical): the sheet `{1748,190,765,1110}` (below the chrome, so the pill/menus stay gated) and the composer `{442,1265,1047,70}` for the editor/PDF cases; the Info panel content `{1748,190,765,900}` for Project Info/Versions; the whole background for the Share dialog. The Ratios are a measurement, not a gate (`visual` stays `continue-on-error`); the info/logs/share calibration is the remaining Phase 3 visual work.
+
+## Phase 4 (composer, transcript, diff)
+
+Prism's captures predate the chat UI, so these have **no immutable reference**.
+`recordRatio` captures each one and logs its size without comparing it; they are
+never a gate (`visual` stays `continue-on-error`).
+
+| Baseline | What it shows | Size (physical) |
+|---|---|---|
+| `composer--dark--empty` | Composer empty state (Ready + Review paper), dark | 2466×1327 |
+| `composer--light--empty` | Same, light | 2466×1327 |
+| `composer--dark--thread` | Transcript with a user/assistant turn, dark | 2466×1327 |
+| `composer--light--thread` | Same, light | 2466×1327 |
+| `diff--dark--default` | Inline Monaco diff with Accept/Reject/Accept all, dark | 2466×1327 |
+| `diff--light--default` | Same, light | 2466×1327 |
+
+Slot geometry (Appendix D, D86): the empty state keeps the 88 px composer slot;
+a thread with parts gives the transcript a `min(45vh, 420px)` scrollable area and
+a 64 px composer rect (§6.4). The a11y walk asserts no emoji and only 16×16
+`currentColor` registry icons across the composer, transcript and diff.

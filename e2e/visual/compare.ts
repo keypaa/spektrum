@@ -209,3 +209,27 @@ export async function compareAgainstReference(
 }
 
 export const VISUAL_BUDGET = 0.0015; // 0.15 %
+
+export interface RecordedBaseline {
+  name: string;
+  path: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Capture a baseline that has no immutable Prism reference (Phase 4's composer,
+ * transcript and diff). Screenshot + log only: never compared, never a gate.
+ */
+export async function recordRatio(
+  page: Page,
+  name: string,
+): Promise<RecordedBaseline> {
+  const dir = join(ARTIFACT_DIR, name);
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, "actual.png");
+  const buffer = await page.screenshot({ path });
+  const png = PNG.sync.read(buffer);
+  console.log(`${name}: recorded ${png.width}x${png.height} (no reference)`);
+  return { name, path, width: png.width, height: png.height };
+}

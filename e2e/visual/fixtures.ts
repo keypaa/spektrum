@@ -24,3 +24,12 @@ export function seedPdfFixture(): void {
 export function seedEditorFixture(): void {
   seedVisualFixture("editor");
 }
+
+/** Add the AI thread/diff fixture on top of the editor dataset. */
+export function seedAiFixture(): void {
+  execFileSync(
+    "pnpm",
+    ["--filter", "@spektrum/web", "visual:ai-seed"],
+    { stdio: "inherit", env: process.env },
+  );
+}

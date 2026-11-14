@@ -10,6 +10,9 @@ const BASE_ENV = {
   BETTER_AUTH_URL: "http://localhost:3000",
   LLM_KEY_ENCRYPTION_SECRET:
     process.env.LLM_KEY_ENCRYPTION_SECRET ?? "e2e-key-encryption-secret-32ch!x",
+  // The owner's `aiEnabled` is true only with a server key (owner-only), so the
+  // composer/transcript baselines render the enabled surface.
+  LLM_API_KEY: "test-key",
 };
 
 export default defineConfig({
