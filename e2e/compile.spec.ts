@@ -14,33 +14,28 @@ const win = (page: Page): Promise<EditorWindow> =>
   page.evaluate(() => window as unknown as EditorWindow);
 
 async function openProject(page: Page): Promise<void> {
+  page.on("console", (msg) => console.log("PAGE:", msg.type(), msg.text().slice(0, 200)));
+  page.on("response", (res) => {
+    if (res.status() >= 400) console.log("HTTP", res.status(), res.url());
+  });
+  page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.goto("/");
   await login(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("monaco-editor")).toBeVisible();
-  await page.waitForFunction(() =>
-    Boolean((window as unknown as EditorWindow).__spekrrum_editor),
-  );
+  await expect(page.locator(".monaco-editor textarea")).toBeVisible();
 }
 
 async function type(page: Page, text: string): Promise<void> {
-  await page.evaluate((value) => {
-    const editor = (window as unknown as EditorWindow).__spekrrum_editor!;
-    editor.setValue(editor.getValue() + value);
-  }, text);
+  await page.getByTestId("monaco-editor").click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(text);
 }
 
 async function blur(page: Page): Promise<void> {
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
 }
 
-async function waitResult(page: Page, timeout = 60_000): Promise<void> {
-  await page.waitForFunction(
-    () => (window as unknown as EditorWindow).__spekrrumResultAt !== undefined,
-    undefined,
-    { timeout },
-  );
-}
 
 test.describe("compile", () => {
   test("keystroke → PDF under 3 s (warm)", async ({ page }) => {
@@ -59,19 +54,13 @@ test.describe("compile", () => {
     };
 
     // Warm the pipeline (the first compile includes worker/container warm-up).
-    await page.evaluate(() => {
-      const editor = (window as unknown as EditorWindow).__spekrrum_editor!;
-      editor.setValue(editor.getValue() + "warm");
-    }, undefined);
-    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await type(page, "warm");
+    await blur(page);
     await expect.poll(latestOk, { timeout: 60_000 }).toBe(true);
 
     const started = Date.now();
-    await page.evaluate(() => {
-      const editor = (window as unknown as EditorWindow).__spekrrum_editor!;
-      editor.setValue(editor.getValue() + "2");
-    }, undefined);
-    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await type(page, "2");
+    await blur(page);
     await expect.poll(latestOk, { timeout: 60_000, intervals: [100, 250, 500] }).toBe(true);
     const elapsed = Date.now() - started;
     expect(elapsed).toBeLessThan(3000);
@@ -82,11 +71,9 @@ test.describe("compile", () => {
     await openProject(page);
     const projectId = new URL(page.url()).pathname.split("/")[2]!;
 
-    await page.evaluate(() => {
-      const editor = (window as unknown as EditorWindow).__spekrrum_editor!;
-      editor.setValue(editor.getValue() + "\n\\undefinedmacro");
-    }, undefined);
-    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await type(page, "\n\\undefinedmacro");
+    await page.keyboard.press("Control+S");
+    await blur(page);
 
     // Wait for the render row to record the error, then reload so the RSC
     // ships the diagnostics (the SSE stream is not observable from Playwright).
@@ -116,13 +103,11 @@ test.describe("compile", () => {
     });
     await expect(card).toBeVisible();
     await card.click();
-    expect(
-      await page.evaluate(
-        () =>
-          (window as unknown as EditorWindow).__spekrrum_editor?.getValue()
-            .split("\n").length ?? 0,
-      ),
-    ).toBeGreaterThan(1);
+    await expect
+      .poll(() => page.locator(".current-line").first().textContent(), {
+        timeout: 10_000,
+      })
+      .toContain("undefinedmacro");
   });
 
   test("another owner's render is 404", async ({ page }) => {
