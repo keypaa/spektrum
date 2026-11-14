@@ -666,10 +666,16 @@ export function EditorClient({
                     const line = (diagnostic.line ?? 0) + 1;
                     if (diagnostic.file) {
                       void openDocument(diagnostic.file).then(() => {
-                        editorRef.current?.revealLine(line);
+                        // The model swap commits in the path-change effect after
+                        // the render; wait one frame before moving the cursor.
+                        requestAnimationFrame(() =>
+                          editorRef.current?.revealLine(line),
+                        );
                       });
                     } else {
-                      editorRef.current?.revealLine(line);
+                      requestAnimationFrame(() =>
+                        editorRef.current?.revealLine(line),
+                      );
                     }
                   }}
                 />

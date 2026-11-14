@@ -62,6 +62,44 @@ const MASKS: Record<string, Mask[]> = {
   // PDF top.
   "editor--dark--blank": [],
   "editor--light--blank": [],
+  // Phase 3: our texlive render can never match Prism's PDF sheet (engine,
+  // fonts, pagination); mask the sheet, the page indicator and the composer
+  // (the captures show Phase 4's chat).
+  "pdf--dark--compiled": [
+    { x: 1748, y: 100, width: 765, height: 1200 },
+    { x: 442, y: 1000, width: 1047, height: 174 },
+  ],
+  "pdf--light--search": [
+    { x: 1748, y: 100, width: 765, height: 1200 },
+    { x: 442, y: 1000, width: 1047, height: 174 },
+  ],
+  "pdf--dark--more-menu": [
+    { x: 1748, y: 100, width: 765, height: 1200 },
+    { x: 442, y: 1000, width: 1047, height: 174 },
+  ],
+  "pdf--dark--zoom-menu": [
+    { x: 1748, y: 100, width: 765, height: 1200 },
+    { x: 442, y: 1000, width: 1047, height: 174 },
+  ],
+  "editor--light--context-menu": [
+    { x: 1748, y: 100, width: 765, height: 1200 },
+    { x: 442, y: 1000, width: 1047, height: 174 },
+  ],
+  "logs--dark--default": [
+    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 1748, y: 1050, width: 765, height: 250 },
+  ],
+  "logs--dark--filter-menu": [
+    { x: 442, y: 1000, width: 1047, height: 174 },
+  ],
+  "info--dark--project-info": [
+    { x: 900, y: 300, width: 900, height: 500 },
+  ],
+  "info--dark--versions": [
+    { x: 900, y: 300, width: 900, height: 500 },
+  ],
+  "info--dark--comments": [],
+  "share--dark": [],
 };
 
 /** Four non-overlapping strips covering everything outside the modal. */

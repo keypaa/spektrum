@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 
-export type Dataset = "light" | "dark" | "empty" | "editor";
+export type Dataset = "light" | "dark" | "empty" | "editor" | "pdf";
 
 /**
  * Re-seed the visual fixture. The seed is idempotent: it renames the owner,
@@ -13,6 +13,11 @@ export function seedVisualFixture(dataset: Dataset): void {
     ["--filter", "@spektrum/web", "visual:seed", dataset],
     { stdio: "inherit", env: process.env },
   );
+}
+
+/** The PDF/Logs baselines open the seeded project with an `ok` render. */
+export function seedPdfFixture(): void {
+  seedVisualFixture("pdf");
 }
 
 /** The editor baselines all open the single `New Project` / `main.tex` pair. */

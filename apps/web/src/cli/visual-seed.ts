@@ -1,13 +1,23 @@
 // Visual fixture seed — deterministic project list for the pixel-diff suite.
 // Run: pnpm --filter @spektrum/web visual:seed light|dark|empty|editor
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const envLocal = resolve(import.meta.dirname, "../../.env.local");
 if (existsSync(envLocal)) process.loadEnvFile(envLocal);
 
 import { eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
-import { documents, folders, projects, userPreferences, users } from "@spektrum/db/schema";
+import {
+  documents,
+  folders,
+  pdfRenders,
+  projects,
+  userPreferences,
+  users,
+} from "@spektrum/db/schema";
+import { createHash } from "node:crypto";
+import { ensureBucket, putObject } from "@spektrum/storage";
+import { revisionHash } from "@spektrum/shared/revision";
 import { BLANK_MAIN_TEX } from "../lib/templates";
 import { createOwner } from "./create-owner";
 
@@ -57,6 +67,7 @@ const EMPTY: Array<[string, number]> = [];
 const arg = process.argv[2];
 const dataset = arg === "light" ? LIGHT : arg === "empty" ? EMPTY : DARK;
 const isEditor = arg === "editor";
+const isPdf = arg === "pdf";
 
 // Mirror ci-seed.ts: create the owner if it does not exist yet (CI runs this
 // seed without a prior ci-seed step).
@@ -115,6 +126,65 @@ if (isEditor) {
     .set({ mainDocumentId: doc!.id })
     .where(eq(projects.id, project!.id));
   console.log(`seeded editor fixture (project ${project!.id}) for ${OWNER_EMAIL}`);
+  await pool.end();
+  process.exit(0);
+}
+
+if (isPdf) {
+  // The PDF/Logs baselines need a project with a real render: the example
+  // document, its diagram blob, and an `ok` render whose PDF is in MinIO.
+  await ensureBucket("pdf");
+  await ensureBucket("uploads");
+  const [project] = await db
+    .insert(projects)
+    .values({ ownerId: owner.id, name: "New Project" })
+    .returning({ id: projects.id });
+  const projectId = project!.id;
+
+  const example = readFileSync(
+    resolve(import.meta.dirname, "../../../../zenno/recon/extracted/example-main.tex"),
+    "utf8",
+  );
+  const [main] = await db
+    .insert(documents)
+    .values({ projectId, path: "main.tex", kind: "tex", content: example })
+    .returning({ id: documents.id });
+  await db
+    .update(projects)
+    .set({ mainDocumentId: main!.id })
+    .where(eq(projects.id, projectId));
+
+  const image = readFileSync(
+    resolve(import.meta.dirname, "../../../../e2e/visual/fixtures/diagram.jpg"),
+  );
+  const blobKey = createHash("sha256").update(image).digest("hex");
+  await putObject("uploads", blobKey, image, "image/jpeg");
+  await db.insert(documents).values({
+    projectId,
+    path: "diagram.jpg",
+    kind: "img",
+    blobKey,
+  });
+
+  const revision = revisionHash([
+    { path: "main.tex", content: example, blobKey: null },
+    { path: "diagram.jpg", content: null, blobKey },
+  ]);
+  const pdf = readFileSync(
+    resolve(import.meta.dirname, "../../../../e2e/visual/fixtures/example.pdf"),
+  );
+  const pdfKey = `pdf/${projectId}/${revision}.pdf`;
+  await putObject("pdf", pdfKey, pdf, "application/pdf");
+  await db.insert(pdfRenders).values({
+    projectId,
+    revisionHash: revision,
+    mainFile: "main.tex",
+    status: "ok",
+    pdfKey,
+    diagnostics: [],
+    durationMs: 1200,
+  });
+  console.log(`seeded pdf fixture (project ${projectId}) for ${OWNER_EMAIL}`);
   await pool.end();
   process.exit(0);
 }
