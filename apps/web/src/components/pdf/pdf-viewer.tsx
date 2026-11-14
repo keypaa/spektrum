@@ -24,6 +24,7 @@ interface PdfViewerProps {
   onNumPages?: (numPages: number) => void;
   onPageChange?: (page: number) => void;
   onPageDoubleClick?: (page: number, x: number, y: number) => void;
+  searchQuery?: string;
   pageRef?: React.MutableRefObject<PdfViewerHandle | null>;
 }
 
@@ -70,6 +71,7 @@ export function PdfViewer({
   onNumPages,
   onPageChange,
   onPageDoubleClick,
+  searchQuery = "",
   pageRef,
 }: PdfViewerProps): React.ReactElement {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -78,6 +80,16 @@ export function PdfViewer({
   const [numPages, setNumPages] = useState(0);
   const [visible, setVisible] = useState<Set<number>>(new Set());
   const [generation, setGeneration] = useState(0);
+  const [hits, setHits] = useState<
+    Array<{ page: number; x: number; y: number; width: number; height: number }>
+  >([]);
+  const [flash, setFlash] = useState<{
+    page: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!pdfUrl) {
@@ -129,14 +141,64 @@ export function PdfViewer({
     return () => observer.disconnect();
   }, [numPages, generation]);
 
+  // Search: extract the text items of the visible pages and map the hits.
+  useEffect(() => {
+    const doc = docRef.current;
+    if (!doc || searchQuery.trim() === "") {
+      setHits([]);
+      return;
+    }
+    let cancelled = false;
+    const query = searchQuery.toLowerCase();
+    const found: Array<{
+      page: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }> = [];
+    void (async () => {
+      for (let page = 1; page <= doc.numPages; page += 1) {
+        const pdfPage = await doc.getPage(page);
+        const viewport = pdfPage.getViewport({ scale: zoom });
+        const content = await pdfPage.getTextContent();
+        for (const item of content.items) {
+          if (!("str" in item) || !item.str.toLowerCase().includes(query))
+            continue;
+          const [, , , , e, f] = item.transform;
+          found.push({
+            page,
+            x: e * zoom,
+            y: viewport.height - f * zoom - item.height * zoom,
+            width: item.width * zoom,
+            height: item.height * zoom,
+          });
+        }
+      }
+      if (!cancelled) setHits(found);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, generation, zoom]);
+
   useEffect(() => {
     if (!pageRef) return;
     pageRef.current = {
-      scrollTo: (page) => {
-        pageEls.current.get(page)?.scrollIntoView({ block: "start" });
+      scrollTo: (page, _xFraction, yFraction) => {
+        const element = pageEls.current.get(page);
+        const host = hostRef.current;
+        if (element && host) {
+          const top =
+            element.offsetTop + yFraction * element.offsetHeight - host.clientHeight / 2;
+          host.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        }
         onPageChange?.(page);
       },
-      revealLineRect: () => undefined,
+      revealLineRect: (page, rect) => {
+        setFlash({ page, ...rect });
+        window.setTimeout(() => setFlash(null), 900);
+      },
       getPageGeometry: (page) => {
         const element = pageEls.current.get(page);
         return element
@@ -185,6 +247,32 @@ export function PdfViewer({
           ) : (
             <div style={{ height: 600, width: 450 }} />
           )}
+          {hits
+            .filter((hit) => hit.page === page)
+            .map((hit, index) => (
+              <div
+                key={index}
+                className="pointer-events-none absolute bg-[color:var(--notification-border-warning)] opacity-40"
+                style={{
+                  left: hit.x,
+                  top: hit.y,
+                  width: hit.width,
+                  height: hit.height,
+                }}
+              />
+            ))}
+          {flash && flash.page === page ? (
+            <div
+              data-testid="pdf-line-flash"
+              className="pointer-events-none absolute bg-[color:var(--bg-preview-hover-inverted)] opacity-60 transition-opacity duration-700"
+              style={{
+                left: flash.x,
+                top: flash.y,
+                width: flash.width,
+                height: flash.height,
+              }}
+            />
+          ) : null}
         </div>
       ))}
     </div>
