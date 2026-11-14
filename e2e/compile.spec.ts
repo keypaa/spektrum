@@ -1,23 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers";
 
-const OWNER = { email: "owner@spektrum.local", password: "owner-password-123" };
 const OTHER = { email: "other@spektrum.local", password: "other-password-123" };
 
-interface EditorWindow {
-  __spekrrum_editor?: { getValue(): string; setValue(value: string): void };
-  __spekrrumResultAt?: number;
-  __spekrrumStart?: number;
-}
-
-const win = (page: Page): Promise<EditorWindow> =>
-  page.evaluate(() => window as unknown as EditorWindow);
-
 async function openProject(page: Page): Promise<void> {
-  page.on("console", (msg) => console.log("PAGE:", msg.type(), msg.text().slice(0, 200)));
-  page.on("response", (res) => {
-    if (res.status() >= 400) console.log("HTTP", res.status(), res.url());
-  });
   page.on("pageerror", (err) => console.log("PAGEERROR:", err.message));
   await page.goto("/");
   await login(page);
