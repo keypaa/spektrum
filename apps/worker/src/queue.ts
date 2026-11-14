@@ -80,9 +80,6 @@ export async function handler(
   job: { data: CompileJob },
   redis: LockRedis = connectRedis(),
 ): Promise<{ skipped?: string }> {
-  try {
-    return await handlerWith(job, redis);
-  } finally {
-    (redis as Redis).disconnect();
-  }
+  // BullMQ owns the connection passed to the Worker; never disconnect it here.
+  return handlerWith(job, redis);
 }

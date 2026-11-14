@@ -215,7 +215,7 @@ export function PdfViewer({
     <div
       ref={hostRef}
       data-testid="pdf-viewport"
-      className="h-full overflow-auto bg-bg-preview p-2"
+      className="relative h-full overflow-auto bg-bg-preview p-2"
     >
       {Array.from({ length: numPages }, (_, index) => index + 1).map((page) => (
         <div
@@ -228,7 +228,7 @@ export function PdfViewer({
           style={{
             filter: darkMode ? "invert(1) hue-rotate(180deg)" : undefined,
           }}
-          className="mx-auto mb-2 w-fit bg-white shadow-[0_1px_3px_rgb(0_0_0_/_0.3)]"
+          className="relative mx-auto mb-2 w-fit bg-white shadow-[0_1px_3px_rgb(0_0_0_/_0.3)]"
           onDoubleClick={
             onPageDoubleClick
               ? (event) => {

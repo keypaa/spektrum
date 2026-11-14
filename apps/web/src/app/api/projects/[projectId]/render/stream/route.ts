@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/auth/session";
 import { getLatestRender } from "@/lib/render-store";
+import { getProject } from "@/lib/projects";
 import { getRedis } from "@spektrum/shared/rate-limit";
 import {
   renderChannel,
@@ -16,9 +17,18 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ projectId: string }> },
 ) {
-  const user = await requireUser();
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
   const { projectId } = await ctx.params;
   if (!UUID_RE.test(projectId)) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  const project = await getProject(user.id, projectId);
+  if (!project) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   const latest = await getLatestRender(user.id, projectId);

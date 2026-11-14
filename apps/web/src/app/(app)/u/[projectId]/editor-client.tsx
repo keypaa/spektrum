@@ -286,6 +286,7 @@ export function EditorClient({
   const [searchOpen, setSearchOpen] = useState(false);
   const [panel, setPanel] = useState<InfoTab | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [pdfQuery, setPdfQuery] = useState("");
   const [log, setLog] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [revision, setRevision] = useState(initialRender?.revision ?? "");
@@ -357,7 +358,7 @@ export function EditorClient({
         { method: "POST" },
       )
         .then((res) => {
-          if (res.ok) router.refresh();
+          if (res.ok) window.location.reload();
         })
         .catch(() => undefined);
     },
@@ -670,13 +671,15 @@ export function EditorClient({
                       void openDocument(diagnostic.file).then(() => {
                         // The model swap commits in the path-change effect after
                         // the render; wait one frame before moving the cursor.
-                        requestAnimationFrame(() =>
-                          editorRef.current?.revealLine(line),
+                        setTimeout(
+                          () => editorRef.current?.revealLine(line),
+                          50,
                         );
                       });
                     } else {
-                      requestAnimationFrame(() =>
-                        editorRef.current?.revealLine(line),
+                      setTimeout(
+                        () => editorRef.current?.revealLine(line),
+                        50,
                       );
                     }
                   }}
@@ -728,6 +731,7 @@ export function EditorClient({
               <PdfViewer
                 pdfUrl={pdfUrl}
                 revision={initialRender?.revision ?? ""}
+                searchQuery={pdfQuery}
                 zoom={zoom / 100}
                 darkMode={preferences.pdfDarkMode}
                 onNumPages={setNumPages}
@@ -738,9 +742,12 @@ export function EditorClient({
             </div>
             {searchOpen ? (
               <PdfSearch
-                query=""
-                onQuery={() => undefined}
-                onClose={() => setSearchOpen(false)}
+                query={pdfQuery}
+                onQuery={setPdfQuery}
+                onClose={() => {
+                  setSearchOpen(false);
+                  setPdfQuery("");
+                }}
               />
             ) : null}
           </div>

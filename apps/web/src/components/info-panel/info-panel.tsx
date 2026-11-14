@@ -4,6 +4,7 @@
 // active tab's content. The right pane shows exactly one of the PDF or this
 // panel (spec §6.3), switched from the Tools menu.
 
+import { useEffect } from "react";
 import { IconClose } from "@spektrum/ui/icons";
 
 export const INFO_TABS = [
@@ -28,6 +29,14 @@ export function InfoPanel({
   onClose,
   children,
 }: InfoPanelProps): React.ReactElement {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div
       data-testid="info-panel"
