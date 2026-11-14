@@ -24,6 +24,7 @@ import {
 import type { SaveResult } from "@/lib/save-document";
 import { usePreferences } from "@/components/preferences-provider";
 import { ProjectSidebar } from "./sidebar/project-sidebar";
+import type { ChatThreadSummary } from "./sidebar/chat-list";
 import { SIDEBAR_STORAGE_KEY, useResizablePane } from "./sidebar/resizable";
 import { EditorContextMenu } from "./editor/editor-context-menu";
 import { NewFileDialog } from "./dialogs/new-file-dialog";
@@ -293,13 +294,73 @@ export function EditorClient({
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [panel, setPanel] = useState<InfoTab | null>(null);
+  const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
+  const refreshThreads = useCallback(async () => {
+    const response = await fetch(`/api/projects/${project.id}/threads`);
+    if (!response.ok) return;
+    const body = (await response.json()) as { threads?: ChatThreadSummary[] };
+    setThreads(Array.isArray(body.threads) ? body.threads : []);
+  }, [project.id]);
+
+  useEffect(() => {
+    void refreshThreads();
+  }, [refreshThreads]);
+
   const chat = useChat({
     projectId: project.id,
     onDiff: () => setPanel(null),
-    onTitle: () => undefined,
-    onThreadChange: () => undefined,
+    onTitle: () => void refreshThreads(),
+    onThreadChange: (id) => {
+      setActiveThreadId(id);
+      if (id) router.replace(`/u/${project.id}?thread=${id}`, { scroll: false });
+      void refreshThreads();
+    },
   });
   const openTabs = docs.map((doc) => doc.path);
+
+  const selectThread = (thread: ChatThreadSummary) => {
+    void chat.loadThread(thread.id);
+  };
+
+  const newChat = () => {
+    chat.reset();
+    router.replace(`/u/${project.id}`, { scroll: false });
+  };
+
+  const renameThread = async (thread: ChatThreadSummary, title: string) => {
+    const response = await fetch(
+      `/api/projects/${project.id}/threads/${thread.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title }),
+      },
+    );
+    if (response.ok) await refreshThreads();
+  };
+
+  const deleteThread = async (thread: ChatThreadSummary) => {
+    const response = await fetch(
+      `/api/projects/${project.id}/threads/${thread.id}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok) return;
+    if (activeThreadId === thread.id) {
+      chat.reset();
+      router.replace(`/u/${project.id}`, { scroll: false });
+    }
+    await refreshThreads();
+  };
+
+  const regenerateThread = async (thread: ChatThreadSummary) => {
+    const response = await fetch(
+      `/api/projects/${project.id}/threads/${thread.id}/title/regenerate`,
+      { method: "POST" },
+    );
+    if (response.ok) await refreshThreads();
+  };
   const [shareOpen, setShareOpen] = useState(false);
   const [pdfQuery, setPdfQuery] = useState("");
   const [log, setLog] = useState<string | null>(null);
@@ -608,6 +669,15 @@ export function EditorClient({
           onRenameDocument={setRenameTarget}
           onDeleteDocument={setDeleteTarget}
           onDownloadDocument={download}
+          threads={threads}
+          activeThreadId={activeThreadId}
+          aiEnabled={aiEnabled}
+          chatBusy={chat.status === "streaming"}
+          onNewChat={newChat}
+          onSelectThread={selectThread}
+          onRenameThread={renameThread}
+          onDeleteThread={deleteThread}
+          onRegenerateThread={regenerateThread}
           user={user}
         />
         {/* 1 px separator; drag to resize (240–480). */}

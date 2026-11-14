@@ -31,6 +31,15 @@ function renderSidebar(overrides: Partial<React.ComponentProps<typeof ProjectSid
     onDeleteDocument: vi.fn(),
     onDownloadDocument: vi.fn(),
     onOpenSettings: vi.fn(),
+    threads: [],
+    activeThreadId: null as string | null,
+    aiEnabled: true,
+    chatBusy: false,
+    onNewChat: vi.fn(),
+    onSelectThread: vi.fn(),
+    onRenameThread: vi.fn(),
+    onDeleteThread: vi.fn(),
+    onRegenerateThread: vi.fn(),
     user: { name: "Keylhan Paumard", email: "owner@spektrum.local" },
     ...overrides,
   };
@@ -100,14 +109,35 @@ describe("ProjectSidebar", () => {
     );
   });
 
-  it("the Chats tab shows the empty message and the plus button still creates files", async () => {
+  it("the Chats tab shows the empty message; the plus is section-aware", async () => {
     const { props } = renderSidebar();
     await userEvent.click(screen.getByRole("tab", { name: "Chats" }));
     expect(screen.getByText("No chats yet")).toBeTruthy();
-    // The + is a Files-tab action (bundle `jh`); back on Files it creates.
+    // On Chats the + starts a new chat, not a new file.
+    await userEvent.click(screen.getByRole("button", { name: "New chat" }));
+    expect(props.onNewChat).toHaveBeenCalled();
+    expect(props.onNewFile).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("tab", { name: "Files" }));
     await userEvent.click(screen.getByRole("button", { name: "New file" }));
     expect(props.onNewFile).toHaveBeenCalled();
+  });
+
+  it("renders the chat threads in the Chats branch, newest first", async () => {
+    const { props } = renderSidebar({
+      activeSection: "chats",
+      threads: [
+        { id: "t1", title: "Older chat", titleSource: "llm", hasAssistantReply: true, createdAt: "2026-11-10T10:00:00.000Z" },
+        { id: "t2", title: "Newer chat", titleSource: "fallback", hasAssistantReply: true, createdAt: "2026-11-12T10:00:00.000Z" },
+      ],
+      activeThreadId: "t2",
+    });
+    expect(props.onNewChat).toBeDefined();
+    const rows = screen.getAllByTestId(/^chat-row-/).map((n) => n.textContent);
+    expect(rows).toEqual(["Newer chat", "Older chat"]);
+    await userEvent.click(screen.getByText("Older chat"));
+    expect(props.onSelectThread).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "t1" }),
+    );
   });
 
   it("the file menu exposes Rename, Download and Delete", async () => {

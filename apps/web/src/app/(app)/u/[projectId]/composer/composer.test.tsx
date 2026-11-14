@@ -14,6 +14,7 @@ const baseChat = {
   error: null,
   send: vi.fn(),
   loadThread: vi.fn(),
+  reset: vi.fn(),
   stop: vi.fn(),
   retry: vi.fn(),
   rerun: vi.fn(),

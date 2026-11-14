@@ -17,6 +17,7 @@ export interface ChatController {
   error: string | null;
   send(text: string, thinking: ThinkingLevel, pinnedPaths: string[]): void;
   loadThread(threadId: string): Promise<void>;
+  reset(): void;
   stop(): void;
   retry(): void;
   rerun(part: MessagePart): void;
@@ -210,6 +211,17 @@ export function useChat(input: {
     setStatus("idle");
   }, []);
 
+  const reset = useCallback(() => {
+    controller.current?.abort();
+    controller.current = null;
+    lastSend.current = null;
+    setThreadId(null);
+    setParts([]);
+    setStatus("idle");
+    setError(null);
+    cb.current.onThreadChange?.(null);
+  }, []);
+
   const retry = useCallback(() => {
     if (lastSend.current) {
       send(
@@ -245,6 +257,7 @@ export function useChat(input: {
     error,
     send,
     loadThread,
+    reset,
     stop,
     retry,
     rerun,

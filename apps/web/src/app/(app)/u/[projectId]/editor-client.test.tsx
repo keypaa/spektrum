@@ -6,7 +6,10 @@ import { PreferencesProvider } from "@/components/preferences-provider";
 
 // The client shell refreshes the RSC tree after a mutation; jsdom has no app
 // router, so stub the one hook it uses.
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 // jsdom cannot load Monaco; the dynamic import would otherwise pull the real
 // module into the test.
