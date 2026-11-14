@@ -4,6 +4,8 @@ import type { ReactElement } from "react";
 import { db } from "@spektrum/db";
 import { users } from "@spektrum/db/schema";
 import { requireUser, UnauthorizedError } from "@/auth/session";
+import { getLlmKeyStatus } from "@/auth/llm-key";
+import { loadWebEnv } from "@spektrum/shared/env";
 import { getProject } from "@/lib/projects";
 import {
   getDocumentById,
@@ -55,6 +57,10 @@ export default async function EditorPage({
     : null;
 
   const initialRender = await getLatestRender(user.id, projectId);
+  const keyStatus = await getLlmKeyStatus(user.id);
+  const aiEnabled =
+    keyStatus.configured ||
+    (user.role === "owner" && Boolean(loadWebEnv().llmApiKey));
   const mainFilePath =
     documents.find((d) => d.id === project.mainDocumentId)?.path ??
     initialPath ??
@@ -88,6 +94,7 @@ export default async function EditorPage({
           : null
       }
       user={{ name: profile?.name ?? user.email, email: user.email }}
+      aiEnabled={aiEnabled}
     />
   );
 }

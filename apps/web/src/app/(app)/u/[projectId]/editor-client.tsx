@@ -31,6 +31,8 @@ import { RenameFileDialog } from "./dialogs/rename-file-dialog";
 import { DeleteFileDialog } from "./dialogs/delete-file-dialog";
 import { PdfPane } from "./pdf-pane";
 import { Composer } from "./composer/composer";
+import { useChat } from "./composer/use-chat";
+import { REVIEW_PROMPT } from "@spektrum/shared/ai";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
 import { useAutosave } from "./use-autosave";
@@ -92,6 +94,7 @@ export interface EditorClientProps {
     stats: ProjectStats | null;
   } | null;
   user: { name: string; email: string };
+  aiEnabled: boolean;
 }
 
 function byPath(a: DocumentSummary, b: DocumentSummary): number {
@@ -105,6 +108,7 @@ export function EditorClient({
   mainFilePath = "",
   initialRender = null,
   user,
+  aiEnabled,
 }: EditorClientProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   const { onPointerDown, dragging } = useResizablePane({
@@ -289,6 +293,13 @@ export function EditorClient({
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [panel, setPanel] = useState<InfoTab | null>(null);
+  const chat = useChat({
+    projectId: project.id,
+    onDiff: () => setPanel(null),
+    onTitle: () => undefined,
+    onThreadChange: () => undefined,
+  });
+  const openTabs = docs.map((doc) => doc.path);
   const [shareOpen, setShareOpen] = useState(false);
   const [pdfQuery, setPdfQuery] = useState("");
   const [log, setLog] = useState<string | null>(null);
@@ -687,8 +698,16 @@ export function EditorClient({
         <div
           data-testid="composer-slot-placeholder"
           className="flex-none border-t border-[color:var(--border-log)]"
+          style={{ height: chat.parts.length > 0 ? "min(45vh, 420px)" : "88px" }}
         >
-          <Composer />
+          <Composer
+            chat={chat}
+            aiEnabled={aiEnabled}
+            onReview={() => chat.send(REVIEW_PROMPT, "Medium", openTabs)}
+            openTabs={openTabs}
+            onAccept={() => undefined}
+            onReject={() => undefined}
+          />
         </div>
       </div>
 
