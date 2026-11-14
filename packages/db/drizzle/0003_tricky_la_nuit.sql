@@ -1,0 +1,2 @@
+CREATE INDEX "chat_messages_thread_idx" ON "chat_messages" USING btree ("thread_id");--> statement-breakpoint
+CREATE INDEX "chat_threads_project_user_updated_idx" ON "chat_threads" USING btree ("project_id","user_id","updated_at");

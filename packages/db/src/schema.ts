@@ -253,7 +253,13 @@ export const chatThreads = pgTable("chat_threads", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-});
+}, (table) => [
+  index("chat_threads_project_user_updated_idx").on(
+    table.projectId,
+    table.userId,
+    table.updatedAt,
+  ),
+]);
 
 export const chatMessages = pgTable("chat_messages", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -265,7 +271,7 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-});
+}, (table) => [index("chat_messages_thread_idx").on(table.threadId)]);
 
 export const userPreferences = pgTable("user_preferences", {
   userId: text("user_id")
