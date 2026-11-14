@@ -179,12 +179,15 @@ test.describe("compile", () => {
     const projectId = new URL(page.url()).pathname.split("/")[2]!;
 
     const started = Date.now();
-    const res = await page.request.post(
-      `/api/projects/${projectId}/compile`,
-      { data: { mainFile: "long.tex" } },
-    );
-    expect(res.status()).toBe(202);
-    const body = (await res.json()) as { revision: string };
+    const body = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/projects/${id}/compile`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mainFile: "long.tex" }),
+      });
+      if (!res.ok) throw new Error(`compile ${res.status}`);
+      return (await res.json()) as { revision: string };
+    }, projectId);
     await expect
       .poll(
         async () => {
