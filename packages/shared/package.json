@@ -14,12 +14,18 @@
     "./preferences": "./src/preferences.ts",
     "./revision": "./src/revision.ts",
     "./paths": "./src/paths.ts",
-    "./compile": "./src/compile.ts"
+    "./compile": "./src/compile.ts",
+    "./ai": "./src/ai.ts",
+    "./ai/tools": "./src/ai/tools.ts",
+    "./ai/prompts": "./src/ai/prompts.ts",
+    "./ai/diff": "./src/ai/diff.ts",
+    "./hash": "./src/hash.ts"
   },
   "scripts": {
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "diff": "9.0.0",
     "ioredis": "6.0.0",
     "zod": "4.6.7"
   },

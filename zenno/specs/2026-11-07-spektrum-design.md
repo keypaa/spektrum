@@ -1940,6 +1940,9 @@ them and the spec changes accordingly.
 | D69 | Queue/channel/key names live in `@spektrum/shared/compile` | Web and worker cannot drift |
 | D70 | Compile e2e config + default testIgnore | The compile spec cannot run in the blocking e2e job |
 | D71 | `login(page, opts?)` | Keeps the existing call sites unchanged |
+| D72 | TypeScript 6.0.3 stays for Phase 4 | The TS 7 native compiler is a separate spike; switching now would put the AI phase's deadline at risk for no user-visible gain |
+| D73 | The chat route is project-scoped and emits `title` | It needs `projectId` for context, ownership and persistence; a generic `/api/llm/chat` cannot enforce any of them. Adds `get_logs`/`search_project` and reconciles §12.4 with §19.4 |
+| D74 | Edits are client-applied proposals | The server never writes document content from a tool call; Accept applies hunks to the editor buffer and saves through the existing PATCH (409 on stale) |
 
 ### 18.1 Repo reset (Phase 0, first action)
 
@@ -2010,14 +2013,17 @@ Phase 2 additions (spec change, §18 D26–D43):
 
 ### 19.4 AI
 
-- Chat: `POST /api/projects/:projectId/chat` body `{ threadId?, message, model? }` → SSE
-  stream of `delta | tool_call | tool_result | done | error`.
+- Chat: `POST /api/projects/:projectId/chat` body
+  `{ threadId?, message, thinking?, pinnedPaths?, selection? }` → SSE events
+  `meta | thinking | text | tool_call | tool_result | diff | title | done | error`.
+  `meta` carries `{ threadId, userMessageId, model }`; `diff` carries
+  `{ ...proposal, id, messageId }` (the assistant message that owns the part).
 - Thread title: `POST /api/projects/:projectId/threads/:threadId/title/regenerate` →
   `{ title, titleSource }`. The automatic first-turn title is produced server-side and
   never blocks the chat stream (§12.7).
-- Tools exposed to the model: `read_file`, `write_file`, `edit_file`, `list_files`,
-  `compile`, `get_logs`, `search_in_project`. Defined once in `packages/shared`, used by
-  the proxy and the client diff UI.
+- Tools exposed to the model: `list_files`, `read_file`, `write_file`, `edit_file`,
+  `create_file`, `delete_file`, `compile`, `get_logs`, `search_project`. Defined once in
+  `packages/shared`, used by the proxy and the client diff UI.
 - Persistence: `chat_threads` / `chat_messages` (§4); a message's `content` JSONB holds
   the parts array, including `apply_patch` items the user accepted or rejected.
 

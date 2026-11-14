@@ -29,6 +29,7 @@
     "zod": "4.6.7",
     "@spektrum/storage": "workspace:*",
     "bullmq": "6.7.6",
+    "diff": "9.0.0",
     "pdfjs-dist": "6.5.438",
     "ioredis": "6.0.0"
   },
