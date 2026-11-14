@@ -13,7 +13,8 @@
     "./rate-limit": "./src/rate-limit.ts",
     "./preferences": "./src/preferences.ts",
     "./revision": "./src/revision.ts",
-    "./paths": "./src/paths.ts"
+    "./paths": "./src/paths.ts",
+    "./compile": "./src/compile.ts"
   },
   "scripts": {
     "build": "tsc --noEmit"

@@ -1,0 +1,30 @@
+{
+  "name": "@spektrum/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@spektrum/db": "workspace:*",
+    "@spektrum/latex": "workspace:*",
+    "@spektrum/shared": "workspace:*",
+    "@spektrum/storage": "workspace:*",
+    "bullmq": "6.7.6",
+    "drizzle-orm": "0.45.4",
+    "ioredis": "6.0.0",
+    "pdfjs-dist": "6.5.438",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}
