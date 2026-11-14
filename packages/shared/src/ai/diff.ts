@@ -77,6 +77,7 @@ export function applyHunks(original: string, hunks: DiffHunk[]): string {
     lines.splice(start, hunk.oldLines, ...replacement);
   }
 
+  if (lines.length === 0) return "";
   return lines.join("\n") + (hadTrailingNewline ? "\n" : "");
 }
 
