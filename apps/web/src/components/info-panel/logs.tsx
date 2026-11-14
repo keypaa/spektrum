@@ -1,7 +1,8 @@
 "use client";
 
 // The Logs tab (spec §9.4): filter menu, diagnostic cards, Raw logs, and a
-// disabled `Fix with AI` per entry (Phase 4).
+// `Fix with AI` action per entry plus `Fix all with AI` (spec §12.5). Every
+// action is a sibling button, never nested inside the jump button.
 
 import { useMemo, useState } from "react";
 import { IconError, IconWarning } from "@spektrum/ui/icons";
@@ -26,12 +27,17 @@ export interface LogsProps {
   diagnostics: Diagnostic[];
   log: string | null;
   onJump: (diagnostic: Diagnostic) => void;
+  /** Send the given diagnostics to the model (spec §12.5). */
+  onFix: (diagnostics: Diagnostic[]) => void;
+  aiEnabled: boolean;
 }
 
 export function Logs({
   diagnostics,
   log,
   onJump,
+  onFix,
+  aiEnabled,
 }: LogsProps): React.ReactElement {
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -66,14 +72,20 @@ export function Logs({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        className="ml-auto h-8 rounded-full border border-[color:var(--border-log)] px-3 text-xs text-fg-tertiary"
-      >
-        Fix all with AI
-      </button>
+      {aiEnabled ? (
+        <button
+          type="button"
+          disabled={filtered.length === 0}
+          onClick={() => onFix(filtered)}
+          className="ml-auto h-8 rounded-full border border-[color:var(--border-log)] px-3 text-xs disabled:opacity-50"
+        >
+          Fix all with AI
+        </button>
+      ) : (
+        <span className="ml-auto text-xs text-fg-tertiary">
+          Add your API key in Settings
+        </span>
+      )}
     </div>
   );
 
@@ -99,30 +111,41 @@ export function Logs({
         <p className="p-4 text-sm text-fg-tertiary">No errors or warnings</p>
       ) : (
         filtered.map((diagnostic, index) => (
-          <button
+          <div
             key={`${diagnostic.message}-${diagnostic.line ?? index}`}
-            type="button"
-            onClick={() => onJump(diagnostic)}
-            className="flex flex-col gap-1 rounded-lg border border-[color:var(--border-log)] bg-bg-log p-2 text-left"
+            data-testid="log-card"
+            className="flex items-start gap-2 rounded-lg border border-[color:var(--border-log)] bg-bg-log p-2"
           >
-            <span className="flex items-center gap-2 text-sm">
-              {diagnostic.severity === "error" ? (
-                <IconError size={16} />
-              ) : (
-                <IconWarning size={16} />
-              )}
-              <span>{diagnostic.message}</span>
-              <span className="ml-auto text-xs text-fg-tertiary">
+            <button
+              type="button"
+              onClick={() => onJump(diagnostic)}
+              className="flex min-w-0 flex-1 flex-col gap-1 text-left"
+            >
+              <span className="flex items-center gap-2 text-sm">
+                {diagnostic.severity === "error" ? (
+                  <IconError size={16} />
+                ) : (
+                  <IconWarning size={16} />
+                )}
+                <span>{diagnostic.message}</span>
+              </span>
+              {diagnostic.file ? (
+                <span className="text-xs text-fg-tertiary">
+                  {diagnostic.file}
+                  {diagnostic.line !== undefined ? `:${diagnostic.line + 1}` : ""}
+                </span>
+              ) : null}
+            </button>
+            {aiEnabled ? (
+              <button
+                type="button"
+                onClick={() => onFix([diagnostic])}
+                className="h-7 flex-none rounded-full border border-[color:var(--border-log)] px-3 text-xs"
+              >
                 Fix with AI
-              </span>
-            </span>
-            {diagnostic.file ? (
-              <span className="text-xs text-fg-tertiary">
-                {diagnostic.file}
-                {diagnostic.line !== undefined ? `:${diagnostic.line + 1}` : ""}
-              </span>
+              </button>
             ) : null}
-          </button>
+          </div>
         ))
       )}
     </div>

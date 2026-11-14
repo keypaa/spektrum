@@ -24,35 +24,72 @@ const diagnostics = [
   },
 ];
 
+const renderLogs = (overrides: Partial<React.ComponentProps<typeof Logs>> = {}) => {
+  const props = {
+    diagnostics,
+    log: "raw",
+    onJump: vi.fn(),
+    onFix: vi.fn(),
+    aiEnabled: true,
+    ...overrides,
+  };
+  render(<Logs {...props} />);
+  return props;
+};
+
 describe("Logs", () => {
   it("defaults to warnings and errors and filters to warnings", async () => {
-    render(<Logs diagnostics={diagnostics} log="raw" onJump={vi.fn()} />);
+    renderLogs();
     expect(screen.getByText("Undefined control sequence")).toBeTruthy();
     await userEvent.click(screen.getByLabelText("Logs filter"));
     await userEvent.click(screen.getByRole("menuitem", { name: "Warnings only" }));
     expect(screen.queryByText("Undefined control sequence")).toBeNull();
-    expect(
-      screen.getByText(/Overfull \\hbox/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Overfull \\hbox/)).toBeTruthy();
   });
 
   it("shows the raw tail", async () => {
-    render(<Logs diagnostics={diagnostics} log="line one" onJump={vi.fn()} />);
+    renderLogs({ log: "line one" });
     await userEvent.click(screen.getByLabelText("Logs filter"));
     await userEvent.click(screen.getByRole("menuitem", { name: "Raw logs" }));
     expect(screen.getByTestId("logs-raw").textContent).toContain("line one");
   });
 
-  it("jumps to the line when a card is clicked", () => {
+  it("jumps to the line when the message button is clicked", () => {
     const onJump = vi.fn();
-    render(<Logs diagnostics={diagnostics} log={null} onJump={onJump} />);
+    renderLogs({ onJump });
     fireEvent.click(screen.getByText("Undefined control sequence"));
     expect(onJump).toHaveBeenCalledWith(diagnostics[0]);
   });
 
   it("shows the empty state", () => {
-    render(<Logs diagnostics={[]} log={null} onJump={vi.fn()} />);
+    renderLogs({ diagnostics: [] });
     expect(screen.getByText("No errors or warnings")).toBeTruthy();
+  });
+
+  it("gives each card two sibling buttons (message + Fix with AI), never nested", () => {
+    renderLogs();
+    const cards = screen.getAllByTestId("log-card");
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      expect(card.querySelectorAll("button")).toHaveLength(2);
+      expect(card.querySelector("button button")).toBeNull();
+    }
+  });
+
+  it("Fix with AI passes that diagnostic; Fix all passes every visible one", async () => {
+    const props = renderLogs();
+    await userEvent.click(screen.getAllByRole("button", { name: "Fix with AI" })[1]!);
+    expect(props.onFix).toHaveBeenCalledWith([diagnostics[1]]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Fix all with AI" }));
+    expect(props.onFix).toHaveBeenLastCalledWith(diagnostics);
+  });
+
+  it("replaces the Fix actions with the key prompt when AI is unavailable", () => {
+    renderLogs({ aiEnabled: false });
+    expect(screen.queryByRole("button", { name: "Fix with AI" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Fix all with AI" })).toBeNull();
+    expect(screen.getByText("Add your API key in Settings")).toBeTruthy();
   });
 });
 

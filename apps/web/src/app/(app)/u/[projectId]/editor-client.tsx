@@ -35,7 +35,7 @@ import { Composer } from "./composer/composer";
 import { useChat } from "./composer/use-chat";
 import { acceptDiff, type DiffPart } from "./composer/diff-accept";
 import { DiffWidget } from "./composer/diff-widget";
-import { REVIEW_PROMPT } from "@spektrum/shared/ai";
+import { FIX_PROMPT, REVIEW_PROMPT } from "@spektrum/shared/ai";
 import { sha256Hex } from "@spektrum/shared/hash";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
@@ -960,6 +960,11 @@ export function EditorClient({
                       );
                     }
                   }}
+                  onFix={(targets) => {
+                    setPanel(null);
+                    void chat.send(FIX_PROMPT(targets), "Medium", openTabs);
+                  }}
+                  aiEnabled={aiEnabled}
                 />
               ) : panel === "Project Info" ? (
                 <ProjectInfo stats={stats} />
