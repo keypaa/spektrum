@@ -27,7 +27,8 @@
     "tsx": "4.23.15",
     "zod": "4.6.7",
     "@spektrum/storage": "workspace:*",
-    "bullmq": "6.7.6"
+    "bullmq": "6.7.6",
+    "pdfjs-dist": "6.5.438"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

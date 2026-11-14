@@ -37,12 +37,20 @@ import { useAutosave } from "./use-autosave";
 import { requestCompile } from "@/lib/compile-client";
 import { useRenderStream } from "@/lib/render-client";
 import type { MonacoEditorHandle } from "@/editor/monaco-editor";
+import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
 import { IconTools } from "@spektrum/ui/icons";
 
 // Monaco is browser-only; the dynamic import (ssr: false) must come from this
 // client component, not the RSC page.
 const MonacoEditor = dynamic(
   () => import("@/editor/monaco-editor").then((m) => m.MonacoEditor),
+  { ssr: false },
+);
+
+// The PDF viewer is browser-only (pdfjs canvas); the placeholder shows until
+// the first render exists.
+const PdfViewer = dynamic(
+  () => import("@/components/pdf/pdf-viewer").then((m) => m.PdfViewer),
   { ssr: false },
 );
 
@@ -57,6 +65,7 @@ export interface EditorClientProps {
     isCurrent: boolean;
     status: string;
     revision: string;
+    pdfUrl: string | null;
   } | null;
   user: { name: string; email: string };
 }
@@ -240,6 +249,11 @@ export function EditorClient({
   });
 
   const render = useRenderStream(project.id);
+  const pdfPageRef = useRef<PdfViewerHandle | null>(null);
+  const pdfUrl =
+    render.status?.event === "result"
+      ? render.status.pdfUrl
+      : (initialRender?.pdfUrl ?? null);
   const compile = useCallback(async () => {
     if (!mainFilePath) return;
     await requestCompile(project.id, mainFilePath).catch(() => undefined);
@@ -475,7 +489,19 @@ export function EditorClient({
         </div>
       </div>
 
-      <PdfPane />
+      {pdfUrl ? (
+        <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">
+          <div className="h-full overflow-hidden rounded-t-lg bg-bg-preview">
+            <PdfViewer
+              pdfUrl={pdfUrl}
+              revision={initialRender?.revision ?? ""}
+              pageRef={pdfPageRef}
+            />
+          </div>
+        </div>
+      ) : (
+        <PdfPane />
+      )}
 
       {contextMenu ? (
         <EditorContextMenu
