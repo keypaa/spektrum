@@ -5,6 +5,12 @@
 
 import { useMemo, useState } from "react";
 import { IconError, IconWarning } from "@spektrum/ui/icons";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@spektrum/ui";
 import type { Diagnostic } from "@spektrum/shared/compile";
 
 type Filter = "all" | "warnings" | "errors" | "raw";
@@ -28,7 +34,6 @@ export function Logs({
   onJump,
 }: LogsProps): React.ReactElement {
   const [filter, setFilter] = useState<Filter>("all");
-  const [filterOpen, setFilterOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (filter === "warnings")
@@ -52,38 +57,28 @@ export function Logs({
   return (
     <div className="flex flex-col gap-2 p-2">
       <div className="flex items-center gap-2">
-        <div className="relative">
-          <button
-            type="button"
-            aria-label="Logs filter"
-            aria-haspopup="menu"
-            onClick={() => setFilterOpen((open) => !open)}
-            className="h-8 rounded-md border border-[color:var(--border-log)] bg-transparent px-2 text-sm"
-          >
-            {FILTERS.find((entry) => entry.value === filter)?.label}
-          </button>
-          {filterOpen ? (
-            <div
-              role="menu"
-              className="absolute left-0 top-9 z-10 min-w-[180px] rounded-lg border border-[color:var(--border-log)] bg-modal-bg py-1 shadow-[var(--shadow-surface)]"
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Logs filter"
+              className="h-8 rounded-md border border-[color:var(--border-log)] bg-transparent px-2 text-sm"
             >
-              {FILTERS.map((entry) => (
-                <button
-                  key={entry.value}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setFilter(entry.value);
-                    setFilterOpen(false);
-                  }}
-                  className="block w-full px-3 py-1 text-left text-sm hover:bg-bg-hover"
-                >
-                  {entry.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+              {FILTERS.find((entry) => entry.value === filter)?.label}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {FILTERS.map((entry) => (
+              <DropdownMenuItem
+                key={entry.value}
+                onSelect={() => setFilter(entry.value)}
+              >
+                {entry.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <button
           type="button"
           disabled

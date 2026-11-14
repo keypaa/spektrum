@@ -130,6 +130,67 @@ jobs:
   # 1/8 baselines are within budget; the rest remain above 0.15 % due to font
   # rasterization/AA, exact icon glyphs, and banner/empty-state layout detail.
   # This job stays non-blocking until calibration is actively resumed.
+  compile:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: spektrum
+          POSTGRES_PASSWORD: spektrum
+          POSTGRES_DB: spektrum
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U spektrum -d spektrum"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start MinIO
+        run: docker compose -f docker/compose.dev.yml up -d minio createbuckets
+      - name: Build the texlive image
+        run: docker build -t spektrum-texlive:dev docker/texlive
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Create + migrate the compile database
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=spektrum psql -h localhost -U spektrum -d postgres \
+            -c "CREATE DATABASE spektrum_test" || true
+          PGPASSWORD=spektrum psql -h localhost -U spektrum -d spektrum_test \
+            -c "CREATE EXTENSION IF NOT EXISTS citext"
+          pnpm db:migrate
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+      - name: Seed the compile owner
+        run: pnpm --filter @spektrum/web exec tsx src/cli/ci-seed.ts
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+      - name: Compile e2e
+        run: pnpm exec playwright test --config playwright.compile.config.ts e2e/compile.spec.ts
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          REDIS_URL: redis://localhost:6379
+          S3_ENDPOINT: http://localhost:9000
+          S3_BUCKET: spektrum-uploads
+          S3_PDF_BUCKET: spektrum-pdf
+          S3_ACCESS_KEY: spektrum
+          S3_SECRET_KEY: spektrum-secret
+          BETTER_AUTH_SECRET: ci-secret-32-chars-minimum!!!!!
+          BETTER_AUTH_URL: http://localhost:3000
+          LLM_KEY_ENCRYPTION_SECRET: ci-key-encryption-secret-32ch!!
+
   visual:
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -160,6 +221,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: Start MinIO
+        run: docker compose -f docker/compose.dev.yml up -d minio createbuckets
       - name: Build
         run: pnpm build
       - name: Create + migrate visual database

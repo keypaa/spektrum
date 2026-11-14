@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, seedVisualFixture, setTheme } from "./helpers";
+import { login, seedPdfFixture, seedVisualFixture, setTheme } from "./helpers";
 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{2BFF}]/u;
 
@@ -108,4 +108,33 @@ test("settings chrome: dialog semantics, nav and switches", async ({ page }) => 
   expect(await sw.getAttribute("role")).toBe("switch");
   // The active file tab exposes aria-current via aria-selected.
   await expect(dialog).toBeVisible();
+});
+
+test("the PDF and Logs screens have no emoji and only 16x16 currentColor icons", async ({ page }) => {
+  seedPdfFixture();
+  await setTheme(page, "dark");
+  await login(page);
+  await page.getByRole("link", { name: "New Project" }).first().click();
+  await expect(page.getByTestId("pdf-pane")).toBeVisible();
+  await page.getByRole("button", { name: "Tools" }).click();
+  await page.getByRole("menuitem", { name: "Logs" }).click();
+  await expect(page.getByTestId("info-panel")).toBeVisible();
+
+  const result = await page.evaluate((emoji) => {
+    const re = new RegExp(emoji, "u");
+    const text = document.body.innerText;
+    const svgs = [...document.querySelectorAll("svg")].map((svg) => ({
+      viewBox: svg.getAttribute("viewBox"),
+      fills: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("fill")),
+      strokes: [...svg.querySelectorAll("*")].map((n) => n.getAttribute("stroke")),
+    }));
+    return { hasEmoji: re.test(text), svgs };
+  }, EMOJI.source);
+
+  expect(result.hasEmoji).toBe(false);
+  for (const svg of result.svgs) {
+    expect(svg.viewBox).toBe("0 0 16 16");
+    for (const fill of svg.fills) expect([null, "none", "currentColor"]).toContain(fill);
+    for (const stroke of svg.strokes) expect([null, "currentColor"]).toContain(stroke);
+  }
 });
