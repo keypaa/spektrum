@@ -38,6 +38,8 @@ import { requestCompile } from "@/lib/compile-client";
 import { useRenderStream } from "@/lib/render-client";
 import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
+import { PdfChrome, pillState } from "@/components/pdf/pdf-chrome";
+import { PdfSearch } from "@/components/pdf/pdf-search";
 import { IconTools } from "@spektrum/ui/icons";
 
 // Monaco is browser-only; the dynamic import (ssr: false) must come from this
@@ -66,6 +68,8 @@ export interface EditorClientProps {
     status: string;
     revision: string;
     pdfUrl: string | null;
+    mainFile: string | null;
+    durationMs: number;
   } | null;
   user: { name: string; email: string };
 }
@@ -232,6 +236,7 @@ export function EditorClient({
     onSaved: (result: SaveResult) => {
       setBaseline(result.updatedAt);
       setSaveNote(null);
+      setDirty(false);
       if (preferences.realtimeCompilation) void compile();
     },
     onConflict: (current) => {
@@ -240,6 +245,7 @@ export function EditorClient({
       const position = editorRef.current?.getPosition();
       setBuffer(current.content ?? "");
       setBaseline(current.updatedAt);
+      setDirty(false);
       if (editorRef.current) {
         editorRef.current.setValue(current.content ?? "");
         if (position) editorRef.current.setPosition(position);
@@ -254,6 +260,23 @@ export function EditorClient({
     render.status?.event === "result"
       ? render.status.pdfUrl
       : (initialRender?.pdfUrl ?? null);
+  const [zoom, setZoom] = useState(100);
+  const [page, setPage] = useState(1);
+  const [numPages, setNumPages] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  // Cmd/Ctrl+F opens the PDF search pill (only when a PDF is showing).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const compile = useCallback(async () => {
     if (!mainFilePath) return;
     await requestCompile(project.id, mainFilePath).catch(() => undefined);
@@ -300,6 +323,7 @@ export function EditorClient({
   const onBufferChange = useCallback(
     (value: string) => {
       setBuffer(value);
+      setDirty(true);
       autosave.schedule();
     },
     [autosave],
@@ -490,13 +514,54 @@ export function EditorClient({
       </div>
 
       {pdfUrl ? (
-        <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">
-          <div className="h-full overflow-hidden rounded-t-lg bg-bg-preview">
-            <PdfViewer
-              pdfUrl={pdfUrl}
-              revision={initialRender?.revision ?? ""}
-              pageRef={pdfPageRef}
-            />
+        <div data-testid="pdf-pane" className="flex h-full min-h-0 flex-col bg-bg-code p-2">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-lg bg-bg-preview">
+            <div className="relative z-10">
+              <PdfChrome
+                state={pillState({
+                  render: render.status,
+                  isCurrent: initialRender?.isCurrent ?? false,
+                  dirty,
+                })}
+                page={page}
+                numPages={numPages}
+                zoom={zoom}
+                onPage={setPage}
+                onZoom={setZoom}
+                onRefresh={() => void compile()}
+                onGoToPdf={() => {
+                  document
+                    .querySelector('[data-testid="pdf-viewport"]')
+                    ?.scrollIntoView({ block: "start" });
+                }}
+                onSearch={() => setSearchOpen(true)}
+                pdfUrl={pdfUrl}
+                mainFile={initialRender?.mainFile ?? null}
+                durationMs={initialRender?.durationMs ?? null}
+                isCurrent={initialRender?.isCurrent ?? false}
+                revision={initialRender?.revision ?? null}
+                darkMode={preferences.pdfDarkMode}
+                zoomShortcuts={preferences.pdfZoomShortcuts}
+              />
+            </div>
+            <div className="min-h-0 flex-1">
+              <PdfViewer
+                pdfUrl={pdfUrl}
+                revision={initialRender?.revision ?? ""}
+                zoom={zoom / 100}
+                darkMode={preferences.pdfDarkMode}
+                onNumPages={setNumPages}
+                onPageChange={setPage}
+                pageRef={pdfPageRef}
+              />
+            </div>
+            {searchOpen ? (
+              <PdfSearch
+                query=""
+                onQuery={() => undefined}
+                onClose={() => setSearchOpen(false)}
+              />
+            ) : null}
           </div>
         </div>
       ) : (

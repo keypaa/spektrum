@@ -20,6 +20,8 @@ interface PdfViewerProps {
   pdfUrl: string | null;
   revision: string;
   zoom?: number;
+  darkMode?: boolean;
+  onNumPages?: (numPages: number) => void;
   onPageChange?: (page: number) => void;
   pageRef?: React.MutableRefObject<PdfViewerHandle | null>;
 }
@@ -63,6 +65,8 @@ function PageCanvas({
 export function PdfViewer({
   pdfUrl,
   zoom = 1,
+  darkMode = false,
+  onNumPages,
   onPageChange,
   pageRef,
 }: PdfViewerProps): React.ReactElement {
@@ -86,6 +90,7 @@ export function PdfViewer({
       void docRef.current?.cleanup();
       docRef.current = doc;
       setNumPages(doc?.numPages ?? 0);
+      onNumPages?.(doc?.numPages ?? 0);
       setGeneration((n) => n + 1);
     });
     return () => {
@@ -155,6 +160,9 @@ export function PdfViewer({
           ref={(element) => {
             if (element) pageEls.current.set(page, element);
             else pageEls.current.delete(page);
+          }}
+          style={{
+            filter: darkMode ? "invert(1) hue-rotate(180deg)" : undefined,
           }}
           className="mx-auto mb-2 w-fit bg-white shadow-[0_1px_3px_rgb(0_0_0_/_0.3)]"
         >
