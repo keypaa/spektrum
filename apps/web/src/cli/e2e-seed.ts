@@ -1,0 +1,107 @@
+// Seed the compile e2e database (idempotent): the owner, the example project
+// (main.tex + diagram.jpg blob), and the second user. Lives in apps/web so
+// workspace deps resolve; run with:
+//   pnpm --filter @spektrum/web exec tsx src/cli/e2e-seed.ts
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const envLocal = resolve(import.meta.dirname, "../../.env.local");
+if (existsSync(envLocal)) process.loadEnvFile(envLocal);
+
+import { createHash } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+import { db, pool } from "@spektrum/db";
+import { accounts, documents, projects, users } from "@spektrum/db/schema";
+import { ensureBucket, putObject } from "@spektrum/storage";
+import { hashPassword } from "../auth/password";
+
+const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
+const OWNER_PASSWORD =
+  process.env.E2E_OWNER_PASSWORD ?? "owner-password-123";
+const OTHER_EMAIL = process.env.E2E_OTHER_EMAIL ?? "other@spektrum.local";
+const OTHER_PASSWORD =
+  process.env.E2E_OTHER_PASSWORD ?? "other-password-123";
+const PROJECT = "New Project";
+
+async function ensureUser(
+  email: string,
+  password: string,
+  name: string,
+  role: "owner" | "member",
+): Promise<string> {
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email));
+  if (existing) return existing.id;
+
+  const id = crypto.randomUUID();
+  await db.insert(users).values({
+    id,
+    email,
+    name,
+    emailVerified: true,
+    role,
+    banned: false,
+  });
+  await db.insert(accounts).values({
+    id: crypto.randomUUID(),
+    userId: id,
+    providerId: "credential",
+    accountId: id,
+    password: await hashPassword(password),
+  });
+  return id;
+}
+
+const root = resolve(import.meta.dirname, "../../../..");
+
+await ensureBucket("pdf");
+await ensureBucket("uploads");
+
+const ownerId = await ensureUser(OWNER_EMAIL, OWNER_PASSWORD, "E2E Owner", "owner");
+await db
+  .delete(projects)
+  .where(and(eq(projects.ownerId, ownerId), eq(projects.name, PROJECT)));
+
+const [project] = await db
+  .insert(projects)
+  .values({ ownerId, name: PROJECT })
+  .returning({ id: projects.id });
+const projectId = project!.id;
+
+const example = readFileSync(
+  resolve(root, "zenno/recon/extracted/example-main.tex"),
+  "utf8",
+);
+const [main] = await db
+  .insert(documents)
+  .values({
+    projectId,
+    path: "main.tex",
+    kind: "tex",
+    content: example,
+  })
+  .returning({ id: documents.id });
+await db
+  .update(projects)
+  .set({ mainDocumentId: main!.id })
+  .where(eq(projects.id, projectId));
+
+const image = readFileSync(
+  resolve(root, "packages/latex/fixtures/src/diagram.jpg"),
+);
+const blobKey = createHash("sha256").update(image).digest("hex");
+await putObject("uploads", blobKey, image, "image/jpeg");
+await db.insert(documents).values({
+  projectId,
+  path: "diagram.jpg",
+  kind: "img",
+  blobKey,
+});
+
+const otherId = await ensureUser(OTHER_EMAIL, OTHER_PASSWORD, "E2E Other", "member");
+
+console.log(
+  `seeded ${PROJECT} (${projectId}) owner=${ownerId.slice(0, 8)} other=${otherId.slice(0, 8)}`,
+);
+await pool.end();

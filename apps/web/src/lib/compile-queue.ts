@@ -18,6 +18,6 @@ export const compileQueue = new Queue(QUEUE_NAME, {
 
 export async function enqueueCompile(job: CompileJob): Promise<void> {
   await compileQueue.add("compile", job, {
-    jobId: `${job.projectId}:${job.revisionHash}`,
+    jobId: `${job.projectId}-${job.revisionHash}`,
   });
 }

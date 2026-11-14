@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "admin:create-owner": "tsx src/cli/create-owner.ts",
-    "visual:seed": "tsx src/cli/visual-seed.ts"
+    "visual:seed": "tsx src/cli/visual-seed.ts",
+    "e2e:seed": "tsx src/cli/e2e-seed.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.18",

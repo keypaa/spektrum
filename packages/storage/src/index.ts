@@ -2,6 +2,7 @@
 // Server-only: do not import from client code.
 
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
   GetBucketPolicyCommand,
   GetObjectCommand,
@@ -39,6 +40,17 @@ function bucketName(bucket: Bucket): string {
 function isMissing(e: unknown): boolean {
   const name = (e as { name?: string }).name;
   return name === "NoSuchKey" || name === "NotFound";
+}
+
+/** Create a bucket if it does not exist (dev/MinIO). */
+export async function ensureBucket(bucket: Bucket): Promise<void> {
+  try {
+    await client.send(
+      new CreateBucketCommand({ Bucket: bucketName(bucket) }),
+    );
+  } catch {
+    /* already exists */
+  }
 }
 
 export async function putObject(
