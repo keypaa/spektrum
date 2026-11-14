@@ -11,7 +11,7 @@ const rows = [
     batchId: "b1",
     documentId: "d1",
     path: "main.tex",
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     author: "Keylhan",
   },
   {
@@ -19,7 +19,7 @@ const rows = [
     batchId: "b1",
     documentId: "d2",
     path: "refs.bib",
-    createdAt: new Date(),
+    createdAt: new Date().toISOString(),
     author: "Keylhan",
   },
   {
@@ -27,7 +27,7 @@ const rows = [
     batchId: "b2",
     documentId: "d1",
     path: "main.tex",
-    createdAt: new Date(Date.now() - 60_000),
+    createdAt: new Date(Date.now() - 60_000).toISOString(),
     author: "Keylhan",
   },
 ];

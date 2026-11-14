@@ -7,9 +7,8 @@ const redis = connectRedis();
 await recoverStaleRuns();
 await recoverStaleLocks(redis);
 
-const url = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
-const worker = new Worker(QUEUE_NAME, handler, {
-  connection: { host: url.hostname, port: Number(url.port || 6379) },
+const worker = new Worker(QUEUE_NAME, (job) => handler(job, redis), {
+  connection: redis,
   concurrency: 2,
 });
 

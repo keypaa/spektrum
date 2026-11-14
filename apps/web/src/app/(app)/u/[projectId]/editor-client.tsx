@@ -85,6 +85,7 @@ export interface EditorClientProps {
     status: string;
     revision: string;
     pdfUrl: string | null;
+    lastOkRevision: string | null;
     mainFile: string | null;
     durationMs: number;
     diagnostics: Diagnostic[];
@@ -297,9 +298,10 @@ export function EditorClient({
   }, [render.status]);
 
   useEffect(() => {
-    if (!revision) return;
+    const mapRevision = initialRender?.lastOkRevision ?? revision;
+    if (!mapRevision) return;
     let cancelled = false;
-    void fetchSyncTex(project.id, revision).then((map) => {
+    void fetchSyncTex(project.id, mapRevision).then((map) => {
       if (!cancelled) setSyncMap(map);
     });
     return () => {

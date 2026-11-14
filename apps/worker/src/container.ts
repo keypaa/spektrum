@@ -31,6 +31,9 @@ export async function runContainer(
   const suffix = `${process.pid}-${Date.now()}`;
   const volume = `spektrum-compile-vol-${suffix}`;
   const name = `spektrum-compile-${suffix}`;
+  if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/.test(mainFile)) {
+    throw new Error(`unsafe main file: ${mainFile}`);
+  }
   const dir = mainFile.includes("/") ? mainFile.slice(0, mainFile.lastIndexOf("/")) : "";
   const base = mainFile.slice(mainFile.lastIndexOf("/") + 1);
   const cd = dir ? `cd /work/${dir} && ` : "cd /work && ";

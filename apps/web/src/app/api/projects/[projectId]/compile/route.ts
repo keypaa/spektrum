@@ -15,7 +15,11 @@ import { currentRevisionKey } from "@spektrum/shared/compile";
 import { revisionHash } from "@spektrum/shared/revision";
 import { errorResponse } from "@/auth/route-errors";
 import { getProject } from "@/lib/projects";
-import { getDocumentByPath, listRevisionDocuments } from "@/lib/documents";
+import {
+  DocumentPathError,
+  getDocumentByPath,
+  listRevisionDocuments,
+} from "@/lib/documents";
 import { enqueueCompile } from "@/lib/compile-queue";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -58,6 +62,21 @@ export async function POST(
       return NextResponse.json({ revision, cached: true });
     }
 
+    const hourly = await consume(
+      `compileHourly:${user.id}`,
+      BUDGETS.compileHourly,
+    );
+    if (!hourly.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited", message: "60 compiles per hour" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(hourly.retryAfterMs / 1000)),
+          },
+        },
+      );
+    }
     const limit = await consume(`compile:${user.id}`, BUDGETS.compile);
     if (!limit.allowed) {
       return NextResponse.json(
@@ -79,6 +98,9 @@ export async function POST(
     });
     return NextResponse.json({ revision }, { status: 202 });
   } catch (e) {
+    if (e instanceof DocumentPathError) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     return errorResponse(e);
   }
 }

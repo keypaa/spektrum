@@ -93,7 +93,7 @@ export interface SnapshotRow {
   batchId: string | null;
   documentId: string;
   path: string;
-  createdAt: Date;
+  createdAt: string;
   author: string;
 }
 
@@ -123,7 +123,10 @@ export async function listSnapshots(
     .innerJoin(users, eq(users.id, snapshots.authorId))
     .where(eq(snapshots.projectId, projectId))
     .orderBy(desc(snapshots.createdAt), desc(snapshots.id));
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }
 
 /** Restore one snapshot into its document (ownership-checked). */

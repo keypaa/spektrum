@@ -2,7 +2,8 @@
 
 import type { SnapshotRow } from "@spektrum/db/snapshots";
 
-function relative(date: Date): string {
+function relative(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
   if (seconds < 60) return "just now";
   if (seconds < 3600) {

@@ -20,10 +20,7 @@ const LOCK_TTL_MS = 5 * 60_000;
 const LOCK_WAIT_MS = 30_000;
 
 export function connectRedis(): Redis {
-  const url = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
-  return new Redis({
-    host: url.hostname,
-    port: Number(url.port || 6379),
+  return new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
     maxRetriesPerRequest: null,
   });
 }
@@ -79,8 +76,13 @@ export async function handlerWith(
 }
 
 /** BullMQ processor entry (one parameter: BullMQ passes a sandbox token second). */
-export async function handler(job: {
-  data: CompileJob;
-}): Promise<{ skipped?: string }> {
-  return handlerWith(job, connectRedis());
+export async function handler(
+  job: { data: CompileJob },
+  redis: LockRedis = connectRedis(),
+): Promise<{ skipped?: string }> {
+  try {
+    return await handlerWith(job, redis);
+  } finally {
+    (redis as Redis).disconnect();
+  }
 }

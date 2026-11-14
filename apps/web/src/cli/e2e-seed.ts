@@ -99,6 +99,17 @@ await db.insert(documents).values({
   blobKey,
 });
 
+const longBody =
+  "\\documentclass{article}\n\\begin{document}\n" +
+  Array.from({ length: 20 }, () => "Page content.\\newpage").join("\n") +
+  "\n\\end{document}\n";
+await db.insert(documents).values({
+  projectId,
+  path: "long.tex",
+  kind: "tex",
+  content: longBody,
+});
+
 const otherId = await ensureUser(OTHER_EMAIL, OTHER_PASSWORD, "E2E Other", "member");
 
 console.log(

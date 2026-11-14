@@ -27,6 +27,7 @@ describe("parseRenderEvent", () => {
     const event = parseRenderEvent(
       JSON.stringify({
         event: "result",
+        revision: "a".repeat(64),
         pdfUrl: "/api/projects/x/render/y/pdf",
         diagnostics: [],
         stats: {

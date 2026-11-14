@@ -36,16 +36,24 @@ function detectProgram(source: string): string {
   return m ? m[1]!.toLowerCase() : "pdflatex";
 }
 
-/** Page boxes from the PDF's `/MediaBox` (one page is enough for fractions). */
-function mediaBoxes(pdf: Buffer): Array<{ width: number; height: number }> {
-  const text = pdf.toString("latin1");
-  const boxes = [...text.matchAll(/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/g)];
-  if (boxes.length === 0) return [{ width: 612, height: 792 }];
-  return boxes.map((m) => ({
-    width: Number(m[3]) - Number(m[1]),
-    height: Number(m[4]) - Number(m[2]),
-  }));
+/** Page boxes from the PDF (pdfjs reads compressed object streams). */
+async function mediaBoxes(pdf: Buffer): Promise<Array<{ width: number; height: number }>> {
+  try {
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const doc = await getDocument({ data: new Uint8Array(pdf) }).promise;
+    const boxes: Array<{ width: number; height: number }> = [];
+    for (let page = 1; page <= doc.numPages; page += 1) {
+      const viewport = (await doc.getPage(page)).getViewport({ scale: 1 });
+      boxes.push({ width: viewport.width, height: viewport.height });
+    }
+    await doc.cleanup();
+    if (boxes.length > 0) return boxes;
+  } catch {
+    /* fall through to the letter default */
+  }
+  return [{ width: 612, height: 792 }];
 }
+
 
 function tail(text: string, lines: number): string {
   const all = text.split("\n");
@@ -131,6 +139,24 @@ export async function runCompile(
           `latexmk failed (exit ${result.exitCode}): ${tail(result.stdout, 20)}`,
         );
       }
+      if (result.exitCode !== 0) {
+        const log = existsSync(logPath)
+          ? readFileSync(logPath, "utf8")
+          : result.stdout;
+        const diagnostics = parseLog(log);
+        await upsert(job, {
+          status: "error",
+          log: tail(log, 2000),
+          diagnostics,
+        });
+        await publish(redis, job.projectId, {
+          event: "status",
+          state: "error",
+          revision: job.revisionHash,
+        });
+        return { status: "error", durationMs: Date.now() - started };
+      }
+
       if (!existsSync(pdfPath)) {
         const log = readFileSync(logPath, "utf8");
         const diagnostics = parseLog(log);
@@ -154,7 +180,7 @@ export async function runCompile(
 
       const log = readFileSync(logPath, "utf8");
       const diagnostics = parseLog(log);
-      const pages = mediaBoxes(pdf);
+      const pages = await mediaBoxes(pdf);
       const map: SyncTexMap = existsSync(synctexPath)
         ? parseSyncTex(readFileSync(synctexPath), pages)
         : { forward: {}, backward: [] };
@@ -185,10 +211,15 @@ export async function runCompile(
         .from(projects)
         .where(eq(projects.id, job.projectId));
       if (project) {
-        await snapshotAfterCompile(job.projectId, project.ownerId);
+        try {
+          await snapshotAfterCompile(job.projectId, project.ownerId);
+        } catch {
+          // A snapshot failure must not fail an otherwise good compile.
+        }
       }
       await publish(redis, job.projectId, {
         event: "result",
+        revision: job.revisionHash,
         pdfUrl: `/api/projects/${job.projectId}/render/${job.revisionHash}/pdf`,
         diagnostics,
         stats,
@@ -207,9 +238,11 @@ export async function runCompile(
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    await upsert(job, { status: "error", log: tail(message, 2000) }).catch(
-      () => undefined,
-    );
+    await upsert(job, {
+      status: "error",
+      log: tail(message, 2000),
+      diagnostics: [{ severity: "error", message, raw: message }],
+    }).catch(() => undefined);
     await publish(redis, job.projectId, {
       event: "status",
       state: "error",

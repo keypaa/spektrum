@@ -85,6 +85,7 @@ export const renderEventSchema = z.discriminatedUnion("event", [
   z.object({ event: z.literal("log"), line: z.string() }),
   z.object({
     event: z.literal("result"),
+    revision: z.string(),
     pdfUrl: z.string(),
     diagnostics: z.array(diagnosticSchema),
     stats: projectStatsSchema,

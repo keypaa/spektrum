@@ -10,6 +10,7 @@ afterEach(cleanup);
 
 const result = {
   event: "result" as const,
+  revision: "a".repeat(64),
   pdfUrl: "/pdf",
   diagnostics: [],
   stats: {
