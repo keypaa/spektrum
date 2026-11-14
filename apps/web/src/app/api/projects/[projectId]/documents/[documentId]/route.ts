@@ -4,12 +4,16 @@ import { requireUser } from "@/auth/session";
 import { assertSameOrigin } from "@spektrum/shared/http/guard";
 import { loadWebEnv } from "@spektrum/shared/env";
 import { errorResponse } from "@/auth/route-errors";
+import { getRedis } from "@spektrum/shared/rate-limit";
+import { renderChannel } from "@spektrum/shared/compile";
+import { revisionHash } from "@spektrum/shared/revision";
 import {
   DocumentPathError,
   ProjectNotFoundError,
   StaleDocumentError,
   deleteDocument,
   getDocumentById,
+  listRevisionDocuments,
   saveDocument,
 } from "@/lib/documents";
 
@@ -48,7 +52,16 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     );
     return NextResponse.json(result);
   } catch (e) {
+    const { projectId, documentId } = await ctx.params;
     if (e instanceof StaleDocumentError) {
+      // §11.0: the losing tab is told over SSE; it reloads and keeps its cursor.
+      const revision = revisionHash(await listRevisionDocuments(projectId));
+      await getRedis()
+        .publish(
+          renderChannel(projectId),
+          JSON.stringify({ event: "conflict", revision, documentId }),
+        )
+        .catch(() => undefined);
       return NextResponse.json(
         { error: "conflict", document: e.current },
         { status: 409 },

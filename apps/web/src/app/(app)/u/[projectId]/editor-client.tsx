@@ -34,6 +34,8 @@ import { Composer } from "./composer/composer";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
 import { useAutosave } from "./use-autosave";
+import { requestCompile } from "@/lib/compile-client";
+import { useRenderStream } from "@/lib/render-client";
 import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import { IconTools } from "@spektrum/ui/icons";
 
@@ -48,6 +50,14 @@ export interface EditorClientProps {
   project: { id: string; name: string };
   documents: DocumentSummary[];
   initialDocument: DocumentRecord | null;
+  /** The project's main file path (for the compile request). */
+  mainFilePath?: string;
+  /** The latest render at page load (for the status pill and isCurrent). */
+  initialRender?: {
+    isCurrent: boolean;
+    status: string;
+    revision: string;
+  } | null;
   user: { name: string; email: string };
 }
 
@@ -59,6 +69,8 @@ export function EditorClient({
   project,
   documents,
   initialDocument,
+  mainFilePath = "",
+  initialRender = null,
   user,
 }: EditorClientProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -211,6 +223,7 @@ export function EditorClient({
     onSaved: (result: SaveResult) => {
       setBaseline(result.updatedAt);
       setSaveNote(null);
+      if (preferences.realtimeCompilation) void compile();
     },
     onConflict: (current) => {
       // §11.0: last write wins per document, but the losing tab reloads the
@@ -226,12 +239,44 @@ export function EditorClient({
     onError: () => flashSaveNote("error"),
   });
 
+  const render = useRenderStream(project.id);
+  const compile = useCallback(async () => {
+    if (!mainFilePath) return;
+    await requestCompile(project.id, mainFilePath).catch(() => undefined);
+  }, [project.id, mainFilePath]);
+
+  // Project open: compile when the persisted render is not the current revision.
+  const mountCompiled = useRef(false);
+  useEffect(() => {
+    if (mountCompiled.current) return;
+    if (initialRender && initialRender.isCurrent) return;
+    mountCompiled.current = true;
+    void compile();
+  }, [compile, initialRender]);
+
+  // A conflict event is for the tab that did not save: reload that document
+  // and keep the cursor (spec §11.0). A dirty buffer is never clobbered.
+  useEffect(() => {
+    const status = render.status;
+    if (!status || status.event !== "conflict") return;
+    if (status.documentId !== activeDoc?.id) return;
+    const current = editorRef.current?.getValue() ?? bufferRef.current;
+    if (current !== bufferRef.current) return;
+    void getDocumentRequest(project.id, activePath ?? "")
+      .then((doc) => {
+        setBuffer(doc.content ?? "");
+        setBaseline(doc.updatedAt);
+        editorRef.current?.loadValue(doc.content ?? "");
+      })
+      .catch(() => undefined);
+  }, [render.status, activeDoc?.id, activePath, project.id]);
+
   // Cmd/Ctrl+S forces a save.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        void autosave.flush();
+        void autosave.flush().then(() => compile());
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -374,7 +419,7 @@ export function EditorClient({
             onActivate={openDocument}
             onClose={(path) => dispatch({ type: "close", path })}
             onCollapseSidebar={() => {}}
-            onRecompile={() => {}}
+            onRecompile={() => void compile()}
             tools={
               <button
                 type="button"

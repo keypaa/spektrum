@@ -11,6 +11,7 @@ import {
   listTree,
 } from "@/lib/documents";
 import { EditorClient } from "./editor-client";
+import { getLatestRender } from "@/lib/render-store";
 
 export default async function EditorPage({
   params,
@@ -53,6 +54,12 @@ export default async function EditorPage({
       )))
     : null;
 
+  const initialRender = await getLatestRender(user.id, projectId);
+  const mainFilePath =
+    documents.find((d) => d.id === project.mainDocumentId)?.path ??
+    initialPath ??
+    "";
+
   const [profile] = await db
     .select({ name: users.name })
     .from(users)
@@ -64,6 +71,16 @@ export default async function EditorPage({
       project={{ id: project.id, name: project.name }}
       documents={documents}
       initialDocument={initialDocument}
+      mainFilePath={mainFilePath}
+      initialRender={
+        initialRender
+          ? {
+              isCurrent: initialRender.render.isCurrent,
+              status: initialRender.render.status,
+              revision: initialRender.render.revision,
+            }
+          : null
+      }
       user={{ name: profile?.name ?? user.email, email: user.email }}
     />
   );

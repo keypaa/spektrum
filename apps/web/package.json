@@ -26,7 +26,8 @@
     "react-dom": "19.3.1",
     "tsx": "4.23.15",
     "zod": "4.6.7",
-    "@spektrum/storage": "workspace:*"
+    "@spektrum/storage": "workspace:*",
+    "bullmq": "6.7.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
