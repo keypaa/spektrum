@@ -276,10 +276,14 @@ export function EditorClient({
 
   const render = useRenderStream(project.id);
   const pdfPageRef = useRef<PdfViewerHandle | null>(null);
-  const pdfUrl =
-    render.status?.event === "result"
-      ? render.status.pdfUrl
-      : (initialRender?.pdfUrl ?? null);
+  // Keep the last successful URL: a `status: running|error` frame must not
+  // unmount the pane (spec §11.2 partial renders).
+  const [pdfUrl, setPdfUrl] = useState<string | null>(
+    initialRender?.pdfUrl ?? null,
+  );
+  useEffect(() => {
+    if (render.status?.event === "result") setPdfUrl(render.status.pdfUrl);
+  }, [render.status]);
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
