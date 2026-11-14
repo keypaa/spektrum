@@ -68,6 +68,7 @@ texcount -total -merge -q ${base} > /work/texcount.txt; echo "$rc" > /work/latex
     ]);
     const container = created.trim();
 
+    await exec("chmod", ["-R", "a+rX", workDir]);
     await exec("docker", ["cp", `${workDir}/.`, `${container}:/work/`]);
 
     let timedOut = false;

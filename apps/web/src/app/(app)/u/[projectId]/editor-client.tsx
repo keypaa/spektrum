@@ -294,6 +294,9 @@ export function EditorClient({
   const [log, setLog] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [revision, setRevision] = useState(initialRender?.revision ?? "");
+  const [lastOk, setLastOk] = useState(
+    initialRender?.lastOkRevision ?? "",
+  );
   const [syncMap, setSyncMap] = useState<SyncTexMap | null>(null);
   const cursorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -312,7 +315,7 @@ export function EditorClient({
     return () => {
       cancelled = true;
     };
-  }, [project.id, revision]);
+  }, [project.id, revision, lastOk]);
 
   const onCursor = useCallback(
     (line: number) => {
@@ -320,7 +323,18 @@ export function EditorClient({
       cursorTimer.current = setTimeout(() => {
         if (!syncMap || !activePath) return;
         const entry = nearestForward(syncMap.forward[activePath], line);
-        if (entry) pdfPageRef.current?.scrollTo(entry.page, entry.x, entry.y);
+        if (entry) {
+          pdfPageRef.current?.scrollTo(entry.page, entry.x, entry.y);
+          const geometry = pdfPageRef.current?.getPageGeometry(entry.page);
+          if (geometry) {
+            pdfPageRef.current?.revealLineRect(entry.page, {
+              x: entry.x * geometry.width,
+              y: entry.y * geometry.height,
+              width: geometry.width * 0.6,
+              height: 14,
+            });
+          }
+        }
       }, 120);
     },
     [syncMap, activePath],
@@ -334,7 +348,9 @@ export function EditorClient({
   useEffect(() => {
     if (render.status?.event !== "status" || render.status.state !== "error")
       return;
-    void fetch(`/api/projects/${project.id}/render/latest`)
+    void fetch(`/api/projects/${project.id}/render/latest`, {
+      cache: "no-store",
+    })
       .then((res) => res.json())
       .then((body: { render?: { diagnostics?: Diagnostic[] } | null }) => {
         setLatestDiagnostics(body.render?.diagnostics ?? []);
@@ -345,9 +361,6 @@ export function EditorClient({
     render.status?.event === "result"
       ? render.status.diagnostics
       : latestDiagnostics;
-  const [lastOk, setLastOk] = useState(
-    initialRender?.lastOkRevision ?? "",
-  );
   useEffect(() => {
     if (render.status?.event === "result")
       setLastOk(render.status.revision);

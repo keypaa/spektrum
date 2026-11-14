@@ -67,16 +67,24 @@ test.describe("compile", () => {
     await blur(page);
     await expect.poll(latestOk, { timeout: 60_000 }).toBe(true);
 
-    await type(page, "2");
-    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-    // Wait until the new save's row is no longer the previous ok revision.
-    await expect
-      .poll(async () => (await latestRender(page, projectId)).render?.isCurrent, {
-        timeout: 60_000,
-      })
-      .toBe(false);
+    const before = (await latestRender(page, projectId)).render?.revision;
     const started = Date.now();
-    await expect.poll(latestOk, { timeout: 60_000, intervals: [100, 250, 500] }).toBe(true);
+    await type(page, "2");
+    await blur(page);
+    await expect
+      .poll(
+        async () => {
+          const latest = (await latestRender(page, projectId)).render;
+          return latest !== null &&
+            latest.revision !== before &&
+            latest.status === "ok" &&
+            latest.isCurrent
+            ? true
+            : false;
+        },
+        { timeout: 60_000, intervals: [100, 250, 500] },
+      )
+      .toBe(true);
     const elapsed = Date.now() - started;
     console.log(`keystroke -> PDF: ${elapsed} ms (gate < 3000)`);
     expect(elapsed).toBeLessThan(3000);
