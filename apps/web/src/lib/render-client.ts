@@ -26,6 +26,8 @@ export function useRenderStream(projectId: string): RenderState {
   const retryRef = useRef(0);
 
   const connect = useCallback(() => {
+    // jsdom (unit tests) and SSR have no EventSource; the e2e covers the live path.
+    if (typeof EventSource === "undefined") return () => undefined;
     const source = new EventSource(
       `/api/projects/${projectId}/render/stream`,
     );
