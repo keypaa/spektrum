@@ -27,7 +27,7 @@ export function exceedsLimit(content: string): boolean {
 export interface DiffAcceptContext {
   projectId: string;
   activePath: string | null;
-  findDoc(path: string): { id: string } | undefined;
+  findDoc(path: string): { id: string; updatedAt?: string } | undefined;
   currentContent(path: string): string;
   baselineFor(path: string): string;
   openPath(path: string): Promise<void>;
@@ -55,7 +55,9 @@ export async function acceptDiff(
     return { ok: false, error: TOO_LARGE_MESSAGE };
   }
 
-  if (proposal.path !== ctx.activePath) {
+  // A create targets a path that does not exist yet, so it must not wait for a
+  // document to load. Replace/delete target an existing document.
+  if (proposal.kind !== "create" && proposal.path !== ctx.activePath) {
     await ctx.openPath(proposal.path);
     await ctx.whenLoaded(proposal.path);
   }
@@ -68,11 +70,12 @@ export async function acceptDiff(
   if (proposal.kind === "create") {
     const existing = ctx.findDoc(proposal.path);
     const doc = existing ?? (await ctx.create(proposal.path));
-    const result = await ctx.save(
-      doc.id,
-      proposal.proposedContent,
-      ctx.baselineFor(proposal.path),
-    );
+    // A freshly created row has no prior baseline: save against the `updatedAt`
+    // the create returned. An existing row uses the caller's baseline.
+    const base = existing
+      ? ctx.baselineFor(proposal.path)
+      : doc.updatedAt ?? ctx.baselineFor(proposal.path);
+    const result = await ctx.save(doc.id, proposal.proposedContent, base);
     ctx.onSaved(proposal.path, proposal.proposedContent, result.updatedAt);
     return { ok: true };
   }

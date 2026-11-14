@@ -426,16 +426,18 @@ export async function POST(
                 signal: AbortSignal.timeout(2000),
               });
               if (title) {
-                send("title", {
-                  threadId: thread.id,
-                  title,
-                  titleSource: "llm",
-                });
+                // Persist before emitting: the client refreshes the thread list
+                // on `title`, and must read the generated title, not the fallback.
                 await db
                   .update(chatThreads)
                   .set({ title, titleSource: "llm", updatedAt: new Date() })
                   .where(eq(chatThreads.id, thread.id))
                   .catch(() => undefined);
+                send("title", {
+                  threadId: thread.id,
+                  title,
+                  titleSource: "llm",
+                });
               }
             } catch {
               // fire-and-forget: the fallback title stays

@@ -18,7 +18,8 @@
     "test:visual": "playwright test --config=playwright.visual.config.ts",
     "lint": "eslint .",
     "db:generate": "pnpm --filter @spektrum/db generate",
-    "db:migrate": "pnpm --filter @spektrum/db migrate"
+    "db:migrate": "pnpm --filter @spektrum/db migrate",
+    "test:ai": "playwright test --config=playwright.ai.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.65.0",

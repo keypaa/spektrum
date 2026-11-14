@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   IconArrowUp,
   IconChevronDown,
@@ -53,9 +53,17 @@ export function Composer({
       el.scrollHeight > LINE_HEIGHT * MAX_LINES ? "auto" : "hidden";
   }, [value]);
 
+  // Guard against a double submit (a fast double click or a click retried by
+  // the harness) before the streaming state has re-rendered.
+  const sending = useRef(false);
+  useEffect(() => {
+    if (!streaming) sending.current = false;
+  }, [streaming]);
+
   const submit = (): void => {
     const text = value.trim();
-    if (!text || streaming || !aiEnabled) return;
+    if (!text || streaming || !aiEnabled || sending.current) return;
+    sending.current = true;
     chat.send(text, level, openTabs);
     setValue("");
   };

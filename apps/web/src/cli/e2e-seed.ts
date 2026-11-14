@@ -10,9 +10,9 @@ if (existsSync(envLocal)) process.loadEnvFile(envLocal);
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
-import { accounts, documents, projects, users } from "@spektrum/db/schema";
+import { documents, projects, users } from "@spektrum/db/schema";
 import { ensureBucket, putObject } from "@spektrum/storage";
-import { hashPassword } from "../auth/password";
+import { ensureUser } from "./seed-lib";
 
 const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
 const OWNER_PASSWORD =
@@ -21,37 +21,6 @@ const OTHER_EMAIL = process.env.E2E_OTHER_EMAIL ?? "other@spektrum.local";
 const OTHER_PASSWORD =
   process.env.E2E_OTHER_PASSWORD ?? "other-password-123";
 const PROJECT = "New Project";
-
-async function ensureUser(
-  email: string,
-  password: string,
-  name: string,
-  role: "owner" | "member",
-): Promise<string> {
-  const [existing] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email));
-  if (existing) return existing.id;
-
-  const id = crypto.randomUUID();
-  await db.insert(users).values({
-    id,
-    email,
-    name,
-    emailVerified: true,
-    role,
-    banned: false,
-  });
-  await db.insert(accounts).values({
-    id: crypto.randomUUID(),
-    userId: id,
-    providerId: "credential",
-    accountId: id,
-    password: await hashPassword(password),
-  });
-  return id;
-}
 
 const root = resolve(import.meta.dirname, "../../../..");
 

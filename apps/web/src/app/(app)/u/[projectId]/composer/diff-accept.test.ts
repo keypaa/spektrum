@@ -90,7 +90,7 @@ describe("acceptDiff", () => {
     );
     expect(result).toEqual({ ok: true });
     expect(c.create).toHaveBeenCalledWith("notes.tex");
-    expect(c.save).toHaveBeenCalledWith("doc-notes.tex", "hello\n", "2026-01-01");
+    expect(c.save).toHaveBeenCalledWith("doc-notes.tex", "hello\n", "2026-02-02");
   });
 
   it("deletes the document without saving content", async () => {

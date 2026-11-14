@@ -175,15 +175,19 @@ export function useChat(input: {
             const frames = buffer.split("\n\n");
             buffer = frames.pop() ?? "";
             for (const frame of frames) {
+              const eventLine = frame
+                .split("\n")
+                .find((line) => line.startsWith("event:"));
               const dataLine = frame
                 .split("\n")
                 .find((line) => line.startsWith("data:"));
-              if (!dataLine) continue;
+              if (!eventLine || !dataLine) continue;
               try {
                 apply(
-                  chatEventSchema.parse(
-                    JSON.parse(dataLine.slice(5).trim()),
-                  ),
+                  chatEventSchema.parse({
+                    event: eventLine.slice(6).trim(),
+                    data: JSON.parse(dataLine.slice(5).trim()),
+                  }),
                 );
               } catch {
                 // skip a malformed frame, keep the partial text

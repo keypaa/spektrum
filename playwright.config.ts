@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "./e2e",
   // The visual suite has its own config (playwright.visual.config.ts) and its
   // own two-server setup; the behavioural suite must never pick it up.
-  testIgnore: ["**/visual/**", "**/compile.spec.ts"],
+  testIgnore: ["**/visual/**", "**/compile.spec.ts", "**/ai.spec.ts"],
   timeout: 30_000,
   // Every spec drives the same owner account and database; parallel workers
   // race on project counts and the sign-in rate limit. The suite is small

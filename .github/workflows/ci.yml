@@ -123,6 +123,12 @@ jobs:
           E2E_WEB_COMMAND: pnpm --filter @spektrum/web start
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+      - run: pnpm test:ai
+        env:
+          E2E_WEB_COMMAND: pnpm --filter @spektrum/web exec next start -p 3000
+          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          LLM_KEY_ENCRYPTION_SECRET: e2e-key-encryption-secret-32ch!x
 
   # Visual calibration did NOT reach the ≤ 0.15 % target (accepted shortfall;
   # see Appendix A of zenno/plans/2026-11-07-01-shell-dashboard.md and

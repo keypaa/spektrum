@@ -155,6 +155,10 @@ export function EditorClient({
   baselineRef.current = baseline;
   const bufferRef = useRef(buffer);
   bufferRef.current = buffer;
+  const loadedPathRef = useRef(loadedPath);
+  loadedPathRef.current = loadedPath;
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
@@ -193,6 +197,8 @@ export function EditorClient({
 
   const activePath = tabs.active;
   const activeDoc = docs.find((d) => d.path === activePath) ?? null;
+  const activePathRef = useRef(activePath);
+  activePathRef.current = activePath;
 
   // The RSC refresh (after a tab switch or a mutation) hands back the freshly
   // loaded document; adopt its content/baseline once it is the active path.
@@ -297,6 +303,7 @@ export function EditorClient({
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [panel, setPanel] = useState<InfoTab | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
@@ -313,7 +320,10 @@ export function EditorClient({
 
   const chat = useChat({
     projectId: project.id,
-    onDiff: () => setPanel(null),
+    onDiff: (part) => {
+      setPanel(null);
+      setReviewingId(part.id);
+    },
     onTitle: () => void refreshThreads(),
     onThreadChange: (id) => {
       setActiveThreadId(id);
@@ -596,7 +606,6 @@ export function EditorClient({
   );
 
   // --- Diff review (spec §7.4): one inline Monaco diff at a time. ---------
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [diffStale, setDiffStale] = useState(false);
   const loadedWaiters = useRef(new Map<string, () => void>());
 
@@ -609,21 +618,27 @@ export function EditorClient({
     }
   }, [loadedPath]);
 
-  const whenPathLoaded = useCallback(
-    (path: string) => {
-      if (loadedPath === path) return Promise.resolve();
-      return new Promise<void>((resolve) => {
-        loadedWaiters.current.set(path, resolve);
-      });
-    },
-    [loadedPath],
-  );
+  const whenPathLoaded = useCallback((path: string) => {
+    // Read the live value: a stale closure would wait for a transition that
+    // already happened and hang the accept.
+    if (loadedPathRef.current === path) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      loadedWaiters.current.set(path, resolve);
+    });
+  }, []);
 
   const reviewingPart =
     chat.parts.find(
       (part): part is DiffPart =>
         part.type === "diff" && part.id === reviewingId && part.status === "pending",
-    ) ?? null;
+    ) ??
+    [...chat.parts]
+      .reverse()
+      .find(
+        (part): part is DiffPart =>
+          part.type === "diff" && part.status === "pending",
+      ) ??
+    null;
 
   useEffect(() => {
     if (!reviewingPart || reviewingPart.proposal.path !== activePath) {
@@ -650,10 +665,10 @@ export function EditorClient({
   ): Promise<{ ok: true } | { ok: false; error: string }> =>
     acceptDiff(part, {
       projectId: project.id,
-      activePath,
-      findDoc: (path) => docs.find((doc) => doc.path === path),
+      activePath: activePathRef.current,
+      findDoc: (path) => docsRef.current.find((doc) => doc.path === path),
       currentContent: (path) =>
-        path === activePath
+        path === activePathRef.current
           ? editorRef.current?.getValue() ?? bufferRef.current
           : "",
       baselineFor: () => baselineRef.current,
@@ -670,11 +685,12 @@ export function EditorClient({
             { id: doc.id, path: doc.path, kind: doc.kind, updatedAt: doc.updatedAt },
           ].sort(byPath),
         );
-        dispatch({ type: "open", path: doc.path });
+        // Leave the buffer alone: the new file is opened explicitly (the row
+        // click), which loads it from the server with the saved content.
         return { id: doc.id, updatedAt: doc.updatedAt };
       },
       remove: async (path) => {
-        const doc = docs.find((d) => d.path === path);
+        const doc = docsRef.current.find((d) => d.path === path);
         if (!doc) return;
         await deleteDocumentRequest(project.id, doc.id);
         setDocs((prev) => prev.filter((d) => d.id !== doc.id));
@@ -682,11 +698,17 @@ export function EditorClient({
         afterMutation();
       },
       onSaved: (path, content, updatedAt) => {
+        // Only the active document's buffer/baseline is authoritative here; a
+        // create for a non-active path leaves the editor untouched (the user
+        // opens the new file, which loads it from the server).
+        if (path !== activePathRef.current) return;
         setBuffer(content);
         setBaseline(updatedAt);
         setDirty(false);
         setLoadedPath(path);
         setSaveNote(null);
+        const editor = editorRef.current;
+        if (editor && editor.getValue() !== content) editor.loadValue(content);
         if (preferences.realtimeCompilation) void compile();
       },
     });
@@ -921,7 +943,7 @@ export function EditorClient({
         <div
           data-testid="composer-slot-placeholder"
           className="flex-none border-t border-[color:var(--border-log)]"
-          style={{ height: chat.parts.length > 0 ? "min(45vh, 420px)" : "88px" }}
+          style={{ height: chat.parts.length > 0 ? "min(45vh, 420px)" : "180px" }}
         >
           <Composer
             chat={chat}
