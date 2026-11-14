@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { handler, supersededBy } from "./queue";
+import { handlerWith, supersededBy } from "./queue";
 
 const REV_A = "a".repeat(64);
 const REV_B = "b".repeat(64);
@@ -27,7 +27,7 @@ describe("handler", () => {
     };
     // The handler imports runCompile directly; the supersede path must return
     // before reaching it, so a rejected promise would surface as a failure.
-    const result = await handler(
+    const result = await handlerWith(
       {
         data: {
           projectId: crypto.randomUUID(),

@@ -134,11 +134,16 @@ export async function assertNoAnonymousRead(bucket: Bucket): Promise<void> {
     // not implement bucket policies, so there is no anonymous grant to find.
     return;
   }
-  const grantsAnonymous = (parsed.Statement ?? []).some(
-    (s) =>
-      s.Effect === "Allow" &&
-      (s.Principal === "*" || s.Principal?.AWS === "*"),
-  );
+  const grantsAnonymous = (parsed.Statement ?? []).some((statement) => {
+    if (statement.Effect !== "Allow") return false;
+    const principal = statement.Principal;
+    return (
+      principal === "*" ||
+      (typeof principal === "object" &&
+        principal !== null &&
+        principal.AWS === "*")
+    );
+  });
   if (grantsAnonymous) throw new StorageError("anonymous_read_policy");
 }
 

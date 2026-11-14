@@ -58,9 +58,9 @@ async function acquireLock(redis: LockRedis, projectId: string): Promise<boolean
   return false;
 }
 
-export async function handler(
+export async function handlerWith(
   job: { data: CompileJob },
-  redis: LockRedis = connectRedis(),
+  redis: LockRedis,
 ): Promise<{ skipped?: string }> {
   const parsed = compileJobSchema.safeParse(job.data);
   if (!parsed.success) throw new Error("invalid compile job");
@@ -76,4 +76,11 @@ export async function handler(
   } finally {
     await redis.del(`${LOCK_PREFIX}${data.projectId}`);
   }
+}
+
+/** BullMQ processor entry (one parameter: BullMQ passes a sandbox token second). */
+export async function handler(job: {
+  data: CompileJob;
+}): Promise<{ skipped?: string }> {
+  return handlerWith(job, connectRedis());
 }
