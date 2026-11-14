@@ -1,5 +1,16 @@
+import { execFileSync } from "node:child_process";
 import { expect, test, type Page } from "@playwright/test";
 import { login } from "./helpers";
+
+// Every case shares one owner/project; re-seed so (b)'s broken document and
+// (a)'s edits cannot leak into the next test.
+test.beforeEach(() => {
+  execFileSync(
+    "pnpm",
+    ["--filter", "@spektrum/web", "exec", "tsx", "src/cli/e2e-seed.ts"],
+    { stdio: "inherit", env: process.env },
+  );
+});
 
 const OTHER = { email: "other@spektrum.local", password: "other-password-123" };
 
@@ -134,6 +145,7 @@ test.describe("compile", () => {
     }, projectId);
     const latest = await latestRender(page, projectId);
     expect(latest.render?.revision).toBe(revision);
+    expect(latest.render?.isCurrent).toBe(true);
   });
 
   test("a failing compile keeps the last good PDF", async ({ page }) => {
@@ -165,17 +177,22 @@ test.describe("compile", () => {
     test.setTimeout(120_000);
     await openProject(page);
     const projectId = new URL(page.url()).pathname.split("/")[2]!;
-    await page.goto(`/u/${projectId}?p=long.tex`);
-    await expect(page.getByTestId("monaco-editor")).toBeVisible();
-    await page.locator(".monaco-editor textarea").waitFor({ timeout: 60_000 });
 
     const started = Date.now();
-    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    const res = await page.request.post(
+      `/api/projects/${projectId}/compile`,
+      { data: { mainFile: "long.tex" } },
+    );
+    expect(res.status()).toBe(202);
+    const body = (await res.json()) as { revision: string };
     await expect
       .poll(
         async () => {
-          const body = await latestRender(page, projectId);
-          return body.render?.status;
+          const latest = await latestRender(page, projectId);
+          return latest.render?.revision === body.revision &&
+            latest.render.status === "ok"
+            ? "ok"
+            : latest.render?.status;
         },
         { timeout: 60_000 },
       )
@@ -226,9 +243,9 @@ test.describe("compile", () => {
       `/api/projects/${projectId}/render/latest`,
     );
     const body = (await latest.json()) as {
-      render: { revision: string } | null;
+      render: { lastOkRevision: string | null } | null;
     };
-    const revision = body.render?.revision;
+    const revision = body.render?.lastOkRevision;
     expect(revision).toBeTruthy();
 
     await page.goto("/");
