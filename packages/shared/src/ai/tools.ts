@@ -72,3 +72,16 @@ export function toolSchemas() {
 }
 
 export type ToolSchema = ReturnType<typeof toolSchemas>[number];
+
+/** The zod schemas behind the JSON tool definitions (for argument parsing). */
+export const toolArgs = {
+  list_files: listFiles,
+  read_file: readFile,
+  write_file: writeFile,
+  edit_file: editFile,
+  create_file: createFile,
+  delete_file: deleteFile,
+  compile,
+  get_logs: getLogs,
+  search_project: searchProject,
+} as const;

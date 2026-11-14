@@ -1,28 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
-import { db } from "@spektrum/db";
-import { pdfRenders } from "@spektrum/db/schema";
 import { requireUser } from "@/auth/session";
 import { assertSameOrigin } from "@spektrum/shared/http/guard";
 import { loadWebEnv } from "@spektrum/shared/env";
-import {
-  BUDGETS,
-  consume,
-  getRedis,
-} from "@spektrum/shared/rate-limit";
-import { currentRevisionKey } from "@spektrum/shared/compile";
-import { revisionHash } from "@spektrum/shared/revision";
 import { errorResponse } from "@/auth/route-errors";
-import { getProject } from "@/lib/projects";
-import {
-  DocumentPathError,
-  getDocumentByPath,
-  listRevisionDocuments,
-} from "@/lib/documents";
-import { enqueueCompile } from "@/lib/compile-queue";
+import { DocumentPathError } from "@/lib/documents";
+import { enqueueProjectCompile } from "@/lib/compile-request";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const bodySchema = z.object({ mainFile: z.string().min(1).max(200) });
 
 export async function POST(
@@ -37,70 +23,35 @@ export async function POST(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const body = bodySchema.parse(await req.json());
-    const project = await getProject(user.id, projectId);
-    if (!project) {
+    const result = await enqueueProjectCompile(user, projectId, body.mainFile);
+
+    if (result.kind === "not_found") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
-    const main = await getDocumentByPath(user.id, projectId, body.mainFile);
-    if (!main) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
-    }
-
-    const revision = revisionHash(await listRevisionDocuments(projectId));
-
-    const [cached] = await db
-      .select({ id: pdfRenders.id })
-      .from(pdfRenders)
-      .where(
-        and(
-          eq(pdfRenders.projectId, projectId),
-          eq(pdfRenders.revisionHash, revision),
-          eq(pdfRenders.status, "ok"),
-        ),
-      );
-    if (cached) {
-      return NextResponse.json({ revision, cached: true });
-    }
-
-    const hourly = await consume(
-      `compileHourly:${user.id}`,
-      BUDGETS.compileHourly,
-    );
-    if (!hourly.allowed) {
-      return NextResponse.json(
-        { error: "rate_limited", message: "60 compiles per hour" },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(Math.ceil(hourly.retryAfterMs / 1000)),
-          },
-        },
-      );
-    }
-    const limit = await consume(`compile:${user.id}`, BUDGETS.compile);
-    if (!limit.allowed) {
+    if (result.kind === "rate_limited") {
       return NextResponse.json(
         { error: "rate_limited" },
         {
           status: 429,
           headers: {
-            "Retry-After": String(Math.ceil(limit.retryAfterMs / 1000)),
+            "Retry-After": String(
+              Math.max(1, Math.ceil(result.retryAfterMs / 1000)),
+            ),
           },
         },
       );
     }
-
-    await getRedis().set(currentRevisionKey(projectId), revision);
-    await enqueueCompile({
-      projectId,
-      revisionHash: revision,
-      mainFile: main.path,
-    });
-    return NextResponse.json({ revision }, { status: 202 });
-  } catch (e) {
-    if (e instanceof DocumentPathError) {
+    if (result.kind === "cached") {
+      return NextResponse.json({
+        revision: result.revision,
+        cached: true,
+      });
+    }
+    return NextResponse.json({ revision: result.revision }, { status: 202 });
+  } catch (error) {
+    if (error instanceof DocumentPathError) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
-    return errorResponse(e);
+    return errorResponse(error);
   }
 }
