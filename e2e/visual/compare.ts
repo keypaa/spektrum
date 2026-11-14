@@ -62,44 +62,45 @@ const MASKS: Record<string, Mask[]> = {
   // PDF top.
   "editor--dark--blank": [],
   "editor--light--blank": [],
-  // Phase 3: our texlive render can never match Prism's PDF sheet (engine,
-  // fonts, pagination); mask the sheet, the page indicator and the composer
-  // (the captures show Phase 4's chat).
+  // Phase 3: our texlive render can never match Prism's PDF sheet; mask the
+  // sheet below the chrome (the pill/menus stay gated) and the composer (the
+  // captures show Phase 4's chat).
   "pdf--dark--compiled": [
-    { x: 1748, y: 100, width: 765, height: 1200 },
-    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 1748, y: 190, width: 765, height: 1110 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "pdf--light--search": [
-    { x: 1748, y: 100, width: 765, height: 1200 },
-    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 1748, y: 190, width: 765, height: 1110 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "pdf--dark--more-menu": [
-    { x: 1748, y: 100, width: 765, height: 1200 },
-    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 1748, y: 190, width: 765, height: 1110 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "pdf--dark--zoom-menu": [
-    { x: 1748, y: 100, width: 765, height: 1200 },
-    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 1748, y: 190, width: 765, height: 1110 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "editor--light--context-menu": [
-    { x: 1748, y: 100, width: 765, height: 1200 },
-    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 1748, y: 190, width: 765, height: 1110 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "logs--dark--default": [
-    { x: 442, y: 1000, width: 1047, height: 174 },
-    { x: 1748, y: 1050, width: 765, height: 250 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "logs--dark--filter-menu": [
-    { x: 442, y: 1000, width: 1047, height: 174 },
+    { x: 442, y: 1265, width: 1047, height: 70 },
   ],
   "info--dark--project-info": [
-    { x: 900, y: 300, width: 900, height: 500 },
+    { x: 1748, y: 190, width: 765, height: 900 },
   ],
   "info--dark--versions": [
-    { x: 900, y: 300, width: 900, height: 500 },
+    { x: 1748, y: 190, width: 765, height: 900 },
   ],
   "info--dark--comments": [],
-  "share--dark": [],
+  "share--dark": [
+    { x: 64, y: 53, width: 2402, height: 1274 },
+  ],
 };
 
 /** Four non-overlapping strips covering everything outside the modal. */

@@ -28,6 +28,7 @@ export function Logs({
   onJump,
 }: LogsProps): React.ReactElement {
   const [filter, setFilter] = useState<Filter>("all");
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (filter === "warnings")
@@ -51,18 +52,38 @@ export function Logs({
   return (
     <div className="flex flex-col gap-2 p-2">
       <div className="flex items-center gap-2">
-        <select
-          aria-label="Logs filter"
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as Filter)}
-          className="h-8 rounded-md border border-[color:var(--border-log)] bg-transparent px-2 text-sm"
-        >
-          {FILTERS.map((entry) => (
-            <option key={entry.value} value={entry.value}>
-              {entry.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Logs filter"
+            aria-haspopup="menu"
+            onClick={() => setFilterOpen((open) => !open)}
+            className="h-8 rounded-md border border-[color:var(--border-log)] bg-transparent px-2 text-sm"
+          >
+            {FILTERS.find((entry) => entry.value === filter)?.label}
+          </button>
+          {filterOpen ? (
+            <div
+              role="menu"
+              className="absolute left-0 top-9 z-10 min-w-[180px] rounded-lg border border-[color:var(--border-log)] bg-modal-bg py-1 shadow-[var(--shadow-surface)]"
+            >
+              {FILTERS.map((entry) => (
+                <button
+                  key={entry.value}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setFilter(entry.value);
+                    setFilterOpen(false);
+                  }}
+                  className="block w-full px-3 py-1 text-left text-sm hover:bg-bg-hover"
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           disabled

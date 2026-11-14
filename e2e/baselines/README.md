@@ -27,7 +27,7 @@ Every capture is **2530×1380 physical**; the app region is **2466×1327 at DSF 
 | `reference/settings--beta--dark.png` | 6 | `screenshot-2026-11-05_21-24-32-google-chrome.png` | Settings modal, dark, Beta features section (fixture `dark`) |
 | `reference/settings--integrations--dark.png` | 7 | `screenshot-2026-11-05_21-24-36-google-chrome.png` | Settings modal, dark, Integrations section (fixture `dark`) |
 
-Phase 2 editor baselines show Prism's pre-compile state (`Initializing...`); the right pane is static until Phase 3.
+Phase 3: the right pane is the real viewer; the two Phase 2 editor baselines are masked on the sheet/pill (the pane is in the no-render state).
 
 ### Deliberate exclusions
 
@@ -71,3 +71,22 @@ Three things about these rectangles are not arbitrary:
 - **The toast really is only 62 px tall inside the app region.** The browser chrome ends at y=53; the toast panel is x 2107–2529, y 0–102 with a shadow to y≈111, so `y1=115` covers it with a little slack. Do not mask the whole top-right: the Import/New buttons and the segmented control are the point of this baseline.
 - **Every baseline with project rows masks the thumbnail column.** The references show real Prism page previews; the fixtures have no thumbnail, so our rows render Prism's default thumbnail. The strip is deliberately generous (55 px box + 6 px each side, every row from the column-header bottom to the card bottom); Task 18 tightens it.
 - **`dashboard--light--empty--banner` masks the bottom-left corner, not the empty state.** The signed-out chip and its menu-free area are the only unreproducible parts; the empty-state cluster in the middle of the card is fully gated, and so is the light banner.
+
+
+## Phase 3 (compile + PDF + logs)
+
+| Baseline | Capture | What it shows | Ratio (2026-11-14) |
+|---|---|---|---|
+| `pdf--dark--compiled` | 18 | Editor + compiled PDF | 4.562 % |
+| `pdf--light--search` | 41 | Light editor, PDF search pill | 3.535 % |
+| `pdf--dark--more-menu` | 31 | PDF ⋯ menu | 4.579 % |
+| `pdf--dark--zoom-menu` | 32 | PDF zoom menu | 4.568 % |
+| `editor--light--context-menu` | 40 | Light editor context menu | 3.607 % |
+| `logs--dark--default` | 29 | Logs panel | 31.551 % |
+| `logs--dark--filter-menu` | 30 | Logs filter menu (custom dropdown; the case currently times out on the item locator) | — |
+| `info--dark--project-info` | 23 | Project Info cards | 13.851 % |
+| `info--dark--versions` | 26 | Versions list | 14.663 % |
+| `info--dark--comments` | 28 | Comments empty state | 32.366 % |
+| `share--dark` | 35 | Share dialog | 91.300 % |
+
+Masks (full-capture physical): the sheet `{1748,190,765,1110}` (below the chrome, so the pill/menus stay gated) and the composer `{442,1265,1047,70}` for the editor/PDF cases; the Info panel content `{1748,190,765,900}` for Project Info/Versions; the whole background for the Share dialog. The Ratios are a measurement, not a gate (`visual` stays `continue-on-error`); the info/logs/share calibration is the remaining Phase 3 visual work.

@@ -12,6 +12,7 @@ import {
   folders,
   pdfRenders,
   projects,
+  snapshots,
   userPreferences,
   users,
 } from "@spektrum/db/schema";
@@ -175,14 +176,49 @@ if (isPdf) {
   );
   const pdfKey = `pdf/${projectId}/${revision}.pdf`;
   await putObject("pdf", pdfKey, pdf, "application/pdf");
-  await db.insert(pdfRenders).values({
+
+  // The captures' Logs/Project Info content (screens 23–30): one overfull
+  // warning, the word counts, and a version snapshot.
+  const diagnostics = [
+    {
+      severity: "warning" as const,
+      message: "Overfull \\hbox (9.89099pt too wide) detected at line 75",
+      file: "main.tex",
+      line: 74,
+      raw: "Overfull \\hbox (9.89099pt too wide) in paragraph at lines 75--75",
+    },
+  ];
+  const stats = {
+    words: 211,
+    wordsInText: 206,
+    wordsInHeaders: 5,
+    wordsOutsideText: 0,
+    headers: 3,
+    figures: 0,
+    mathInline: 1,
+    mathDisplay: 2,
+  };
+  const [render] = await db
+    .insert(pdfRenders)
+    .values({
+      projectId,
+      revisionHash: revision,
+      mainFile: "main.tex",
+      status: "ok",
+      pdfKey,
+      diagnostics,
+      stats,
+      log: "Overfull \\hbox (9.89099pt too wide) in paragraph at lines 75--75\n",
+      durationMs: 1200,
+    })
+    .returning({ id: pdfRenders.id });
+
+  await db.insert(snapshots).values({
     projectId,
-    revisionHash: revision,
-    mainFile: "main.tex",
-    status: "ok",
-    pdfKey,
-    diagnostics: [],
-    durationMs: 1200,
+    documentId: main!.id,
+    content: example,
+    batchId: render!.id,
+    authorId: owner.id,
   });
   console.log(`seeded pdf fixture (project ${projectId}) for ${OWNER_EMAIL}`);
   await pool.end();

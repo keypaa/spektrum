@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { compareAgainstReference } from "./compare";
+import { compareAgainstReference, VISUAL_BUDGET } from "./compare";
 import { seedPdfFixture } from "./fixtures";
 import { login, movePointerAway, setTheme } from "./helpers";
 
@@ -20,7 +20,7 @@ test("logs--dark--default", async ({ page }) => {
   await movePointerAway(page);
   const result = await compareAgainstReference(page, "logs--dark--default");
   console.log(`logs--dark--default: ${(result.ratio * 100).toFixed(3)} %`);
-  expect(result.ratio).toBeLessThanOrEqual(0.05);
+  expect(result.ratio).toBeLessThanOrEqual(VISUAL_BUDGET);
 });
 
 test("logs--dark--filter-menu", async ({ page }) => {
@@ -29,7 +29,7 @@ test("logs--dark--filter-menu", async ({ page }) => {
   await login(page);
   await openLogs(page);
   await page.getByLabel("Logs filter").click();
-  await page.getByRole("option", { name: "Warnings only" }).click();
+  await page.getByRole("menuitem", { name: "Warnings only" }).click();
   await page.getByLabel("Logs filter").click();
   await movePointerAway(page);
   const result = await compareAgainstReference(
@@ -37,5 +37,5 @@ test("logs--dark--filter-menu", async ({ page }) => {
     "logs--dark--filter-menu",
   );
   console.log(`logs--dark--filter-menu: ${(result.ratio * 100).toFixed(3)} %`);
-  expect(result.ratio).toBeLessThanOrEqual(0.05);
+  expect(result.ratio).toBeLessThanOrEqual(VISUAL_BUDGET);
 });

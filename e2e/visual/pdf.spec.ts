@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { compareAgainstReference } from "./compare";
+import { compareAgainstReference, VISUAL_BUDGET } from "./compare";
 import { seedPdfFixture } from "./fixtures";
 import { login, movePointerAway, setTheme } from "./helpers";
 
@@ -30,7 +30,7 @@ for (const c of CASES) {
     await movePointerAway(page);
     const result = await compareAgainstReference(page, c.name);
     console.log(`${c.name}: ${(result.ratio * 100).toFixed(3)} %`);
-    expect(result.ratio).toBeLessThanOrEqual(0.05);
+    expect(result.ratio).toBeLessThanOrEqual(VISUAL_BUDGET);
   });
 }
 
@@ -44,7 +44,7 @@ test("pdf--dark--more-menu", async ({ page }) => {
   await movePointerAway(page);
   const result = await compareAgainstReference(page, "pdf--dark--more-menu");
   console.log(`pdf--dark--more-menu: ${(result.ratio * 100).toFixed(3)} %`);
-  expect(result.ratio).toBeLessThanOrEqual(0.05);
+  expect(result.ratio).toBeLessThanOrEqual(VISUAL_BUDGET);
 });
 
 test("pdf--dark--zoom-menu", async ({ page }) => {
@@ -57,7 +57,7 @@ test("pdf--dark--zoom-menu", async ({ page }) => {
   await movePointerAway(page);
   const result = await compareAgainstReference(page, "pdf--dark--zoom-menu");
   console.log(`pdf--dark--zoom-menu: ${(result.ratio * 100).toFixed(3)} %`);
-  expect(result.ratio).toBeLessThanOrEqual(0.05);
+  expect(result.ratio).toBeLessThanOrEqual(VISUAL_BUDGET);
 });
 
 test("editor--light--context-menu", async ({ page }) => {
@@ -66,8 +66,9 @@ test("editor--light--context-menu", async ({ page }) => {
   await login(page);
   await openProject(page);
   await page.getByTestId("monaco-editor").click({ button: "right" });
-  await expect(page.getByTestId("editor-context-menu")).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("menu", { name: "Editor context menu" }),
+  ).toBeVisible();
   await movePointerAway(page);
   const result = await compareAgainstReference(
     page,
@@ -76,5 +77,5 @@ test("editor--light--context-menu", async ({ page }) => {
   console.log(
     `editor--light--context-menu: ${(result.ratio * 100).toFixed(3)} %`,
   );
-  expect(result.ratio).toBeLessThanOrEqual(0.05);
+  expect(result.ratio).toBeLessThanOrEqual(VISUAL_BUDGET);
 });
