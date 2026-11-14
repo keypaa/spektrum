@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
-    "./documents": "./src/documents.ts"
+    "./documents": "./src/documents.ts",
+    "./snapshots": "./src/snapshots.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

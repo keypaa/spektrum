@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "@spektrum/db";
-import { pdfRenders } from "@spektrum/db/schema";
+import { pdfRenders, projects } from "@spektrum/db/schema";
 import {
   currentRevisionKey,
   type CompileJob,
@@ -14,6 +14,7 @@ import { revisionHash } from "@spektrum/shared/revision";
 import { normalizeDocumentPath } from "@spektrum/shared/paths";
 import { parseLog, parseSyncTex, parseTexcount } from "@spektrum/latex";
 import { putObject } from "@spektrum/storage";
+import { snapshotAfterCompile } from "@spektrum/db/snapshots";
 import { connectRedis, supersededBy } from "./queue";
 import { materialise } from "./materialise";
 import { runContainer } from "./container";
@@ -179,6 +180,13 @@ export async function runCompile(
         pdfKey,
         synctexKey,
       });
+      const [project] = await db
+        .select({ ownerId: projects.ownerId })
+        .from(projects)
+        .where(eq(projects.id, job.projectId));
+      if (project) {
+        await snapshotAfterCompile(job.projectId, project.ownerId);
+      }
       await publish(redis, job.projectId, {
         event: "result",
         pdfUrl: `/api/projects/${job.projectId}/render/${job.revisionHash}/pdf`,

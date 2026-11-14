@@ -82,6 +82,7 @@ export default async function EditorPage({
               mainFile: initialRender.render.mainFile,
               durationMs: initialRender.render.durationMs,
               diagnostics: initialRender.render.diagnostics,
+              stats: initialRender.render.stats,
             }
           : null
       }

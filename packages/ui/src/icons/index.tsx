@@ -52,6 +52,17 @@ export function IconError({ size, className, ...rest }: IconProps) {
   );
 }
 
+export function IconLink({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <title>Link</title>
+      <path d="M6.5 9.5 9.5 6.5" />
+      <path d="M7 4.5 8.5 3A2.5 2.5 0 0 1 12 6.5L10.5 8" />
+      <path d="M9 11.5 7.5 13A2.5 2.5 0 0 1 4 9.5L5.5 8" />
+    </svg>
+  );
+}
+
 export function IconInfo({ size, className, ...rest }: IconProps) {
   return (
     <svg {...base({ size, className, ...rest })}>

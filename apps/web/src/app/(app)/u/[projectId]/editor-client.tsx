@@ -42,6 +42,11 @@ import { PdfChrome, pillState } from "@/components/pdf/pdf-chrome";
 import { PdfSearch } from "@/components/pdf/pdf-search";
 import { InfoPanel, INFO_TABS, type InfoTab } from "@/components/info-panel/info-panel";
 import { Logs } from "@/components/info-panel/logs";
+import { ProjectInfo } from "@/components/info-panel/project-info";
+import { Versions } from "@/components/info-panel/versions";
+import { Comments } from "@/components/info-panel/comments";
+import { ShareDialog } from "@/components/info-panel/share-dialog";
+import type { SnapshotRow } from "@spektrum/db/snapshots";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +56,7 @@ import {
 import { fetchSyncTex } from "@/lib/synctex-client";
 import { nearestForward } from "@/components/pdf/use-sync-scroll";
 import { nearestAnchor } from "@/components/pdf/use-sync-jump";
-import type { Diagnostic, SyncTexMap } from "@spektrum/shared";
+import type { Diagnostic, ProjectStats, SyncTexMap } from "@spektrum/shared";
 import { IconTools } from "@spektrum/ui/icons";
 
 // Monaco is browser-only; the dynamic import (ssr: false) must come from this
@@ -83,6 +88,7 @@ export interface EditorClientProps {
     mainFile: string | null;
     durationMs: number;
     diagnostics: Diagnostic[];
+    stats: ProjectStats | null;
   } | null;
   user: { name: string; email: string };
 }
@@ -278,7 +284,7 @@ export function EditorClient({
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [panel, setPanel] = useState<InfoTab | null>(null);
-  const [, setShareOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [log, setLog] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [revision, setRevision] = useState(initialRender?.revision ?? "");
@@ -319,6 +325,42 @@ export function EditorClient({
     render.status?.event === "result"
       ? render.status.diagnostics
       : (initialRender?.diagnostics ?? []);
+  const stats =
+    render.status?.event === "result"
+      ? render.status.stats
+      : (initialRender?.stats ?? null);
+  const [snapshotRows, setSnapshotRows] = useState<SnapshotRow[]>([]);
+
+  useEffect(() => {
+    if (panel !== "Versions") return;
+    let cancelled = false;
+    void fetch(`/api/projects/${project.id}/snapshots`)
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as { snapshots?: SnapshotRow[] };
+        if (!cancelled) setSnapshotRows(body.snapshots ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [panel, project.id]);
+
+  const restoreBatch = useCallback(
+    (batchId: string) => {
+      const row = snapshotRows.find((entry) => entry.batchId === batchId);
+      if (!row) return;
+      void fetch(
+        `/api/projects/${project.id}/snapshots/${row.id}/restore`,
+        { method: "POST" },
+      )
+        .then((res) => {
+          if (res.ok) router.refresh();
+        })
+        .catch(() => undefined);
+    },
+    [project.id, router, snapshotRows],
+  );
 
   useEffect(() => {
     if (panel !== "Logs" || !revision) return;
@@ -631,6 +673,12 @@ export function EditorClient({
                     }
                   }}
                 />
+              ) : panel === "Project Info" ? (
+                <ProjectInfo stats={stats} />
+              ) : panel === "Versions" ? (
+                <Versions rows={snapshotRows} onRestore={restoreBatch} />
+              ) : panel === "Comments" ? (
+                <Comments />
               ) : (
                 <div className="p-4 text-sm text-fg-tertiary" />
               )}
@@ -692,6 +740,12 @@ export function EditorClient({
       ) : (
         <PdfPane />
       )}
+
+      <ShareDialog
+        open={shareOpen}
+        projectName={project.name}
+        onClose={() => setShareOpen(false)}
+      />
 
       {contextMenu ? (
         <EditorContextMenu
