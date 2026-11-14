@@ -13,6 +13,8 @@ export default tseslint.config(
       "pnpm-lock.yaml",
       // vendored recon evidence (Prism's CSS/JS, extracted bundles) — not ours to lint
       "zenno/recon/**",
+      // generated pdfjs worker copied into public at build time
+      "apps/web/public/**",
     ],
   },
   ...tseslint.configs.recommended,
