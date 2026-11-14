@@ -218,12 +218,24 @@ test.describe("compile", () => {
     await openProject(page);
     const projectId = new URL(page.url()).pathname.split("/")[2]!;
 
+    // Open the second tab BEFORE the first save so its baseline is stale.
     const second = await context.newPage();
     await second.goto(`/u/${projectId}?p=main.tex`);
-    await second.getByTestId("monaco-editor").click();
+    await second.bringToFront();
     await expect(second.locator(".monaco-editor textarea")).toBeVisible();
+    await second.getByTestId("monaco-editor").click();
+    await second.waitForFunction(() =>
+      Boolean(
+        (window as unknown as Record<string, unknown>).__spekrrum_editor,
+      ),
+    );
+    const before = await second.evaluate(
+      () =>
+        (window as unknown as { __spekrrum_editor: { getPosition(): { lineNumber: number } | null } })
+          .__spekrrum_editor.getPosition(),
+    );
 
-    // Tab A saves "AAA".
+    // First tab saves "AAA".
     await type(page, "AAA");
     await blur(page);
     await expect
@@ -232,15 +244,42 @@ test.describe("compile", () => {
       })
       .toBe("ok");
 
-    // Tab B types "BBB" and saves: it loses, and must reload A's content.
+    // Second tab saves "BBB": the PATCH must 409.
+    const saved = second.waitForResponse(
+      (res) =>
+        res.url().includes("/documents/") && res.request().method() === "PATCH",
+      { timeout: 30_000 },
+    );
     await type(second, "BBB");
     await second.keyboard.press("Control+S");
-    await second.waitForTimeout(1500);
-    const lines = () => second.locator(".view-lines").textContent() ?? "";
-    await expect.poll(lines, { timeout: 20_000 }).toContain("AAA");
-    await expect(lines()).not.toContain("BBB");
+    expect((await saved).status()).toBe(409);
+
+    // The losing tab reloads the winner's content, and keeps its cursor.
+    const winner = await page.evaluate(
+      () =>
+        (window as unknown as { __spekrrum_editor: { getValue(): string } })
+          .__spekrrum_editor.getValue(),
+    );
+    await expect
+      .poll(
+        async () =>
+          second.evaluate(
+            () =>
+              (window as unknown as { __spekrrum_editor: { getValue(): string } })
+                .__spekrrum_editor.getValue(),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(winner);
+    const after = await second.evaluate(
+      () =>
+        (window as unknown as { __spekrrum_editor: { getPosition(): { lineNumber: number } | null } })
+          .__spekrrum_editor.getPosition(),
+    );
+    expect(after?.lineNumber).toBe(before?.lineNumber);
     await second.close();
   });
+
 
   test("another owner's render is 404", async ({ page }) => {
     test.setTimeout(120_000);
