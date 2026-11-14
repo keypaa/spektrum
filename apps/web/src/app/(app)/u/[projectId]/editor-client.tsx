@@ -40,10 +40,18 @@ import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
 import { PdfChrome, pillState } from "@/components/pdf/pdf-chrome";
 import { PdfSearch } from "@/components/pdf/pdf-search";
+import { InfoPanel, INFO_TABS, type InfoTab } from "@/components/info-panel/info-panel";
+import { Logs } from "@/components/info-panel/logs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@spektrum/ui";
 import { fetchSyncTex } from "@/lib/synctex-client";
 import { nearestForward } from "@/components/pdf/use-sync-scroll";
 import { nearestAnchor } from "@/components/pdf/use-sync-jump";
-import type { SyncTexMap } from "@spektrum/shared";
+import type { Diagnostic, SyncTexMap } from "@spektrum/shared";
 import { IconTools } from "@spektrum/ui/icons";
 
 // Monaco is browser-only; the dynamic import (ssr: false) must come from this
@@ -74,6 +82,7 @@ export interface EditorClientProps {
     pdfUrl: string | null;
     mainFile: string | null;
     durationMs: number;
+    diagnostics: Diagnostic[];
   } | null;
   user: { name: string; email: string };
 }
@@ -268,6 +277,9 @@ export function EditorClient({
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [panel, setPanel] = useState<InfoTab | null>(null);
+  const [, setShareOpen] = useState(false);
+  const [log, setLog] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [revision, setRevision] = useState(initialRender?.revision ?? "");
   const [syncMap, setSyncMap] = useState<SyncTexMap | null>(null);
@@ -302,6 +314,26 @@ export function EditorClient({
   );
 
 
+
+  const diagnostics =
+    render.status?.event === "result"
+      ? render.status.diagnostics
+      : (initialRender?.diagnostics ?? []);
+
+  useEffect(() => {
+    if (panel !== "Logs" || !revision) return;
+    let cancelled = false;
+    void fetch(`/api/projects/${project.id}/render/${revision}/log`)
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as { log?: string };
+        if (!cancelled) setLog(body.log ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [panel, project.id, revision]);
 
   // Cmd/Ctrl+F opens the PDF search pill (only when a PDF is showing).
   useEffect(() => {
@@ -509,14 +541,29 @@ export function EditorClient({
             onCollapseSidebar={() => {}}
             onRecompile={() => void compile()}
             tools={
-              <button
-                type="button"
-                aria-disabled="true"
-                className="flex h-9 flex-none items-center gap-2 rounded-full bg-[color:var(--button-primary-bg)] px-3 text-xs font-medium text-[color:var(--button-primary-text)]"
-              >
-                <IconTools size={14} />
-                Tools
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Tools"
+                    className="flex h-9 flex-none items-center gap-2 rounded-full bg-[color:var(--button-primary-bg)] px-3 text-xs font-medium text-[color:var(--button-primary-text)]"
+                  >
+                    <IconTools size={14} />
+                    Tools
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {INFO_TABS.map((tab) => (
+                    <DropdownMenuItem key={tab} onSelect={() => setPanel(tab)}>
+                      {tab}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem onSelect={() => setShareOpen(true)}>
+                    Share
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled>Export</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             }
             status={
               saveNote ? (
@@ -564,7 +611,33 @@ export function EditorClient({
         </div>
       </div>
 
-      {pdfUrl ? (
+      {panel ? (
+        <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">
+          <div className="h-full overflow-hidden rounded-t-lg bg-bg-preview">
+            <InfoPanel tab={panel} onTab={setPanel} onClose={() => setPanel(null)}>
+              {panel === "Logs" ? (
+                <Logs
+                  diagnostics={diagnostics}
+                  log={log}
+                  onJump={(diagnostic) => {
+                    setPanel(null);
+                    const line = (diagnostic.line ?? 0) + 1;
+                    if (diagnostic.file) {
+                      void openDocument(diagnostic.file).then(() => {
+                        editorRef.current?.revealLine(line);
+                      });
+                    } else {
+                      editorRef.current?.revealLine(line);
+                    }
+                  }}
+                />
+              ) : (
+                <div className="p-4 text-sm text-fg-tertiary" />
+              )}
+            </InfoPanel>
+          </div>
+        </div>
+      ) : pdfUrl ? (
         <div data-testid="pdf-pane" className="flex h-full min-h-0 flex-col bg-bg-code p-2">
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-lg bg-bg-preview">
             <div className="relative z-10">
