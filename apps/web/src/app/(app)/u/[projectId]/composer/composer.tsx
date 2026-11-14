@@ -28,15 +28,13 @@ export function Composer({
   aiEnabled,
   onReview,
   openTabs,
-  onAccept,
-  onReject,
+  onReviewDiff,
 }: {
   chat: ReturnType<typeof useChat>;
   aiEnabled: boolean;
   onReview(): void;
   openTabs: string[];
-  onAccept(part: Extract<MessagePart, { type: "diff" }>): void;
-  onReject(part: Extract<MessagePart, { type: "diff" }>): void;
+  onReviewDiff(part: Extract<MessagePart, { type: "diff" }>): void;
 }): React.ReactElement {
   const [value, setValue] = useState("");
   const [level, setLevel] = useState<ThinkingLevel>("Medium");
@@ -66,14 +64,7 @@ export function Composer({
     <div className="flex h-full min-h-0 flex-col justify-end px-6 pb-4">
       {chat.parts.length > 0 ? (
         <div className="min-h-0 flex-1 overflow-hidden">
-          <Transcript
-            parts={chat.parts}
-            projectId=""
-            threadId={chat.threadId}
-            onAccept={onAccept}
-            onReject={onReject}
-            onRerun={chat.rerun}
-          />
+          <Transcript parts={chat.parts} onReviewDiff={onReviewDiff} />
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">

@@ -4,16 +4,10 @@ import type { MessagePart } from "@spektrum/shared/ai";
 
 export function Transcript({
   parts,
-  onAccept,
-  onReject,
-  onRerun,
+  onReviewDiff,
 }: {
   parts: MessagePart[];
-  projectId: string;
-  threadId: string | null;
-  onAccept(part: Extract<MessagePart, { type: "diff" }>): void;
-  onReject(part: Extract<MessagePart, { type: "diff" }>): void;
-  onRerun(part: MessagePart): void;
+  onReviewDiff(part: Extract<MessagePart, { type: "diff" }>): void;
 }): React.ReactElement {
   return (
     <div className="flex min-h-0 flex-col gap-2 overflow-y-auto px-1 py-2">
@@ -57,29 +51,13 @@ export function Transcript({
               {part.proposal.path} · {part.proposal.kind}
             </p>
             {part.status === "pending" ? (
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  className="h-7 rounded-full bg-[color:var(--button-primary-bg)] px-3 text-xs text-[color:var(--button-primary-text)]"
-                  onClick={() => onAccept(part)}
-                >
-                  Accept
-                </button>
-                <button
-                  type="button"
-                  className="h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs"
-                  onClick={() => onReject(part)}
-                >
-                  Reject
-                </button>
-                <button
-                  type="button"
-                  className="h-7 rounded-full px-2 text-xs text-text-editor-tertiary"
-                  onClick={() => onRerun(part)}
-                >
-                  Re-run
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => onReviewDiff(part)}
+                className="mt-2 h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs"
+              >
+                Review
+              </button>
             ) : (
               <p className="mt-1 text-xs text-text-editor-tertiary">
                 {part.status}

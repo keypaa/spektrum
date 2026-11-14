@@ -15,6 +15,7 @@ const baseChat = {
   send: vi.fn(),
   loadThread: vi.fn(),
   reset: vi.fn(),
+  setDiffStatus: vi.fn(),
   stop: vi.fn(),
   retry: vi.fn(),
   rerun: vi.fn(),
@@ -31,8 +32,7 @@ function renderComposer(
       aiEnabled={aiEnabled}
       onReview={onReview}
       openTabs={["main.tex"]}
-      onAccept={vi.fn()}
-      onReject={vi.fn()}
+      onReviewDiff={vi.fn()}
     />,
   );
   return { onReview };

@@ -21,7 +21,7 @@ import {
   getDocumentRequest,
   renameDocumentRequest,
 } from "@/lib/document-client";
-import type { SaveResult } from "@/lib/save-document";
+import { saveDocumentRequest, type SaveResult } from "@/lib/save-document";
 import { usePreferences } from "@/components/preferences-provider";
 import { ProjectSidebar } from "./sidebar/project-sidebar";
 import type { ChatThreadSummary } from "./sidebar/chat-list";
@@ -33,7 +33,10 @@ import { DeleteFileDialog } from "./dialogs/delete-file-dialog";
 import { PdfPane } from "./pdf-pane";
 import { Composer } from "./composer/composer";
 import { useChat } from "./composer/use-chat";
+import { acceptDiff, type DiffPart } from "./composer/diff-accept";
+import { DiffWidget } from "./composer/diff-widget";
 import { REVIEW_PROMPT } from "@spektrum/shared/ai";
+import { sha256Hex } from "@spektrum/shared/hash";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
 import { useAutosave } from "./use-autosave";
@@ -591,6 +594,130 @@ export function EditorClient({
     },
     [autosave, tabs.active],
   );
+
+  // --- Diff review (spec §7.4): one inline Monaco diff at a time. ---------
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [diffStale, setDiffStale] = useState(false);
+  const loadedWaiters = useRef(new Map<string, () => void>());
+
+  useEffect(() => {
+    if (!loadedPath) return;
+    const resolve = loadedWaiters.current.get(loadedPath);
+    if (resolve) {
+      loadedWaiters.current.delete(loadedPath);
+      resolve();
+    }
+  }, [loadedPath]);
+
+  const whenPathLoaded = useCallback(
+    (path: string) => {
+      if (loadedPath === path) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        loadedWaiters.current.set(path, resolve);
+      });
+    },
+    [loadedPath],
+  );
+
+  const reviewingPart =
+    chat.parts.find(
+      (part): part is DiffPart =>
+        part.type === "diff" && part.id === reviewingId && part.status === "pending",
+    ) ?? null;
+
+  useEffect(() => {
+    if (!reviewingPart || reviewingPart.proposal.path !== activePath) {
+      setDiffStale(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      const current = editorRef.current?.getValue() ?? bufferRef.current;
+      void sha256Hex(current).then((hash) => {
+        if (!cancelled) {
+          setDiffStale(hash !== reviewingPart.proposal.originalHash);
+        }
+      });
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [reviewingPart, activePath, buffer]);
+
+  const acceptPart = async (
+    part: DiffPart,
+  ): Promise<{ ok: true } | { ok: false; error: string }> =>
+    acceptDiff(part, {
+      projectId: project.id,
+      activePath,
+      findDoc: (path) => docs.find((doc) => doc.path === path),
+      currentContent: (path) =>
+        path === activePath
+          ? editorRef.current?.getValue() ?? bufferRef.current
+          : "",
+      baselineFor: () => baselineRef.current,
+      openPath: openDocument,
+      whenLoaded: whenPathLoaded,
+      applyHunks: (path, hunks) => editorRef.current?.applyHunks(path, hunks),
+      save: (documentId, content, baseUpdatedAt) =>
+        saveDocumentRequest(project.id, documentId, content, baseUpdatedAt),
+      create: async (path) => {
+        const doc = await createDocumentRequest(project.id, path);
+        setDocs((prev) =>
+          [
+            ...prev.filter((d) => d.path !== doc.path),
+            { id: doc.id, path: doc.path, kind: doc.kind, updatedAt: doc.updatedAt },
+          ].sort(byPath),
+        );
+        dispatch({ type: "open", path: doc.path });
+        return { id: doc.id, updatedAt: doc.updatedAt };
+      },
+      remove: async (path) => {
+        const doc = docs.find((d) => d.path === path);
+        if (!doc) return;
+        await deleteDocumentRequest(project.id, doc.id);
+        setDocs((prev) => prev.filter((d) => d.id !== doc.id));
+        dispatch({ type: "close", path });
+        afterMutation();
+      },
+      onSaved: (path, content, updatedAt) => {
+        setBuffer(content);
+        setBaseline(updatedAt);
+        setDirty(false);
+        setLoadedPath(path);
+        setSaveNote(null);
+        if (preferences.realtimeCompilation) void compile();
+      },
+    });
+
+  const patchDecision = async (
+    part: DiffPart,
+    decision: "accepted" | "rejected",
+  ): Promise<void> => {
+    if (!chat.threadId) return;
+    await fetch(
+      `/api/projects/${project.id}/threads/${chat.threadId}/messages/${part.messageId}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ diffId: part.id, decision }),
+      },
+    );
+    chat.setDiffStatus(part.id, decision);
+  };
+
+  const acceptAll = async (): Promise<void> => {
+    const pending = chat.parts.filter(
+      (part): part is DiffPart =>
+        part.type === "diff" && part.status === "pending",
+    );
+    for (const part of pending) {
+      const result = await acceptPart(part);
+      if (result.ok) await patchDecision(part, "accepted");
+    }
+    setReviewingId(null);
+  };
   const onPdfDoubleClick = useCallback(
     (page: number, _x: number, y: number) => {
       const anchors =
@@ -749,7 +876,7 @@ export function EditorClient({
         </div>
         <div
           data-testid="editor-area-placeholder"
-          className="min-h-0 flex-1 overflow-hidden bg-bg-code"
+          className="relative min-h-0 flex-1 overflow-hidden bg-bg-code"
         >
           {activePath ? (
             <MonacoEditor
@@ -764,6 +891,32 @@ export function EditorClient({
               onContextMenu={(point) => setContextMenu(point)}
             />
           ) : null}
+          {reviewingPart ? (
+            <DiffWidget
+              part={reviewingPart}
+              original={
+                reviewingPart.proposal.path === activePath
+                  ? editorRef.current?.getValue() ?? buffer
+                  : ""
+              }
+              projectId={project.id}
+              threadId={chat.threadId}
+              theme={isDark ? "crixet" : "crixet-light"}
+              stale={diffStale}
+              busy={chat.status === "streaming"}
+              onAccept={acceptPart}
+              onReject={async () => {}}
+              onRerun={(part) => {
+                chat.rerun(part);
+                setReviewingId(null);
+              }}
+              onStatus={(part, status) => {
+                chat.setDiffStatus(part.id, status);
+                if (status === "accepted") setReviewingId(null);
+              }}
+              onAcceptAll={() => void acceptAll()}
+            />
+          ) : null}
         </div>
         <div
           data-testid="composer-slot-placeholder"
@@ -775,8 +928,7 @@ export function EditorClient({
             aiEnabled={aiEnabled}
             onReview={() => chat.send(REVIEW_PROMPT, "Medium", openTabs)}
             openTabs={openTabs}
-            onAccept={() => undefined}
-            onReject={() => undefined}
+            onReviewDiff={(part) => setReviewingId(part.id)}
           />
         </div>
       </div>

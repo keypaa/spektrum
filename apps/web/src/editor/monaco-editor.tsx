@@ -9,6 +9,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { editor } from "monaco-editor";
 import type { Preferences } from "@spektrum/shared/preferences";
+import { applyHunks as applyHunksToText, type DiffHunk } from "@spektrum/shared/ai/diff";
 import { monaco, setupMonacoEnvironment } from "./monaco-environment";
 import { registerLanguages, languageForPath } from "./languages";
 import { createEditorOptions } from "./options";
@@ -19,6 +20,9 @@ export interface MonacoEditorHandle {
   /** Replace the content without scheduling a save (loading a document,
    *  conflict recovery — the content comes from the server). */
   loadValue(value: string): void;
+  /** Apply jsdiff hunks to a document model, as one undo stop, without
+   *  scheduling a save (the caller persists explicitly). */
+  applyHunks(path: string, hunks: DiffHunk[]): void;
   focus(): void;
   getPosition(): { lineNumber: number; column: number } | null;
   setPosition(position: { lineNumber: number; column: number }): void;
@@ -199,6 +203,21 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
             editor.pushUndoStop();
             applyingExternal.current = false;
           }
+        },
+        applyHunks: (path, hunks) => {
+          const editor = editorRef.current;
+          const model = modelsRef.current.get(path);
+          if (!editor || !model) return;
+          const next = applyHunksToText(model.getValue(), hunks);
+          applyingExternal.current = true;
+          editor.pushUndoStop();
+          model.pushEditOperations(
+            [],
+            [{ range: model.getFullModelRange(), text: next }],
+            () => null,
+          );
+          editor.pushUndoStop();
+          applyingExternal.current = false;
         },
         focus: () => editorRef.current?.focus(),
         getPosition: () => {

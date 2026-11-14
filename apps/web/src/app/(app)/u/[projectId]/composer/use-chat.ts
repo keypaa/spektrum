@@ -18,6 +18,7 @@ export interface ChatController {
   send(text: string, thinking: ThinkingLevel, pinnedPaths: string[]): void;
   loadThread(threadId: string): Promise<void>;
   reset(): void;
+  setDiffStatus(diffId: string, status: "accepted" | "rejected"): void;
   stop(): void;
   retry(): void;
   rerun(part: MessagePart): void;
@@ -222,6 +223,17 @@ export function useChat(input: {
     cb.current.onThreadChange?.(null);
   }, []);
 
+  const setDiffStatus = useCallback(
+    (diffId: string, status: "accepted" | "rejected") => {
+      setParts((current) =>
+        current.map((part) =>
+          part.type === "diff" && part.id === diffId ? { ...part, status } : part,
+        ),
+      );
+    },
+    [],
+  );
+
   const retry = useCallback(() => {
     if (lastSend.current) {
       send(
@@ -258,6 +270,7 @@ export function useChat(input: {
     send,
     loadThread,
     reset,
+    setDiffStatus,
     stop,
     retry,
     rerun,
