@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InfoPanel } from "./info-panel";
 import { Logs } from "./logs";
@@ -24,23 +25,21 @@ const diagnostics = [
 ];
 
 describe("Logs", () => {
-  it("defaults to warnings and errors and filters to warnings", () => {
+  it("defaults to warnings and errors and filters to warnings", async () => {
     render(<Logs diagnostics={diagnostics} log="raw" onJump={vi.fn()} />);
     expect(screen.getByText("Undefined control sequence")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Logs filter"), {
-      target: { value: "warnings" },
-    });
+    await userEvent.click(screen.getByLabelText("Logs filter"));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Warnings only" }));
     expect(screen.queryByText("Undefined control sequence")).toBeNull();
     expect(
       screen.getByText(/Overfull \\hbox/),
     ).toBeTruthy();
   });
 
-  it("shows the raw tail", () => {
+  it("shows the raw tail", async () => {
     render(<Logs diagnostics={diagnostics} log="line one" onJump={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Logs filter"), {
-      target: { value: "raw" },
-    });
+    await userEvent.click(screen.getByLabelText("Logs filter"));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Raw logs" }));
     expect(screen.getByTestId("logs-raw").textContent).toContain("line one");
   });
 

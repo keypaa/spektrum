@@ -303,7 +303,7 @@ export function EditorClient({
   }, [render.status]);
 
   useEffect(() => {
-    const mapRevision = initialRender?.lastOkRevision ?? revision;
+    const mapRevision = lastOk || revision;
     if (!mapRevision) return;
     let cancelled = false;
     void fetchSyncTex(project.id, mapRevision).then((map) => {
@@ -328,10 +328,30 @@ export function EditorClient({
 
 
 
+  const [latestDiagnostics, setLatestDiagnostics] = useState<Diagnostic[]>(
+    initialRender?.diagnostics ?? [],
+  );
+  useEffect(() => {
+    if (render.status?.event !== "status" || render.status.state !== "error")
+      return;
+    void fetch(`/api/projects/${project.id}/render/latest`)
+      .then((res) => res.json())
+      .then((body: { render?: { diagnostics?: Diagnostic[] } | null }) => {
+        setLatestDiagnostics(body.render?.diagnostics ?? []);
+      })
+      .catch(() => undefined);
+  }, [render.status, project.id]);
   const diagnostics =
     render.status?.event === "result"
       ? render.status.diagnostics
-      : (initialRender?.diagnostics ?? []);
+      : latestDiagnostics;
+  const [lastOk, setLastOk] = useState(
+    initialRender?.lastOkRevision ?? "",
+  );
+  useEffect(() => {
+    if (render.status?.event === "result")
+      setLastOk(render.status.revision);
+  }, [render.status]);
   const stats =
     render.status?.event === "result"
       ? render.status.stats
@@ -415,8 +435,7 @@ export function EditorClient({
     const status = render.status;
     if (!status || status.event !== "conflict") return;
     if (status.documentId !== activeDoc?.id) return;
-    const current = editorRef.current?.getValue() ?? bufferRef.current;
-    if (current !== bufferRef.current) return;
+    if (dirty) return;
     void getDocumentRequest(project.id, activePath ?? "")
       .then((doc) => {
         setBuffer(doc.content ?? "");

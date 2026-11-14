@@ -43,51 +43,57 @@ export function Logs({
     return diagnostics;
   }, [diagnostics, filter]);
 
+  const filterRow = (
+    <div className="flex items-center gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Logs filter"
+            className="h-8 rounded-md border border-[color:var(--border-log)] bg-transparent px-2 text-sm"
+          >
+            {FILTERS.find((entry) => entry.value === filter)?.label}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {FILTERS.map((entry) => (
+            <DropdownMenuItem
+              key={entry.value}
+              onSelect={() => setFilter(entry.value)}
+            >
+              {entry.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <button
+        type="button"
+        disabled
+        aria-disabled="true"
+        className="ml-auto h-8 rounded-full border border-[color:var(--border-log)] px-3 text-xs text-fg-tertiary"
+      >
+        Fix all with AI
+      </button>
+    </div>
+  );
+
   if (filter === "raw") {
     return (
-      <pre
-        data-testid="logs-raw"
-        className="m-2 overflow-auto rounded-lg bg-bg-code p-2 font-mono text-xs"
-      >
-        {log ?? ""}
-      </pre>
+      <div className="flex flex-col gap-2 p-2">
+        {filterRow}
+        <pre
+          data-testid="logs-raw"
+          className="overflow-auto rounded-lg bg-bg-code p-2 font-mono text-xs"
+        >
+          {log ?? ""}
+        </pre>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-2 p-2">
-      <div className="flex items-center gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Logs filter"
-              className="h-8 rounded-md border border-[color:var(--border-log)] bg-transparent px-2 text-sm"
-            >
-              {FILTERS.find((entry) => entry.value === filter)?.label}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {FILTERS.map((entry) => (
-              <DropdownMenuItem
-                key={entry.value}
-                onSelect={() => setFilter(entry.value)}
-              >
-                {entry.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <button
-          type="button"
-          disabled
-          aria-disabled="true"
-          className="ml-auto h-8 rounded-full border border-[color:var(--border-log)] px-3 text-xs text-fg-tertiary"
-        >
-          Fix all with AI
-        </button>
-      </div>
+      {filterRow}
 
       {filtered.length === 0 ? (
         <p className="p-4 text-sm text-fg-tertiary">No errors or warnings</p>

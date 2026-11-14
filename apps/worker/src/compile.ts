@@ -196,6 +196,12 @@ export async function runCompile(
       await putObject("pdf", pdfKey, pdf, "application/pdf");
       await putObject("pdf", synctexKey, JSON.stringify(map), "application/json");
 
+      const currentAtEnd = await redis.get(currentRevisionKey(job.projectId));
+      if (supersededBy(currentAtEnd, job.revisionHash)) {
+        await upsert(job, { status: "superseded" });
+        return { status: "error", durationMs: Date.now() - started };
+      }
+
       const durationMs = Date.now() - started;
       await upsert(job, {
         status: "ok",

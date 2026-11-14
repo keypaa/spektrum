@@ -67,9 +67,15 @@ test.describe("compile", () => {
     await blur(page);
     await expect.poll(latestOk, { timeout: 60_000 }).toBe(true);
 
-    const started = Date.now();
     await type(page, "2");
-    await blur(page);
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    // Wait until the new save's row is no longer the previous ok revision.
+    await expect
+      .poll(async () => (await latestRender(page, projectId)).render?.isCurrent, {
+        timeout: 60_000,
+      })
+      .toBe(false);
+    const started = Date.now();
     await expect.poll(latestOk, { timeout: 60_000, intervals: [100, 250, 500] }).toBe(true);
     const elapsed = Date.now() - started;
     console.log(`keystroke -> PDF: ${elapsed} ms (gate < 3000)`);
