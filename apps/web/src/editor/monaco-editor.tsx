@@ -23,6 +23,7 @@ export interface MonacoEditorHandle {
   getPosition(): { lineNumber: number; column: number } | null;
   setPosition(position: { lineNumber: number; column: number }): void;
   trigger(action: string): void;
+  revealLine(line: number): void;
   getEditor(): editor.IStandaloneCodeEditor | null;
 }
 
@@ -33,6 +34,8 @@ export interface MonacoEditorProps {
   theme: "crixet" | "crixet-light";
   preferences: Preferences;
   onChange(value: string): void;
+  /** Cursor moved to a 1-based line (SyncTeX forward sync). */
+  onCursorChange?(line: number): void;
   onReady?(): void;
   /** Right-click inside the editor (viewport coordinates). */
   onContextMenu?(point: { x: number; y: number }): void;
@@ -46,7 +49,7 @@ function modelUri(path: string) {
 
 export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   function MonacoEditor(
-    { path, value, language, theme, preferences, onChange, onReady, onContextMenu },
+    { path, value, language, theme, preferences, onChange, onCursorChange, onReady, onContextMenu },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement>(null);
@@ -55,6 +58,8 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     const viewStatesRef = useRef(new Map<string, editor.ICodeEditorViewState | null>());
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
+    const onCursorChangeRef = useRef(onCursorChange);
+    onCursorChangeRef.current = onCursorChange;
   // Suppress the change event for programmatic value replacement (loading a
   // document, conflict recovery) — those must not schedule a save of content
   // the server already has.
@@ -99,6 +104,9 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
         if (applyingExternal.current) return;
         const current = editor.getModel();
         if (current) onChangeRef.current(current.getValue());
+      });
+      editor.onDidChangeCursorPosition((event) => {
+        onCursorChangeRef.current?.(event.position.lineNumber);
       });
       onReady?.();
 
@@ -203,6 +211,12 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
         },
         trigger: (action) => {
           editorRef.current?.trigger("spektrum", action, null);
+        },
+        revealLine: (line) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.revealLineInCenter(line);
+          editor.setPosition({ lineNumber: line, column: 1 });
         },
         getEditor: () => editorRef.current,
       }),

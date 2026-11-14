@@ -40,6 +40,10 @@ import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
 import { PdfChrome, pillState } from "@/components/pdf/pdf-chrome";
 import { PdfSearch } from "@/components/pdf/pdf-search";
+import { fetchSyncTex } from "@/lib/synctex-client";
+import { nearestForward } from "@/components/pdf/use-sync-scroll";
+import { nearestAnchor } from "@/components/pdf/use-sync-jump";
+import type { SyncTexMap } from "@spektrum/shared";
 import { IconTools } from "@spektrum/ui/icons";
 
 // Monaco is browser-only; the dynamic import (ssr: false) must come from this
@@ -265,6 +269,39 @@ export function EditorClient({
   const [numPages, setNumPages] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [revision, setRevision] = useState(initialRender?.revision ?? "");
+  const [syncMap, setSyncMap] = useState<SyncTexMap | null>(null);
+  const cursorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const status = render.status;
+    if (status && "revision" in status) setRevision(status.revision);
+  }, [render.status]);
+
+  useEffect(() => {
+    if (!revision) return;
+    let cancelled = false;
+    void fetchSyncTex(project.id, revision).then((map) => {
+      if (!cancelled) setSyncMap(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, revision]);
+
+  const onCursor = useCallback(
+    (line: number) => {
+      if (cursorTimer.current) clearTimeout(cursorTimer.current);
+      cursorTimer.current = setTimeout(() => {
+        if (!syncMap || !activePath) return;
+        const entry = nearestForward(syncMap.forward[activePath], line);
+        if (entry) pdfPageRef.current?.scrollTo(entry.page, entry.x, entry.y);
+      }, 120);
+    },
+    [syncMap, activePath],
+  );
+
+
 
   // Cmd/Ctrl+F opens the PDF search pill (only when a PDF is showing).
   useEffect(() => {
@@ -369,6 +406,19 @@ export function EditorClient({
     },
     [autosave, tabs.active],
   );
+  const onPdfDoubleClick = useCallback(
+    (page: number, _x: number, y: number) => {
+      const anchors =
+        syncMap?.backward.find((entry) => entry.page === page)?.anchors ?? [];
+      const anchor = nearestAnchor(anchors, y);
+      if (!anchor) return;
+      void openDocument(anchor.path).then(() => {
+        editorRef.current?.revealLine(anchor.line);
+      });
+    },
+    [syncMap, openDocument],
+  );
+
 
   const afterMutation = () => {
     // The local state is already updated; refresh the RSC tree without a
@@ -501,6 +551,7 @@ export function EditorClient({
               theme={isDark ? "crixet" : "crixet-light"}
               preferences={preferences}
               onChange={onBufferChange}
+              onCursorChange={onCursor}
               onContextMenu={(point) => setContextMenu(point)}
             />
           ) : null}
@@ -552,6 +603,7 @@ export function EditorClient({
                 darkMode={preferences.pdfDarkMode}
                 onNumPages={setNumPages}
                 onPageChange={setPage}
+                onPageDoubleClick={onPdfDoubleClick}
                 pageRef={pdfPageRef}
               />
             </div>

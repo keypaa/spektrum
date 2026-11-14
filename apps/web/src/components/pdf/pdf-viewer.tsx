@@ -23,6 +23,7 @@ interface PdfViewerProps {
   darkMode?: boolean;
   onNumPages?: (numPages: number) => void;
   onPageChange?: (page: number) => void;
+  onPageDoubleClick?: (page: number, x: number, y: number) => void;
   pageRef?: React.MutableRefObject<PdfViewerHandle | null>;
 }
 
@@ -68,6 +69,7 @@ export function PdfViewer({
   darkMode = false,
   onNumPages,
   onPageChange,
+  onPageDoubleClick,
   pageRef,
 }: PdfViewerProps): React.ReactElement {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -165,6 +167,18 @@ export function PdfViewer({
             filter: darkMode ? "invert(1) hue-rotate(180deg)" : undefined,
           }}
           className="mx-auto mb-2 w-fit bg-white shadow-[0_1px_3px_rgb(0_0_0_/_0.3)]"
+          onDoubleClick={
+            onPageDoubleClick
+              ? (event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  onPageDoubleClick(
+                    page,
+                    (event.clientX - rect.left) / rect.width,
+                    (event.clientY - rect.top) / rect.height,
+                  );
+                }
+              : undefined
+          }
         >
           {visible.has(page) ? (
             <PageCanvas doc={docRef.current} page={page} zoom={zoom} />
