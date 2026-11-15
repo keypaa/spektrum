@@ -176,6 +176,9 @@ importers:
       '@playwright/test':
         specifier: 1.65.0
         version: 1.65.0
+      '@spektrum/db':
+        specifier: workspace:*
+        version: link:packages/db
       '@spektrum/storage':
         specifier: workspace:*
         version: link:packages/storage
@@ -191,6 +194,9 @@ importers:
       autocannon:
         specifier: 7.15.0
         version: 7.15.0
+      drizzle-orm:
+        specifier: 0.45.4
+        version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.18.0)(kysely@0.29.8)(postgres@4.1.0)
       eslint:
         specifier: ^10.14.0
         version: 10.14.0(jiti@2.7.0)(supports-color@7.2.0)

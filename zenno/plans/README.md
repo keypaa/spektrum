@@ -16,7 +16,7 @@ previous one's exit criteria pass.
 | 02 | `2026-11-07-02-editor.md` | Monaco + both themes, LaTeX grammar, folding, tabs, sidebar, file CRUD, composer shell, settings modal | **Complete (2026-11-13).** Open a project, edit, switch tabs, hard refresh preserves state; settings persist. Visual ratios recorded (1.1–3.2 %; ≤ 0.15 % not met, accepted and non-blocking) |
 | 03 | `2026-11-07-03-compile-pdf-logs.md` | Worker, TeX image, latexmk, log parser, PDF viewer, SyncTeX, Logs panel, Info panel (Project Info, Versions, Comments, Share) | **Complete (2026-11-14, merged `1a4fe66`).** Type → PDF < 3 s (gate 1498 ms); errors in Logs at the right line; compile e2e 7/7; visual ratios recorded (non-blocking) |
 | 04 | `2026-11-07-04-ai.md` | LLM proxy, BYOK resolution, context builder, tools, diffs, Fix with AI, Review paper, threads, model-generated thread titles | **Complete (2026-11-14).** Typecheck/lint clean; `pnpm test` 611 passed / 5 skipped (101 files); build green; default e2e 25/25; AI e2e 9/9; composer/thread/diff visual baselines recorded (non-blocking) |
-| 05 | `2026-11-07-05-ship.md` | Import/export, VPS provisioning, TLS, backups, monitoring, hardening | Live URL; real paper authored end to end |
+| 05 | `2026-11-07-05-ship.md` | Import/export, reference Docker deployment, backups, monitoring, hardening | **Complete (2026-11-15).** Prism import/export with a byte-exact round trip (S3-gated); reference `docker compose` stack (web + worker + Caddy + Postgres + Redis + SeaweedFS) — host-agnostic, no provider named; backups with retention + rehearsable restore; health/metrics/redacted logs; optional Sentry; admin CLI; load test. `pnpm test` 662 passed / 7 skipped; typecheck/lint clean; all three images build; launch runbook in `zenno/docs/phase-5-launch.md` |
 
 ## Phase 1–5 task outline
 
@@ -42,9 +42,10 @@ thinking levels; tool schema + executor; diff model + inline widget; accept/reje
 Fix with AI; Review paper; thread persistence; **model-generated thread titles +
 "Regenerate title"**; usage metering; error/retry UX.
 
-**05 Ship** — Prism importer + report; export; round-trip test; VPS provisioning;
-Caddy + TLS; Postgres/Redis/MinIO hardening; backups; logs + metrics; Sentry;
-security review; load test; launch checklist.
+**05 Ship** — Prism importer + report; export; round-trip test; host-agnostic
+deployment kit (Docker + Caddy + Postgres/Redis/SeaweedFS); backups + retention;
+logs + metrics; optional Sentry; security hardening + audit; load test; launch
+runbook (`zenno/docs/phase-5-launch.md`).
 
 ## Cross-plan invariants
 

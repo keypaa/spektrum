@@ -26,6 +26,9 @@ set +a
 
 mkdir -p "$DEST"
 
+echo "==> pruning old renders (keeps the last 20 per project + snapshot-pinned)"
+pnpm exec tsx scripts/prune-renders.ts
+
 echo "==> dumping postgres"
 "${COMPOSE[@]}" --env-file "$ENV_FILE" exec -T postgres \
   pg_dump -U "${POSTGRES_USER}" -Fc "${POSTGRES_DB}" > "$DEST/db.dump"

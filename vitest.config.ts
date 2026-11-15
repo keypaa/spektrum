@@ -119,6 +119,17 @@ export default defineConfig({
         test: {
           include: ["scripts/**/*.test.ts", "docker/**/*.test.ts"],
           environment: "node",
+          env: {
+            DATABASE_URL:
+              process.env.DATABASE_URL ??
+              "postgres://spektrum:spektrum@localhost:5432/spektrum_unit",
+            REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
+            S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://localhost:8333",
+            S3_BUCKET: process.env.S3_BUCKET ?? "spektrum-uploads",
+            S3_PDF_BUCKET: process.env.S3_PDF_BUCKET ?? "spektrum-pdf",
+            S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? "spektrum",
+            S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? "spektrum-secret",
+          },
         },
       },
     ],
