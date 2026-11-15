@@ -240,6 +240,14 @@ jobs:
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           REDIS_URL: redis://localhost:6379
+      - name: Object store log
+        # An S3 500 means the store rejected the request; its own log is the only
+        # place that says why.
+        if: always()
+        run: docker logs --tail 60 seaweedfs 2>&1 || true
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          REDIS_URL: redis://localhost:6379
 
   visual:
     runs-on: ubuntu-latest
