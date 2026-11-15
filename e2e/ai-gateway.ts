@@ -13,10 +13,13 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { appendFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const PORT = 4010;
 const TOKEN = "test-token";
-const LOG = "/tmp/opencode/ai-gateway.log";
+const LOG =
+  process.env.AI_GATEWAY_LOG ?? join(tmpdir(), "spektrum-ai-gateway.log");
 
 interface Recorded {
   path: string;
