@@ -6,6 +6,7 @@ import { DEFAULT_PREFERENCES } from "@spektrum/shared/preferences";
 
 const state = vi.hoisted(() => ({
   model: null as null | { pushEditOperations: ReturnType<typeof vi.fn> },
+  editor: null as null | { updateOptions: ReturnType<typeof vi.fn> },
 }));
 
 vi.mock("@/editor/monaco-environment", () => {
@@ -34,6 +35,7 @@ vi.mock("@/editor/monaco-environment", () => {
     trigger: vi.fn(),
   };
   state.model = model;
+  state.editor = editor;
   return {
     monaco: {
       Uri: { parse: (value: string) => ({ toString: () => value }) },
@@ -60,6 +62,51 @@ afterEach(() => vi.clearAllMocks());
 const HUNKS = [
   { oldStart: 2, oldLines: 1, newStart: 2, newLines: 1, lines: ["-b", "+B"] },
 ];
+
+describe("MonacoEditor loading gate", () => {
+  it("applies readOnly when the document has not loaded yet", () => {
+    render(
+      <MonacoEditor
+        path="main.tex"
+        value=""
+        language="latex"
+        theme="crixet"
+        preferences={DEFAULT_PREFERENCES}
+        readOnly
+        onChange={vi.fn()}
+      />,
+    );
+    // Typing into the empty placeholder model would replace the real document
+    // with whatever was typed, so the editor must be read-only until load.
+    expect(state.editor!.updateOptions).toHaveBeenCalledWith({ readOnly: true });
+  });
+
+  it("is editable once readOnly is false", () => {
+    const view = render(
+      <MonacoEditor
+        path="main.tex"
+        value=""
+        language="latex"
+        theme="crixet"
+        preferences={DEFAULT_PREFERENCES}
+        readOnly
+        onChange={vi.fn()}
+      />,
+    );
+    view.rerender(
+      <MonacoEditor
+        path="main.tex"
+        value="loaded"
+        language="latex"
+        theme="crixet"
+        preferences={DEFAULT_PREFERENCES}
+        readOnly={false}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(state.editor!.updateOptions).toHaveBeenLastCalledWith({ readOnly: false });
+  });
+});
 
 describe("MonacoEditor handle", () => {
   it("applyHunks applies the hunks, pushes undo and does not schedule a save", () => {

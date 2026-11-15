@@ -37,6 +37,9 @@ export interface MonacoEditorProps {
   language: string;
   theme: "crixet" | "crixet-light";
   preferences: Preferences;
+  /** True until the document's content has been loaded: typing into the empty
+   *  placeholder model would otherwise replace the real document. */
+  readOnly?: boolean;
   onChange(value: string): void;
   /** Cursor moved to a 1-based line (SyncTeX forward sync). */
   onCursorChange?(line: number): void;
@@ -53,7 +56,18 @@ function modelUri(path: string) {
 
 export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
   function MonacoEditor(
-    { path, value, language, theme, preferences, onChange, onCursorChange, onReady, onContextMenu },
+    {
+      path,
+      value,
+      language,
+      theme,
+      preferences,
+      readOnly = false,
+      onChange,
+      onCursorChange,
+      onReady,
+      onContextMenu,
+    },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement>(null);
@@ -149,6 +163,13 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       if (saved) editor.restoreViewState(saved);
       editor.focus();
     }, [path]);
+
+    // The editor is read-only until the document's content has been loaded, so
+    // a keystroke during page load cannot replace a real document with what
+    // was typed.
+    useEffect(() => {
+      editorRef.current?.updateOptions({ readOnly });
+    }, [readOnly]);
 
     // Apply preference changes without re-creating the editor.
     useEffect(() => {

@@ -908,6 +908,10 @@ export function EditorClient({
               language={activePath.endsWith(".bib") ? "bibtex" : "latex"}
               theme={isDark ? "crixet" : "crixet-light"}
               preferences={preferences}
+              // Nothing is editable until this document's content has been
+              // loaded; typing into the empty placeholder would replace the
+              // real file with what was typed.
+              readOnly={activePath !== loadedPath}
               onChange={onBufferChange}
               onCursorChange={onCursor}
               onContextMenu={(point) => setContextMenu(point)}
