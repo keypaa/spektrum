@@ -1,0 +1,28 @@
+# ARM64 (aarch64) pins for the reference stack.
+#
+#   docker compose -f docker/compose.prod.yml -f docker/compose.arm64.yml up -d
+#
+# The four third-party images in compose.prod.yml are pinned by digest, and
+# those digests are amd64-only manifests: on an ARM host `docker pull` fails
+# with "no matching manifest for linux/arm64/v8". This file re-pins the same
+# tags to their arm64 manifests, so the pinning guarantee is kept on both
+# architectures instead of being dropped for the ARM host.
+#
+# scripts/deploy.sh appends this file automatically on aarch64.
+#
+# The app images (web, worker, migrate) need no pin here: they build FROM
+# node:26-bookworm-slim, which is multi-arch, and are built on the host.
+name: spektrum
+
+services:
+  caddy:
+    image: caddy:2@sha256:9ee998103a2bc0d4392bbe9738b4069da1562d6920b3cd8088cfd098a8270120
+
+  postgres:
+    image: postgres:16-alpine@sha256:40e58641410e030f5769096bca8372f68f243e1859c8ecdf11f227da390d514d
+
+  redis:
+    image: redis:7-alpine@sha256:52d1ea8a654b10f06af3ecda4e9dbcd035c7868b5c49ee7975de917f81de13db
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest@sha256:210d0f5999432219ca23f61bf467965869520202d4a820d717a6a6c008b77a41

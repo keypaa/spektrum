@@ -233,6 +233,7 @@ To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-
 | Caddy cannot get a certificate | DNS not pointing at the host, or 80/443 blocked. |
 | Import → 413 | Archive over 30 MB, or the proxy truncated the body. |
 | Import → 400 `bad_request` | Not a zip (magic bytes), or no `archive` field. |
+| Pull fails: `no matching manifest for linux/arm64` | The host is ARM and the override was skipped. `scripts/deploy.sh`, `backup.sh` and `restore.sh` append `docker/compose.arm64.yml` automatically on aarch64; a hand-run `docker compose` command needs it too. See §13. |
 
 ## 12. The compile e2e
 
@@ -255,3 +256,28 @@ Two things make it fragile in a way worth knowing:
 `scripts/compile-diagnostics.ts` prints the queue counts, render statuses and the
 tail of the TeX log for any run — use it before guessing. The object store's own
 log is the other half: `docker logs seaweedfs`.
+
+## 13. ARM (aarch64) hosts
+
+Free-tier ARM instances are a good fit for this stack, and they work unchanged
+apart from one compose detail.
+
+`docker/compose.prod.yml` pins every third-party image by digest, and those
+digests are **amd64-only** manifests — on aarch64 `docker pull` fails with "no
+matching manifest for linux/arm64/v8". `docker/compose.arm64.yml` re-pins the
+same tags to their arm64 manifests, so images stay pinned on both
+architectures instead of the pins being dropped for ARM.
+
+`scripts/lib/compose.sh` detects `aarch64`/`arm64` and appends that file, and
+`deploy.sh`, `backup.sh` and `restore.sh` all source it — so the documented
+commands work unchanged. Only a hand-typed `docker compose` invocation needs
+both `-f` flags:
+
+```bash
+docker compose -f docker/compose.prod.yml -f docker/compose.arm64.yml ps
+```
+
+The app images (`web`, `worker`, `migrate`) and the TeX Live image need no
+override: they build from `node:26-bookworm-slim` and `debian:bookworm-slim`,
+which are multi-arch, and are built on the host.
+

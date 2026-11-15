@@ -12,7 +12,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-COMPOSE=(docker compose -f docker/compose.prod.yml)
+# shellcheck source=scripts/lib/compose.sh
+source scripts/lib/compose.sh
 ENV_FILE="${SPEKTRUM_ENV_FILE:-.env}"
 # Absolute so a test can point at a temporary file.
 [[ "$ENV_FILE" == /* ]] || ENV_FILE="$PWD/$ENV_FILE"

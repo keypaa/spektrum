@@ -15,7 +15,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-COMPOSE=(docker compose -f docker/compose.prod.yml)
+# shellcheck source=scripts/lib/compose.sh
+source scripts/lib/compose.sh
 ENV_FILE="${SPEKTRUM_ENV_FILE:-.env}"
 # Absolute so a test can point at a temporary file.
 [[ "$ENV_FILE" == /* ]] || ENV_FILE="$PWD/$ENV_FILE"
@@ -60,13 +61,13 @@ for ((i = 1; i <= ATTEMPTS; i += 1)); do
     break
   fi
   if ((i == ATTEMPTS)); then
-    echo "health check failed — docker compose -f docker/compose.prod.yml logs web" >&2
+    echo "health check failed — ${COMPOSE[*]} logs web" >&2
     exit 1
   fi
   sleep "$INTERVAL"
 done
 
-cat <<'EOF'
+cat <<EOF
 
 Deployed.
 
@@ -74,7 +75,7 @@ Create the first owner explicitly. The password is read from the environment,
 never written to disk or to this script:
 
   read -rsp 'owner password: ' OWNER_PASSWORD && export OWNER_PASSWORD
-  docker compose -f docker/compose.prod.yml exec -T web \
+  ${COMPOSE[*]} exec -T web \\
     pnpm admin:create-owner --email you@example.com
 
 EOF
