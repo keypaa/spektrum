@@ -48,6 +48,13 @@ export default defineConfig({
             BETTER_AUTH_SECRET: "test-secret-32-chars-minimum!!!!!!",
             BETTER_AUTH_URL: "http://localhost:3000",
             LLM_KEY_ENCRYPTION_SECRET: "test-key-encryption-secret-32ch!",
+            // Storage-gated tests (import round trip) need a bucket; the
+            // `web` project has no S3 defaults of its own.
+            S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://localhost:9000",
+            S3_BUCKET: process.env.S3_BUCKET ?? "spektrum-uploads",
+            S3_PDF_BUCKET: process.env.S3_PDF_BUCKET ?? "spektrum-pdf",
+            S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? "spektrum",
+            S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? "spektrum-secret",
           },
         },
       },
