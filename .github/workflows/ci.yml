@@ -228,6 +228,7 @@ jobs:
           LLM_KEY_ENCRYPTION_SECRET: ci-key-encryption-secret-32ch!!!
       - name: Compile diagnostics
         if: always()
+        timeout-minutes: 3
         run: pnpm exec tsx scripts/compile-diagnostics.ts
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
