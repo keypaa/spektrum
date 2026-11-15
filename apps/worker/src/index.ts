@@ -13,6 +13,18 @@ const worker = new Worker(QUEUE_NAME, (job) => handler(job, redis), {
   concurrency: 2,
 });
 
+// A failed compile is otherwise invisible: the job is retried and finally
+// dropped, and the only trace is the render row. Log the outcome so an operator
+// can see why compiles are not landing.
+worker.on("failed", (job, error) => {
+  console.error(
+    `compile failed: job=${job?.id} attempts=${job?.attemptsMade} ${error.message}`,
+  );
+});
+worker.on("completed", (job) => {
+  console.log(`compile done: job=${job?.id}`);
+});
+
 let stopping = false;
 const stop = async (signal: string): Promise<void> => {
   if (stopping) return;

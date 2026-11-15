@@ -214,6 +214,12 @@ jobs:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
       - name: Compile e2e
         run: pnpm exec playwright test --config playwright.compile.config.ts e2e/compile.spec.ts
+      - name: Compile diagnostics
+        if: always()
+        run: pnpm exec tsx scripts/compile-diagnostics.ts
+        env:
+          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          REDIS_URL: redis://localhost:6379
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           REDIS_URL: redis://localhost:6379
