@@ -36,8 +36,19 @@ const envVarSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   S3_ENDPOINT: z.string().optional(),
   S3_BUCKET: z.string().optional(),
+  S3_PDF_BUCKET: z.string().optional(),
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
+  // Prism import caps (spec §13.2.4). Positive integers only: a bad value must
+  // fail at startup, not on the first upload.
+  IMPORT_MAX_FILE_BYTES: z.coerce.number().int().positive().default(26_214_400),
+  IMPORT_MAX_TOTAL_BYTES: z.coerce.number().int().positive().default(536_870_912),
+  IMPORT_MAX_ENTRIES: z.coerce.number().int().positive().default(50_000),
+  IMPORT_MAX_RATIO: z.coerce.number().int().positive().default(100),
+  IMPORT_MAX_PROJECTS: z.coerce.number().int().positive().default(200),
+  // Optional error reporting and the metrics bearer token.
+  SENTRY_DSN: z.string().url().optional(),
+  METRICS_TOKEN: z.string().min(1).optional(),
   NODE_ENV: z.string().default("development"),
 });
 
@@ -62,8 +73,16 @@ export interface WebEnv {
   githubClientSecret?: string | undefined;
   s3Endpoint?: string | undefined;
   s3Bucket?: string | undefined;
+  s3PdfBucket?: string | undefined;
   s3AccessKey?: string | undefined;
   s3SecretKey?: string | undefined;
+  importMaxFileBytes: number;
+  importMaxTotalBytes: number;
+  importMaxEntries: number;
+  importMaxRatio: number;
+  importMaxProjects: number;
+  sentryDsn?: string | undefined;
+  metricsToken?: string | undefined;
   nodeEnv: string;
 }
 
@@ -93,8 +112,16 @@ export function loadWebEnv(source: NodeJS.ProcessEnv = process.env): WebEnv {
       githubClientSecret: v.GITHUB_CLIENT_SECRET,
       s3Endpoint: v.S3_ENDPOINT,
       s3Bucket: v.S3_BUCKET,
+      s3PdfBucket: v.S3_PDF_BUCKET,
       s3AccessKey: v.S3_ACCESS_KEY,
       s3SecretKey: v.S3_SECRET_KEY,
+      importMaxFileBytes: v.IMPORT_MAX_FILE_BYTES,
+      importMaxTotalBytes: v.IMPORT_MAX_TOTAL_BYTES,
+      importMaxEntries: v.IMPORT_MAX_ENTRIES,
+      importMaxRatio: v.IMPORT_MAX_RATIO,
+      importMaxProjects: v.IMPORT_MAX_PROJECTS,
+      sentryDsn: v.SENTRY_DSN,
+      metricsToken: v.METRICS_TOKEN,
       nodeEnv: v.NODE_ENV,
     };
   }

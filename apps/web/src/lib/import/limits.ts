@@ -1,8 +1,6 @@
-// Import limits shared by the route and the importer (spec §13.2).
-//
-// Until Task 12 wires `IMPORT_MAX_*` through the env schema these are read
-// straight from `process.env`; after that they come from `loadWebEnv()` so the
-// value is validated in one place with every other setting.
+// Import limits shared by the route and the importer (spec §13.2.4).
+import { loadWebEnv } from "@spektrum/shared/env";
+
 export type ImportLimits = {
   maxFileBytes?: number;
   maxTotalBytes?: number;
@@ -10,27 +8,21 @@ export type ImportLimits = {
   maxProjects?: number;
 };
 
+/**
+ * Import limits from the validated environment (`IMPORT_MAX_*`).
+ *
+ * `loadWebEnv` applies the defaults, so every value is present; the importer
+ * still treats them as overrides on top of its own constants, which is what
+ * lets a caller pass an explicit subset.
+ */
 export function limitsFromEnv(
   source: NodeJS.ProcessEnv = process.env,
 ): ImportLimits {
-  const out: ImportLimits = {};
-  const read = (name: string, apply: (value: number) => void) => {
-    const raw = source[name];
-    if (raw === undefined) return;
-    const value = Number(raw);
-    if (Number.isSafeInteger(value) && value > 0) apply(value);
+  const env = loadWebEnv(source);
+  return {
+    maxFileBytes: env.importMaxFileBytes,
+    maxTotalBytes: env.importMaxTotalBytes,
+    maxEntries: env.importMaxEntries,
+    maxProjects: env.importMaxProjects,
   };
-  read("IMPORT_MAX_FILE_BYTES", (v) => {
-    out.maxFileBytes = v;
-  });
-  read("IMPORT_MAX_TOTAL_BYTES", (v) => {
-    out.maxTotalBytes = v;
-  });
-  read("IMPORT_MAX_ENTRIES", (v) => {
-    out.maxEntries = v;
-  });
-  read("IMPORT_MAX_PROJECTS", (v) => {
-    out.maxProjects = v;
-  });
-  return out;
 }
