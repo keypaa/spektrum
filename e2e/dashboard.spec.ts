@@ -191,6 +191,9 @@ test("a project name opens the editor", async ({ page }) => {
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("menuitem", { name: "Blank project" }).click();
   await expect(page.getByText("New Project", { exact: true })).toBeVisible();
+  // Creating a project refreshes the list; clicking while that refresh is in
+  // flight loses the navigation, so let the network settle first.
+  await page.waitForLoadState("networkidle");
 
   await page.getByRole("link", { name: "New Project" }).click();
   await expect(page).toHaveURL(/\/u\/[0-9a-f-]{36}/);
