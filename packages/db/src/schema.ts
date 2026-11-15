@@ -273,6 +273,32 @@ export const chatMessages = pgTable("chat_messages", {
     .notNull(),
 }, (table) => [index("chat_messages_thread_idx").on(table.threadId)]);
 
+// Prism import batches — one row per (owner, project, archive hash) so a
+// re-import of the same archive is a no-op instead of a duplicate project
+// (spec §13.2.5 idempotency).
+export const importBatches = pgTable(
+  "import_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectName: text("project_name").notNull(),
+    archiveHash: text("archive_hash").notNull(),
+    report: jsonb("report").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("import_batches_owner_project_hash_key").on(
+      table.userId,
+      table.projectName,
+      table.archiveHash,
+    ),
+  ],
+);
+
 export const userPreferences = pgTable("user_preferences", {
   userId: text("user_id")
     .primaryKey()
