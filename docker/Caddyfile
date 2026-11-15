@@ -1,0 +1,35 @@
+# Caddy front door (spec §10.6, §19). TLS is automatic for PUBLIC_URL; only
+# Caddy publishes ports, everything else stays on the compose network.
+{
+	email {$ACME_EMAIL}
+}
+
+{$PUBLIC_URL} {
+	encode gzip
+
+	# The import route accepts a Prism archive; 30 MB matches
+	# experimental.proxyClientMaxBodySize in apps/web/next.config.ts.
+	request_body {
+		max_size 30MB
+	}
+
+	# Monaco runs in a blob: worker and Next streams inline bootstrap scripts,
+	# so `worker-src blob:` and `'unsafe-inline'` are required. Third-party
+	# origins are deliberately absent: the editor bundle is self-hosted.
+	# SENTRY_INGEST_HOST is optional and only present when Sentry is configured.
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' {$SENTRY_INGEST_HOST}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	# `flush_interval -1` disables response buffering, which is what the SSE
+	# routes (`/api/projects/[id]/render/stream`, `/api/projects/[id]/chat`)
+	# need to reach the browser as they are produced.
+	reverse_proxy web:3000 {
+		flush_interval -1
+	}
+}
