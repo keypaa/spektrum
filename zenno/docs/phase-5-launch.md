@@ -234,22 +234,24 @@ To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-
 | Import → 413 | Archive over 30 MB, or the proxy truncated the body. |
 | Import → 400 `bad_request` | Not a zip (magic bytes), or no `archive` field. |
 
-## 12. The compile e2e is non-blocking (known, diagnosed)
+## 12. The compile e2e
 
-The `compile` CI job is marked `continue-on-error: true` on purpose. This is not
-a broken pipeline:
+`compile` is a required CI job: seven specs covering type → PDF, errors at the
+right line, supersede semantics, the last-good PDF, a 20-page document, the
+two-tab conflict, and another owner's render being 404.
 
-- Jobs enqueue and complete (`queue: compile { wait: 0, failed: 0, completed: 4 }`).
-- Renders are produced and reach `error` for a broken document, `ok` for a good one.
-- `scripts/compile-diagnostics.ts` prints the queue counts, render statuses and the
-  tail of the TeX log for any run — use it before guessing.
+Two things make it fragile in a way worth knowing:
 
-What is left is assertion races in three specs: a reload plus an edit produces two
-compiles, so the newest render supersedes the one the assertion polls, and the
-tests read `render/latest` rather than the revision they mean.
+- **The object store must have a volume node.** SeaweedFS accepts S3 connections
+  and bucket creation before it can store anything, and answers 500 until the
+  master has a writable volume. The compose/CI readiness gate asks the master to
+  assign in `spektrum-pdf` and restarts the store if it cannot; `packages/storage`
+  also retries transient 5xx.
+- **Assert on the revision you asked for.** A reload plus an edit produces two
+  compiles and the newer one supersedes the older; polling "the latest render" is
+  therefore a race. The specs call `POST /api/projects/:id/compile` and wait for
+  that revision.
 
-To finish it: make those assertions require `render.isCurrent` (or the specific
-revision), then flip `continue-on-error` off. The three specs are
-`a compile error lands in Logs at the right line`,
-`a newer edit supersedes the running compile`, and
-`the two-tab conflict reloads the losing tab`.
+`scripts/compile-diagnostics.ts` prints the queue counts, render statuses and the
+tail of the TeX log for any run — use it before guessing. The object store's own
+log is the other half: `docker logs seaweedfs`.

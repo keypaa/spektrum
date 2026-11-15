@@ -93,11 +93,10 @@ async function send(
 
 export async function ensureBucket(bucket: Bucket): Promise<void> {
   try {
-    await send(
+    // Not through `send()`: "already owned" is the expected answer here, not a
+    // failure worth retrying or logging.
+    await client.send(
       new CreateBucketCommand({ Bucket: bucketName(bucket) }),
-      "createBucket",
-      bucket,
-      "",
     );
   } catch (e) {
     const name = (e as { name?: string }).name;
