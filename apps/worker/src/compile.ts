@@ -244,6 +244,13 @@ export async function runCompile(
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    // The render row keeps a short message; the full error (with the S3
+    // `$metadata` when that is what failed) goes to the worker log, because
+    // "internal error" alone does not say which operation failed.
+    console.error(
+      `compile failed: project=${job.projectId} revision=${job.revisionHash}:`,
+      e,
+    );
     await upsert(job, {
       status: "error",
       log: tail(message, 2000),
