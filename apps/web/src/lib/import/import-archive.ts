@@ -58,10 +58,38 @@ function contentTypeFor(path: string): string {
   return MIME_BY_EXT[path.slice(dot + 1).toLowerCase()] ?? "application/octet-stream";
 }
 
+/**
+ * Serialise imports inside this process.
+ *
+ * Inflating an archive is synchronous CPU work in the request path: a 17 MB
+ * archive with a 17:1 ratio expands to ~286 MB and blocks the event loop for
+ * over a second, and the total cap allows more. Two imports at once would
+ * double that on a single-threaded server, so the second waits. (A real fix is
+ * to move inflate into a worker; this bounds the blast radius until then.)
+ */
+let importChain: Promise<unknown> = Promise.resolve();
+
+export function withImportLock<T>(task: () => Promise<T>): Promise<T> {
+  const run = importChain.then(task, task);
+  importChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export async function importArchive(
   userId: string,
   archiveBytes: Uint8Array,
   limits: ImportLimits = {},
+): Promise<ImportReport> {
+  return withImportLock(() => importArchiveNow(userId, archiveBytes, limits));
+}
+
+async function importArchiveNow(
+  userId: string,
+  archiveBytes: Uint8Array,
+  limits: ImportLimits,
 ): Promise<ImportReport> {
   const maxFileBytes = limits.maxFileBytes ?? ZIP_LIMITS.maxFileBytes;
   const archiveHash = await sha256HexBytes(archiveBytes);
@@ -82,7 +110,7 @@ export async function importArchive(
       maxFileBytes,
       maxTotalBytes: limits.maxTotalBytes ?? ZIP_LIMITS.maxTotalBytes,
       maxEntries: limits.maxEntries ?? ZIP_LIMITS.maxEntries,
-      maxRatio: ZIP_LIMITS.maxRatio,
+      maxRatio: limits.maxRatio ?? ZIP_LIMITS.maxRatio,
     }),
     {
       maxFileBytes,

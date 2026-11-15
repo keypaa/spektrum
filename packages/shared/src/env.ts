@@ -89,7 +89,11 @@ export interface WebEnv {
 export function loadWebEnv(source: NodeJS.ProcessEnv = process.env): WebEnv {
   const raw: Record<string, string | undefined> = {};
   for (const [k, v] of Object.entries(source)) {
-    if (v !== undefined) raw[k] = v;
+    // An empty value means "not set": `env_file: .env` passes `KEY=` through as
+    // an empty string, and a present-but-empty optional key must not fail the
+    // whole schema (that would 500 every mutating route while /api/health, which
+    // never calls loadWebEnv, still answered 200).
+    if (v !== undefined && v !== "") raw[k] = v;
   }
   const result = envVarSchema.safeParse(raw);
 

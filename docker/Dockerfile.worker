@@ -21,10 +21,16 @@ RUN pnpm install --frozen-lockfile
 
 FROM node:26-bookworm-slim AS runtime
 WORKDIR /app
+ARG TARGETARCH=amd64
 RUN npm install -g pnpm@12.18.0 \
   && apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl \
-  && curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-28.5.2.tgz \
+  && case "${TARGETARCH}" in \
+       amd64) DOCKER_ARCH=x86_64 ;; \
+       arm64) DOCKER_ARCH=aarch64 ;; \
+       *) echo "unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+     esac \
+  && curl -fsSL "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-28.5.2.tgz" \
      | tar -xz -C /usr/local/bin --strip-components=1 docker/docker \
   && rm -rf /var/lib/apt/lists/* \
   && groupadd --system --gid 1001 spektrum \

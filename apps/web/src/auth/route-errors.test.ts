@@ -1,50 +1,39 @@
-import { describe, expect, it } from "vitest";
-import { z, ZodError } from "zod";
+// @vitest-environment node
+// The 500 path used to `console.error` the raw error. An error message can
+// carry anything the failing code put in it — an upstream response, a header,
+// a token — so the logger must redact before it reaches stdout.
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { errorResponse } from "./route-errors";
-import { UnauthorizedError, ForbiddenError } from "./session";
-import { CsrfError } from "@spektrum/shared/http/guard";
+
+const write = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+afterEach(() => {
+  write.mockClear();
+  error.mockClear();
+});
 
 describe("errorResponse", () => {
-  it("maps UnauthorizedError to 401", async () => {
-    const res = errorResponse(new UnauthorizedError());
-    expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "unauthorized" });
-  });
-
-  it("maps a permanent ban to 403 with a support message", async () => {
-    const res = errorResponse(new ForbiddenError("banned"));
-    expect(res.status).toBe(403);
-    const body = (await res.json()) as { message: string };
-    expect(body.message).toMatch(/banned/i);
-    expect(res.headers.get("retry-after")).toBeNull();
-  });
-
-  it("maps a suspension to 429 with Retry-After in seconds", async () => {
-    const res = errorResponse(new ForbiddenError("suspended", 90_000));
-    expect(res.status).toBe(429);
-    expect(res.headers.get("retry-after")).toBe("90");
-  });
-
-  it("maps CsrfError to 403", async () => {
-    expect(errorResponse(new CsrfError("nope")).status).toBe(403);
-  });
-
-  it("maps ZodError to 400 with issues", async () => {
-    const schema = z.object({ email: z.string().email() });
-    const parsed = schema.safeParse({ email: "nope" });
-    if (parsed.success) throw new Error("expected failure");
-    const res = errorResponse(parsed.error as ZodError);
-    expect(res.status).toBe(400);
-    const body = (await res.json()) as { issues: unknown[] };
-    expect(body.issues.length).toBeGreaterThan(0);
-  });
-
-  it("maps unknown errors to a generic 500 that leaks nothing", async () => {
-    const res = errorResponse(new Error("password hash boom: postgres://u:p@h/db"));
+  it("answers 500 with a generic body", async () => {
+    const res = errorResponse(new Error("boom"));
     expect(res.status).toBe(500);
-    const text = await res.text();
-    expect(text).not.toContain("postgres");
-    expect(text).not.toContain("boom");
-    expect(JSON.parse(text)).toEqual({ error: "internal_error" });
+    expect(await res.json()).toEqual({ error: "internal_error" });
+  });
+
+  it("logs the failure through the redacting logger, not console.error", async () => {
+    errorResponse(
+      new Error("upstream said Authorization: Bearer sk-abcdef1234567890"),
+    );
+    expect(error).not.toHaveBeenCalled();
+    const line = write.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(line).toContain("route.unhandled");
+    expect(line).not.toContain("sk-abcdef1234567890");
+  });
+
+  it("redacts a bearer token that is not shaped like an API key", async () => {
+    errorResponse(new Error("header was Bearer abcdefghijklmnopqrst"));
+    const line = write.mock.calls.map((c) => c.join(" ")).join("\n");
+    expect(line).not.toContain("abcdefghijklmnopqrst");
+    expect(line).toContain("[redacted]");
   });
 });

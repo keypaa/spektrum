@@ -6,6 +6,7 @@ export type ImportLimits = {
   maxTotalBytes?: number;
   maxEntries?: number;
   maxProjects?: number;
+  maxRatio?: number;
 };
 
 /**
@@ -24,5 +25,6 @@ export function limitsFromEnv(
     maxTotalBytes: env.importMaxTotalBytes,
     maxEntries: env.importMaxEntries,
     maxProjects: env.importMaxProjects,
+    maxRatio: env.importMaxRatio,
   };
 }

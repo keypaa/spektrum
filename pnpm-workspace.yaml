@@ -4,6 +4,10 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  # Source-map upload CLI; reviewed and deliberately not built (we do not upload
+  # maps from inside the image). Listing it keeps `pnpm install` green in CI,
+  # where an unclassified ignored build is an error.
+  '@sentry/cli': false
 
 # Security overrides for transitive dependencies (pnpm 12 reads these from
 # pnpm-workspace.yaml, not package.json).

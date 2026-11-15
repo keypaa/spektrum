@@ -73,8 +73,14 @@ export async function POST(req: NextRequest) {
     const report = await importArchive(user.id, bytes, limits);
     return NextResponse.json({ report });
   } catch (e) {
+    // Only a size cap is a 413; a corrupt archive, too many entries or a
+    // suspicious ratio are client errors and must not tell the user their
+    // archive was too large.
     if (e instanceof ZipError) {
-      return NextResponse.json({ error: "too_large" }, { status: 413 });
+      return NextResponse.json(
+        { error: e.code === "too_large" ? "too_large" : "bad_request" },
+        { status: e.code === "too_large" ? 413 : 400 },
+      );
     }
     return errorResponse(e);
   }

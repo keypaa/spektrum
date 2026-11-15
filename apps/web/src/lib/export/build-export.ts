@@ -30,6 +30,23 @@ function safeSegment(name: string): string {
   return cleaned === "" ? "project" : cleaned;
 }
 
+/**
+ * Unique directory segments for a set of project names.
+ *
+ * Two names can sanitise to the same segment (`a/b` and `a-b` both become
+ * `a-b`), and because a zip is keyed by path the later project would overwrite
+ * the earlier one — silent data loss in an "export everything" backup.
+ */
+export function uniqueSegments(names: string[]): string[] {
+  const used = new Map<string, number>();
+  return names.map((name) => {
+    const base = safeSegment(name);
+    const seen = used.get(base) ?? 0;
+    used.set(base, seen + 1);
+    return seen === 0 ? base : `${base}-${seen + 1}`;
+  });
+}
+
 async function readDocuments(
   userId: string,
   projectId: string,
@@ -107,11 +124,15 @@ export async function buildAllExport(
 ): Promise<{ fileName: string; bytes: Uint8Array }> {
   const listed = await listProjects(userId);
   const files: ExportFile[] = [];
+  // Project names are sanitised into directory segments, and two different
+  // names can collapse onto one; a zip is keyed by path, so a collision would
+  // silently drop one project's files from the "backup".
+  const segments = uniqueSegments(listed.map((project) => project.name));
 
-  for (const project of listed) {
+  for (const [index, project] of listed.entries()) {
     const found = await readDocuments(userId, project.id);
     if (!found) continue;
-    const segment = safeSegment(found.projectName);
+    const segment = segments[index] ?? safeSegment(found.projectName);
     for (const doc of found.docs) {
       files.push({ path: `${segment}/${doc.path}`, data: doc.data });
     }

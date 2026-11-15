@@ -13,6 +13,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { UnauthorizedError, ForbiddenError } from "./session";
 import { CsrfError } from "@spektrum/shared/http/guard";
+import { log } from "@/lib/log";
 
 export function errorResponse(e: unknown): NextResponse {
   if (e instanceof UnauthorizedError) {
@@ -52,6 +53,13 @@ export function errorResponse(e: unknown): NextResponse {
   if (e instanceof SyntaxError) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
-  console.error("unhandled route error:", e);
+  // The message and stack can carry anything the failing code put in them
+  // (an upstream response, a header, a token), so they go through the
+  // redacting logger rather than straight to stderr.
+  log.error("route.unhandled", {
+    message: e instanceof Error ? e.message : String(e),
+    name: e instanceof Error ? e.name : typeof e,
+    stack: e instanceof Error ? e.stack : undefined,
+  });
   return NextResponse.json({ error: "internal_error" }, { status: 500 });
 }

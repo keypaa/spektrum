@@ -23,12 +23,14 @@ The reference stack is `docker/compose.prod.yml`:
 
 ```bash
 git clone <this repo> /opt/spektrum && cd /opt/spektrum
-./scripts/build-texlive.sh          # builds spektrum-texlive:local
+TEXLIVE_IMAGE=spektrum-texlive:local ./scripts/build-texlive.sh
 ```
 
-The worker spawns that image once per compile. The tag is
-`TEXLIVE_IMAGE=spektrum-texlive:local` in `.env`; the code default stays
-`spektrum-texlive:dev` so local development and CI keep working.
+The worker spawns that image once per compile. `container.ts` defaults to
+`spektrum-texlive:dev` (what local development and CI build), while
+`docker/compose.prod.yml` sets `TEXLIVE_IMAGE=spektrum-texlive:local` — so build
+the production tag explicitly, as above. `scripts/build-texlive.sh` takes the
+tag from the same variable.
 
 ## 2. Configure
 
@@ -61,9 +63,11 @@ grep -E '^(BETTER_AUTH_SECRET|LLM_KEY_ENCRYPTION_SECRET|POSTGRES_PASSWORD|S3_SEC
 ./scripts/deploy.sh
 ```
 
-It pulls the images, runs the one-shot `migrate` service (Drizzle migrations +
-bucket creation) and waits for it, starts `web`, `worker` and `caddy`, then
-polls `$PUBLIC_URL/api/health`. Re-running it is safe.
+It builds the images (`docker compose build`) — unless `IMAGE_REGISTRY` is set,
+in which case it pulls pre-built images from that registry — runs the one-shot
+`migrate` service (Drizzle migrations + bucket creation) and waits for it,
+starts `web`, `worker` and `caddy`, then polls `$PUBLIC_URL/api/health`.
+Re-running it is safe.
 
 Then create the first owner (explicit, because it needs a password):
 
@@ -135,12 +139,15 @@ container and point a temporary `DATABASE_URL` at it.
 
 ## 7. Rollback
 
-The previous images are still on the host, so a rollback is a re-tag:
+Re-run the deploy with the previous tag once the images are tagged in a
+registry, or restore the data:
 
 ```bash
+# If you publish images: build/tag the previous version and deploy it.
 docker images spektrum-web --format '{{.Tag}} {{.CreatedSince}}'
-IMAGE_TAG=<previous> ./scripts/deploy.sh     # compose builds/pulls by tag
-# or, if the schema did not change:
+IMAGE_TAG=<previous> IMAGE_REGISTRY=<registry> ./scripts/deploy.sh
+
+# Otherwise roll the data back (this is the path that always works):
 ./scripts/restore.sh backups/<last-good>
 ```
 
@@ -182,17 +189,30 @@ destructive migration means restoring the dump, not downgrading the schema.
   from Docker Hub and quay.io now requires authentication. The app talks to it
   through the standard S3 client, so any S3-compatible service works — point
   `S3_ENDPOINT` at it and drop the `seaweedfs` service.
-- **`spektrum_http_requests_total` does not exist.** Request metrics come from
-  Caddy (`metrics /metrics` on the admin endpoint). An in-app counter fed by
-  `proxy.ts` would read zero: Next compiles the proxy into its own bundle, so it
-  cannot share a registry with the route.
+- **HTTP request metrics come from Caddy, not from the app.** An in-app counter
+  fed by `proxy.ts` would read zero: Next compiles the proxy into its own
+  bundle, so it cannot share a registry with the route.
+- **Import is serialised inside the web process.** Inflation is synchronous CPU
+  work (a 17 MB archive expands to ~286 MB), so `importArchive` takes a
+  module-level lock and one import runs at a time. Moving the inflate into a
+  worker is the real fix; until then this bounds the blast radius.
+- **Per-request metrics** (`caddy_http_requests_total`,
+  `caddy_http_request_duration_seconds`) come from `http://caddy:2019/metrics`
+  — the `metrics` **global** option, never a site directive, which would publish
+  an unauthenticated `/metrics` on `PUBLIC_URL`. That port is not published by
+  compose, so only containers on the compose network can scrape it. The app's
+  `/api/metrics` exposes process metrics (CPU, heap, event-loop lag) behind
+  `METRICS_TOKEN`.
+- **The worker image is multi-arch**: the Docker CLI is fetched for
+  `TARGETARCH` (`amd64` → `x86_64`, `arm64` → `aarch64`).
 
 ## 10. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
-| `/api/metrics` → 503 | `METRICS_TOKEN` unset in production. Set it and restart `web`. |
+| `/api/metrics` → 503 | `METRICS_TOKEN` is unset or empty in production. Set it (or remove the line from `.env`) and restart `web`. |
 | `/api/metrics` → 401 | Wrong `Authorization: Bearer` value. |
+| Every mutating route → 500, health → 200 | A required env value is present but invalid. `docker compose logs web` shows the aggregated `Invalid environment configuration` list; an empty `KEY=` counts as unset. |
 | Health → `{"ok":false,"db":"down"}` | Postgres not ready or `DATABASE_URL` wrong; `docker compose logs postgres`. |
 | Worker restarts | No Docker socket access: check `DOCKER_GID` matches the host's `docker` group. |
 | Compiles fail with "no such image" | `TEXLIVE_IMAGE` not built on this host: `./scripts/build-texlive.sh`. |

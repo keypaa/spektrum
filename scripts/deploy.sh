@@ -3,9 +3,14 @@
 #
 #   ./scripts/deploy.sh
 #
-# Reads .env from the repo root. Runs the one-shot `migrate` service (schema +
-# buckets) before starting the app, then waits for the health endpoint.
-# Owner creation is NOT done here: it needs a password and must be explicit.
+# Reads .env from the repo root. Builds the images, runs the one-shot `migrate`
+# service (schema + buckets) before starting the app, then waits for the health
+# endpoint. Owner creation is NOT done here: it needs a password and must be
+# explicit.
+#
+# Set IMAGE_REGISTRY to pull pre-built images from a registry instead of
+# building locally (`docker compose pull` cannot pull a service that only has a
+# local `build:` and no registry-qualified image name).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -29,8 +34,13 @@ if [[ -z "${PUBLIC_URL:-}" || -z "${ACME_EMAIL:-}" ]]; then
   exit 1
 fi
 
-echo "==> pulling images"
-"${COMPOSE[@]}" --env-file "$ENV_FILE" pull
+if [[ -n "${IMAGE_REGISTRY:-}" ]]; then
+  echo "==> pulling pre-built images from ${IMAGE_REGISTRY}"
+  "${COMPOSE[@]}" --env-file "$ENV_FILE" pull
+else
+  echo "==> building images"
+  "${COMPOSE[@]}" --env-file "$ENV_FILE" build
+fi
 
 echo "==> migrating (schema + buckets)"
 "${COMPOSE[@]}" --env-file "$ENV_FILE" up -d migrate
@@ -39,19 +49,20 @@ echo "==> migrating (schema + buckets)"
 echo "==> starting the stack"
 "${COMPOSE[@]}" --env-file "$ENV_FILE" up -d web worker caddy
 
+ATTEMPTS="${HEALTH_ATTEMPTS:-60}"
+INTERVAL="${HEALTH_INTERVAL:-2}"
 echo "==> waiting for ${PUBLIC_URL%/}/api/health"
-for _ in $(seq 1 60); do
+for ((i = 1; i <= ATTEMPTS; i += 1)); do
   if curl -fsS "${PUBLIC_URL%/}/api/health" >/dev/null 2>&1; then
     echo "healthy"
     break
   fi
-  sleep 2
+  if ((i == ATTEMPTS)); then
+    echo "health check failed — docker compose -f docker/compose.prod.yml logs web" >&2
+    exit 1
+  fi
+  sleep "$INTERVAL"
 done
-
-if ! curl -fsS "${PUBLIC_URL%/}/api/health" >/dev/null 2>&1; then
-  echo "health check failed — docker compose -f docker/compose.prod.yml logs web" >&2
-  exit 1
-fi
 
 cat <<'EOF'
 

@@ -31,6 +31,28 @@ describe("parsePrismArchive", () => {
     expect(parsed.projects).toHaveLength(0);
   });
 
+  it("rejects absolute, backslash, control-character and over-long paths", () => {
+    const long = `${"x".repeat(210)}.tex`;
+    const parsed = parsePrismArchive(
+      readZip(
+        writeZip([
+          { path: "/etc/passwd", data: enc("x") },
+          { path: "P\\evil.tex", data: enc("x") },
+          { path: "P/evil\u0001.tex", data: enc("x") },
+          { path: `P/${long}`, data: enc("x") },
+          { path: "P/./sneaky.tex", data: enc("x") },
+        ]),
+      ),
+    );
+    expect(parsed.rejectedPaths).toContain("/etc/passwd");
+    expect(parsed.rejectedPaths).toContain("P\\evil.tex");
+    expect(parsed.rejectedPaths).toContain("P/evil\u0001.tex");
+    expect(parsed.rejectedPaths).toContain(`P/${long}`);
+    expect(parsed.rejectedPaths).toContain("P/./sneaky.tex");
+    // Nothing of the rejected entries reached a project.
+    expect(parsed.projects).toHaveLength(0);
+  });
+
   it("drops directory entries and macOS junk", () => {
     const parsed = parsePrismArchive(readZip(writeZip([
       { path: "P/main.tex", data: enc("x") },

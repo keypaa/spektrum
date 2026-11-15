@@ -151,6 +151,13 @@ export function writeZip(
   files: Array<{ path: string; data: Uint8Array }>,
 ): Uint8Array {
   const zippable: Record<string, Uint8Array> = {};
-  for (const file of files) zippable[file.path] = file.data;
+  for (const file of files) {
+    // A `Zippable` is keyed by path, so a duplicate would silently overwrite
+    // the earlier entry and produce a corrupt "backup" with no error.
+    if (Object.hasOwn(zippable, file.path)) {
+      throw new ZipError("bad_zip");
+    }
+    zippable[file.path] = file.data;
+  }
   return zipSync(zippable, { level: 6 });
 }

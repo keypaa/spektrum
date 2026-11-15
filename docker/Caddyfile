@@ -2,19 +2,17 @@
 # Caddy publishes ports, everything else stays on the compose network.
 {
 	email {$ACME_EMAIL}
-	# Prometheus metrics for this site are served on the admin endpoint, not on
-	# the public one: `metrics` below enables collection, and Caddy exposes the
-	# registry at :2019/metrics. That port is never published by compose, so the
-	# app's /api/metrics stays the only public (token-gated) endpoint.
+	# Prometheus metrics live on the admin endpoint (http://caddy:2019/metrics),
+	# never on the public site: `metrics` is a *global* option, and using it as a
+	# site directive instead would publish an unauthenticated /metrics on
+	# PUBLIC_URL. The admin port is not published by compose, so only containers
+	# on the compose network can scrape it.
 	admin 0.0.0.0:2019
+	metrics
 }
 
 {$PUBLIC_URL} {
 	encode gzip
-
-	# Collect per-request metrics for Prometheus (scrape :2019/metrics inside the
-	# compose network; the app's /api/metrics is the public, token-gated one).
-	metrics /metrics
 
 	# The import route accepts a Prism archive; 30 MB matches
 	# experimental.proxyClientMaxBodySize in apps/web/next.config.ts.
