@@ -7,19 +7,20 @@
     "node": ">=26 <27"
   },
   "scripts": {
-    "dev": "pnpm --filter @spektrum/web dev",
-    "dev:infra": "docker compose -f docker/compose.dev.yml up -d",
-    "dev:infra:down": "docker compose -f docker/compose.dev.yml down",
-    "dev:db": "./scripts/dev-db.sh",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r exec tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "test:e2e": "playwright test",
-    "test:visual": "playwright test --config=playwright.visual.config.ts",
-    "lint": "eslint .",
     "db:generate": "pnpm --filter @spektrum/db generate",
     "db:migrate": "pnpm --filter @spektrum/db migrate",
-    "test:ai": "playwright test --config=playwright.ai.config.ts"
+    "dev": "pnpm --filter @spektrum/web dev",
+    "dev:db": "./scripts/dev-db.sh",
+    "dev:infra": "docker compose -f docker/compose.dev.yml up -d",
+    "dev:infra:down": "docker compose -f docker/compose.dev.yml down",
+    "lint": "eslint .",
+    "loadtest": "tsx scripts/loadtest.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:ai": "playwright test --config=playwright.ai.config.ts",
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test --config=playwright.visual.config.ts",
+    "typecheck": "pnpm -r exec tsc --noEmit"
   },
   "devDependencies": {
     "@opentelemetry/api": "1.10.0",
@@ -28,6 +29,7 @@
     "@types/node": "^26.0.0",
     "@types/pg": "8.18.0",
     "@types/pngjs": "^6.0.5",
+    "autocannon": "7.15.0",
     "eslint": "^10.14.0",
     "pixelmatch": "8.0.0",
     "pngjs": "7.0.0",
