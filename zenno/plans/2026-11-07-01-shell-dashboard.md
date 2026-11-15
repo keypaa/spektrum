@@ -3681,7 +3681,7 @@ Measured in Playwright/Chromium at viewport 2182×1174 CSS, DSF ~1.13 (devicePix
 
 ### Final visual gate ratios (Task 18, final calibration run)
 
-**The ≤ 0.15 % acceptance target was NOT met.** Final state (`task-18-calibration-wip` @ `54f3fc4`): 1/8 baselines within budget; the other 7 remain above 0.15 %. This is accepted as a known shortfall (environment font rasterization / AA, exact icon glyphs, and banner/empty-state layout detail); the visual CI job is kept non-blocking. Reference PNGs were not modified.
+**The ≤ 0.15 % acceptance target was NOT met.** Final state (`task-18-calibration-wip` @ `cc62ede`): 1/8 baselines within budget; the other 7 remain above 0.15 %. This is accepted as a known shortfall (environment font rasterization / AA, exact icon glyphs, and banner/empty-state layout detail); the visual CI job is kept non-blocking. Reference PNGs were not modified.
 
 | Baseline | Ratio | Budget | Status |
 |---|---:|---:|---|
