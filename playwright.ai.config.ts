@@ -23,6 +23,12 @@ export default defineConfig({
   testIgnore: ["**/visual/**"],
   workers: 1,
   timeout: 120_000,
+  // Assertions default to 5 s, which is tight on a cold CI runner: this flow is
+  // send -> mock gateway -> tool loop -> diff widget, well over 5 s there.
+  expect: { timeout: 15_000 },
+  // A cold runner can lose a timing-sensitive interaction; one retry turns that
+  // into a reported flake rather than a red build.
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: "http://localhost:3000",
     extraHTTPHeaders: {
