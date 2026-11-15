@@ -48,10 +48,37 @@ function isMissing(e: unknown): boolean {
  *  A bucket that already exists is success; anything else throws. This used to
  *  swallow every error, which meant a not-yet-ready object store looked like a
  *  successful run and the first real PUT failed later with a confusing 500. */
+
+/**
+ * Send one command, naming the operation on failure.
+ *
+ * A bare S3 `InternalError` does not say whether a read, a write or a bucket
+ * call failed; the worker's render row only keeps the message, so the context
+ * has to be added here or it is lost.
+ */
+async function send(
+  command: unknown,
+  operation: string,
+  bucket: Bucket,
+  key: string,
+): Promise<void> {
+  try {
+    await client.send(command as never);
+  } catch (e) {
+    console.error(
+      `s3 ${operation} failed: ${bucket}/${key}: ${(e as Error).message}`,
+    );
+    throw e;
+  }
+}
+
 export async function ensureBucket(bucket: Bucket): Promise<void> {
   try {
-    await client.send(
+    await send(
       new CreateBucketCommand({ Bucket: bucketName(bucket) }),
+      "createBucket",
+      bucket,
+      "",
     );
   } catch (e) {
     const name = (e as { name?: string }).name;
@@ -68,13 +95,16 @@ export async function putObject(
   body: string | Uint8Array,
   contentType: string,
 ): Promise<void> {
-  await client.send(
+  await send(
     new PutObjectCommand({
       Bucket: bucketName(bucket),
       Key: key,
       Body: body,
       ContentType: contentType,
     }),
+    "putObject",
+    bucket,
+    key,
   );
 }
 
