@@ -150,22 +150,31 @@ test("switching tabs loads the other document's content", async ({ page }) => {
 
   // Type into main.tex, then create notes.tex with distinct content.
   await edit("MAIN_MARKER");
-  await page.waitForTimeout(900);
   await page.getByRole("button", { name: "New file" }).click();
   const dialog = page.getByRole("dialog", { name: "New file" });
   await dialog.getByRole("textbox", { name: "File name" }).fill("notes");
   await dialog.getByRole("button", { name: "Create" }).click();
   await expect(dialog).toHaveCount(0);
-  // Let the model swap for the new tab commit before editing.
-  await page.waitForTimeout(300);
-  await edit("NOTES_MARKER");
-  await page.waitForTimeout(900);
 
   const editorText = () =>
-    page.evaluate(
-      () =>
-        document.querySelector("[data-testid='monaco-editor']")?.textContent ?? "",
-    );
+    // A tab switch is an RSC navigation: the execution context is torn down
+    // mid-poll. Treat that as "no value yet" and let the poll retry.
+    page
+      .evaluate(
+        () =>
+          document.querySelector("[data-testid='monaco-editor']")?.textContent ?? "",
+      )
+      .catch(() => "");
+
+  // Wait for the tab switch to commit, not a fixed delay: the editor swaps to
+  // an empty model for the new path synchronously with the selection, and a
+  // fixed sleep races the fetch that fills it.
+  await expect(page.getByTestId("tab-notes.tex")).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect.poll(editorText).toBe("");
+  await edit("NOTES_MARKER");
 
   // Switch back to main.tex: its content must load, not an empty buffer.
   await page.getByTestId("tab-main.tex").click();

@@ -19,7 +19,10 @@ const CURRENT = {
 };
 
 let handle: ReturnType<typeof useAutosave>;
+let view: ReturnType<typeof render>;
 let latest = "v0";
+let currentDocId = "d1";
+let baseline = "2026-11-12T10:00:00.000Z";
 const onSaved = vi.fn();
 const onConflict = vi.fn();
 const onError = vi.fn();
@@ -27,9 +30,9 @@ const onError = vi.fn();
 function Harness(): ReactElement {
   handle = useAutosave({
     projectId: "p1",
-    documentId: "d1",
+    documentId: currentDocId,
     getValue: () => latest,
-    getBaseline: () => "2026-11-12T10:00:00.000Z",
+    getBaseline: () => baseline,
     onSaved,
     onConflict,
     onError,
@@ -43,11 +46,13 @@ function patchOk(): ReturnType<typeof vi.fn> {
 
 beforeEach(() => {
   latest = "v0";
+  currentDocId = "d1";
+  baseline = "2026-11-12T10:00:00.000Z";
   onSaved.mockClear();
   onConflict.mockClear();
   onError.mockClear();
   vi.useFakeTimers();
-  render(<Harness />);
+  view = render(<Harness />);
 });
 
 afterEach(() => {
@@ -193,5 +198,39 @@ describe("useAutosave", () => {
     // keepalive: true — assert no such call was made.
     const keepaliveCalls = fetchMock.mock.calls.filter(([, init]) => init.keepalive === true);
     expect(keepaliveCalls).toHaveLength(0);
+  });
+
+  // The debounce can outlive the document that produced it: the user switches
+  // tabs inside the 400 ms window. Reading the live documentId/value at fire
+  // time wrote one document's text into another (observed: notes.tex receiving
+  // main.tex's content).
+  it("saves the document it was scheduled for, not the one active at fire time", async () => {
+    const fetchMock = patchOk();
+    vi.stubGlobal("fetch", fetchMock);
+
+    currentDocId = "notes-doc";
+    latest = "notes text";
+    baseline = "2026-11-12T10:00:00.000Z";
+    act(() => view.rerender(<Harness />));
+    handle.schedule();
+
+    // The tab switches before the debounce fires.
+    currentDocId = "main-doc";
+    latest = "main text";
+    baseline = "2026-11-12T11:00:00.000Z";
+    // The parent re-renders with the new active document.
+    act(() => view.rerender(<Harness />));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    const call = fetchMock.mock.calls[0]!;
+    expect(String(call[0])).toContain("/documents/notes-doc");
+    const body = JSON.parse(String((call[1] as RequestInit).body)) as {
+      content: string;
+      baseUpdatedAt: string;
+    };
+    expect(body.content).toBe("notes text");
+    expect(body.baseUpdatedAt).toBe("2026-11-12T10:00:00.000Z");
   });
 });

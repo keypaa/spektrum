@@ -1,9 +1,16 @@
 "use client";
 
 // Debounced autosave (spec §11.0/D1): 400 ms debounce, coalesced per document,
-// plus a forced save on blur, pagehide and tab switch. The server is the source
-// of truth: every request carries the last known `updatedAt` as the baseline,
-// and a 409 hands the authoritative document back to the caller.
+// plus a forced save on blur, pagehide and a document change. The server is the
+// source of truth: every request carries the last known `updatedAt` as the
+// baseline, and a 409 hands the authoritative document back to the caller.
+//
+// A pending save is bound to the (document, text, baseline) it was scheduled
+// with. The debounce can outlive the document that produced it — the user may
+// switch tabs inside the 400 ms window — and reading the live `documentId` /
+// `getValue()` at fire time would then write one document's text into another.
+// That was a real corruption path (observed: `notes.tex` receiving `main.tex`'s
+// content), so the target is captured at schedule time and passed explicitly.
 //
 // The unload path is best-effort BY CONSTRUCTION and the residual risk is
 // LOW: Chromium caps a keepalive fetch at 64 KiB, while a document may be
@@ -32,6 +39,15 @@ export interface AutosaveOptions {
   onError(): void;
 }
 
+/** A save is bound to the document it was scheduled for, and to the baseline
+ *  that document had then: a debounce that fires after a tab switch must not
+ *  write the newly active document's text (or baseline) into another one. */
+interface SaveTarget {
+  documentId: string;
+  value: string;
+  baseUpdatedAt: string;
+}
+
 export interface AutosaveHandle {
   schedule(): void;
   flush(): Promise<void>;
@@ -45,33 +61,48 @@ export function useAutosave(options: AutosaveOptions): AutosaveHandle {
   // The baseline (`updatedAt`) belongs to the caller: `getBaseline()` returns
   // the value `onSaved` last reported, which keeps the hook stateless about it.
   const savedValue = useRef<string | null>(null);
+  const savedDocId = useRef<string | null>(null);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
-  const pending = useRef(false);
+  const pending = useRef<SaveTarget | null>(null);
+  // The (document, text, baseline) the current debounce belongs to.
+  const timerTarget = useRef<SaveTarget | null>(null);
 
-  const send = useCallback(async (keepalive = false): Promise<void> => {
+  const currentTarget = useCallback((): SaveTarget => {
     const o = optionsRef.current;
-    const value = o.getValue();
-    if (value === savedValue.current && !dirty.current) return;
-    if (keepalive && value.length > KEEPALIVE_LIMIT_BYTES) {
+    return {
+      documentId: o.documentId,
+      value: o.getValue(),
+      baseUpdatedAt: o.getBaseline(),
+    };
+  }, []);
+
+  const send = useCallback(async (target: SaveTarget, keepalive = false): Promise<void> => {
+    const o = optionsRef.current;
+    if (keepalive && target.value.length > KEEPALIVE_LIMIT_BYTES) {
       // Deliberately skipped (documented at the top of the file): Chromium
       // caps a keepalive fetch at 64 KiB and this body would not survive.
       return;
     }
+    const unchanged =
+      savedDocId.current === target.documentId && target.value === savedValue.current;
+    if (unchanged && !dirty.current) return;
     try {
       const result = await saveDocumentRequest(
         o.projectId,
-        o.documentId,
-        value,
-        o.getBaseline(),
+        target.documentId,
+        target.value,
+        target.baseUpdatedAt,
         { keepalive },
       );
-      savedValue.current = value;
+      savedDocId.current = target.documentId;
+      savedValue.current = target.value;
       dirty.current = false;
       o.onSaved(result);
     } catch (e) {
       if (e instanceof ConflictError) {
+        savedDocId.current = target.documentId;
         savedValue.current = e.current.content;
         dirty.current = false;
         o.onConflict(e.current);
@@ -84,15 +115,16 @@ export function useAutosave(options: AutosaveOptions): AutosaveHandle {
   // One serialised chain: at most one request in flight; edits while it runs
   // queue exactly one follow-up.
   const runChain = useCallback(
-    async (keepalive = false) => {
+    async (target: SaveTarget, keepalive = false) => {
       if (inFlight.current) {
-        pending.current = true;
+        pending.current = target;
         return inFlight.current;
       }
-      const promise = send(keepalive).then(async () => {
+      const promise = send(target, keepalive).then(async () => {
         while (pending.current) {
-          pending.current = false;
-          await send();
+          const next = pending.current;
+          pending.current = null;
+          await send(next);
         }
       });
       inFlight.current = promise;
@@ -100,40 +132,56 @@ export function useAutosave(options: AutosaveOptions): AutosaveHandle {
         await promise;
       } finally {
         if (inFlight.current === promise) inFlight.current = null;
-        pending.current = false;
+        pending.current = null;
       }
     },
     [send],
   );
 
   const schedule = useCallback(() => {
+    const target = currentTarget();
+    const previous = timerTarget.current;
+    // Leaving a document with an unsaved edit: flush it now (the forced save on
+    // document change) and start tracking the new one.
+    if (previous && previous.documentId !== target.documentId) {
+      if (timer.current) {
+        clearTimeout(timer.current);
+        timer.current = null;
+      }
+      timerTarget.current = null;
+      void runChain(previous);
+    }
+    timerTarget.current = target;
     dirty.current = true;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       timer.current = null;
-      void runChain();
+      const scheduled = timerTarget.current;
+      if (scheduled) void runChain(scheduled);
     }, DEBOUNCE_MS);
-  }, [runChain]);
+  }, [currentTarget, runChain]);
 
   const flush = useCallback(async () => {
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
     }
-    await runChain();
-  }, [runChain]);
+    const target = timerTarget.current ?? currentTarget();
+    timerTarget.current = null;
+    await runChain(target);
+  }, [currentTarget, runChain]);
 
   useEffect(() => {
     const onBlur = () => void flush();
     // `visibilitychange` → hidden fires BEFORE the page is torn down (reload,
-  // tab close, app switch) while the document is still live, so the ordinary
-  // fetch completes. Chromium drops the *body* of a keepalive request issued
-  // during unload teardown, so this — not pagehide — is the reliable save.
-  const onVisibility = () => {
-    if (document.visibilityState === "hidden") void runChain(true);
-  };
-  const onPageHide = () => void runChain(true);
-  window.addEventListener("blur", onBlur);
+    // tab close, app switch) while the document is still live, so the ordinary
+    // fetch completes. Chromium drops the *body* of a keepalive request issued
+    // during unload teardown, so this — not pagehide — is the reliable save.
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") void runChain(currentTarget(), true);
+    };
+    const onPageHide = () => void runChain(currentTarget(), true);
+    window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
     return () => {
@@ -142,7 +190,7 @@ export function useAutosave(options: AutosaveOptions): AutosaveHandle {
       window.removeEventListener("pagehide", onPageHide);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [flush, runChain]);
+  }, [currentTarget, flush, runChain]);
 
   return {
     schedule,
