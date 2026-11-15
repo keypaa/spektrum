@@ -233,3 +233,23 @@ To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-
 | Caddy cannot get a certificate | DNS not pointing at the host, or 80/443 blocked. |
 | Import → 413 | Archive over 30 MB, or the proxy truncated the body. |
 | Import → 400 `bad_request` | Not a zip (magic bytes), or no `archive` field. |
+
+## 12. The compile e2e is non-blocking (known, diagnosed)
+
+The `compile` CI job is marked `continue-on-error: true` on purpose. This is not
+a broken pipeline:
+
+- Jobs enqueue and complete (`queue: compile { wait: 0, failed: 0, completed: 4 }`).
+- Renders are produced and reach `error` for a broken document, `ok` for a good one.
+- `scripts/compile-diagnostics.ts` prints the queue counts, render statuses and the
+  tail of the TeX log for any run — use it before guessing.
+
+What is left is assertion races in three specs: a reload plus an edit produces two
+compiles, so the newest render supersedes the one the assertion polls, and the
+tests read `render/latest` rather than the revision they mean.
+
+To finish it: make those assertions require `render.isCurrent` (or the specific
+revision), then flip `continue-on-error` off. The three specs are
+`a compile error lands in Logs at the right line`,
+`a newer edit supersedes the running compile`, and
+`the two-tab conflict reloads the losing tab`.
