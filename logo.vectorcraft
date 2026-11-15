@@ -1,0 +1,2571 @@
+{
+  "format": "vectorcraft",
+  "version": 4,
+  "generator": "VectorCraft 0.24.1",
+  "pdfCompatible": true,
+  "pdf": {
+    "mime": "application/pdf",
+    "data": "JVBERi0xLjcKJYCAgIAKCjEgMCBvYmoKPDwvVHlwZS9QYWdlcy9Db3VudCAxL0tpZHNbMyAwIFJdPj4KZW5kb2JqCjIgMCBvYmoKPDwvUHJvY1NldFsvUERGL1RleHQvSW1hZ2VDL0ltYWdlQl0+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUmVzb3VyY2VzIDIgMCBSL01lZGlhQm94WzAgMCA1OTUuMjc1NiA4NDEuODg5OF0vQmxlZWRCb3hbMCAwIDU5NS4yNzU2IDg0MS44ODk4XS9UcmltQm94WzAgMCA1OTUuMjc1NiA4NDEuODg5OF0vUGFyZW50IDEgMCBSL0NvbnRlbnRzIDQgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDEwMjEvRmlsdGVyL0ZsYXRlRGVjb2RlPj4Kc3RyZWFtCnic7ZhBihxJDEX3fYq4wAiFpJAizjAr4yMUDAOTvfD9N0PaldJPSEwvsrwqvGjzULZ+Svmhv3603rhx+2v/Ma3TnGu2x2djCosYi60xeUyRkLH/15eKzca0mCczj/Zfs0HTvK+m6mTBHu2zmU9yZTagG1Afk8J1Z8fjFwie/fj345+Pbx8/bpHcRUiXi4zWVShEu7XP1i1osHYHurVui7ozC9A+OCuN2F3miY1n3QOoLKU+ee2/EqDR1IiANrL8V2HpSfRA7Um31oUpdGnA031VYXZB+NTzQFratzPO18xOMI6reT5uXNnf75X9qZV9v89lMWisWNr6GDTm8vbZhJmCbXrBrQkLqffoBYU165yWStiJzV9lD4BgMITHp19N0iIlBg2WstFfobSsM/orJOvSXsBqVQlT9naCx/tVkxzDxQxv9tV7Sa9a0n1OEpkUa7m0zp1CYshupaG02IcD3ZrsElwNa2VX/6xU4mD3E7Nn3QMouglguinblJtSD7ippIObRIK6SUx4WEbWZQ9g6aaCpXs70XzD7AKTuJjkvYZ67+rVu7rRV1OIuWvbLW/huv8VqBzUecoAujXl/a/T0QFq56Nw0VwcE5D3o+wBFEyF8Pjgs0naosSgpw7ZaKnJpGaGlop1lKWjCtWSDlaSt4L5atWgJnAxv5vN9F7QKxZ0n4NUBwkra+s9qM/l8dNDzqS8ViDemnqn5T5P1eqatZOGyhRkwkfhAzAaCWAaKRuVk1ISOKnkg5VUlYZ5h0pVybrsASzNVBCEb4jrHbMNDuNqnvd66r2yP7Sy37vs+e90jDCdtHzpHpQq/BfFY0TRuiaYMWnfIx2g/izDW8RYi0yin24Rzp14GvRwll9lJSbR6RKRFC8R9XSF0uxRKLWcQm3pPoXaesNsA4O4muTLzhDvZb1mWV+1TYYu805Tx/yZiTLRF8X7QtE6EZgr9TgfHcztWYcXBrBNweOTrib54ZcatE0KR9dkqizXZPhM0yRBzyQszZhc6+2qR03haoqvOjC893T/nr5olopSxkErNM4HhKJ4QChaFwDjRdp9P5kV6/yswwMCmiVhmiWblFlSDZilhINZKizWw5kps0MSMEvB0oyBFN4ue8AULqb4quPBe0/37+mrZjlCk7pRLJ3jdBUoCleBgpXr1Z26xonEswqPAmAUuB88P+PskJ96KUGfHJrRJhkIyyYZJQ+XVIwskxys5ELePN6qfnu9+8XkXnQPeK/mntV80RKVcUyUTMecp5RfFEN+0croJkYRizHjm/izDiM+2iJh2iKblC9SDfiihIMxKsbVw5n2skMSsEbB0oxREd4ue8AULqb4qmz/3pPcvqfvH9/+Bw5ri08KZW5kc3RyZWFtCmVuZG9iago1IDAgb2JqCjw8L1RpdGxlKFVudGl0bGVkLTEpL0NyZWF0b3IoVmVjdG9yQ3JhZnQpL1Byb2R1Y2VyKFZlY3RvckNyYWZ0KS9Nb2REYXRlKEQ6MjAyNjExMTMyMTAwMTVaKS9DcmVhdGlvbkRhdGUoRDoyMDI2MTExMzIwMDIwNVopPj4KZW5kb2JqCjYgMCBvYmoKPDwvTGVuZ3RoIDEwNjAvVHlwZS9NZXRhZGF0YS9TdWJ0eXBlL1hNTD4+CnN0cmVhbQo8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9InhtcC13cml0ZXIiPjxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+PHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIiAgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiAgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iICB4bWxuczp4bXBUUGc9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC90L3BnLyIgIHhtbG5zOnBkZj0iaHR0cDovL25zLmFkb2JlLmNvbS9wZGYvMS4zLyIgPjxkYzp0aXRsZT48cmRmOkFsdD48cmRmOmxpIHhtbDpsYW5nPSJ4LWRlZmF1bHQiPlVudGl0bGVkLTE8L3JkZjpsaT48L3JkZjpBbHQ+PC9kYzp0aXRsZT48eG1wOkNyZWF0b3JUb29sPlZlY3RvckNyYWZ0PC94bXA6Q3JlYXRvclRvb2w+PHBkZjpQcm9kdWNlcj5WZWN0b3JDcmFmdDwvcGRmOlByb2R1Y2VyPjx4bXA6TW9kaWZ5RGF0ZT4yMDI2LTExLTEzVDIxOjAwOjE1KzAwOjAwPC94bXA6TW9kaWZ5RGF0ZT48eG1wOkNyZWF0ZURhdGU+MjAyNi0xMS0xM1QyMDowMjowNSswMDowMDwveG1wOkNyZWF0ZURhdGU+PHhtcFRQZzpOUGFnZXM+MTwveG1wVFBnOk5QYWdlcz48ZGM6Zm9ybWF0PmFwcGxpY2F0aW9uL3BkZjwvZGM6Zm9ybWF0Pjx4bXBNTTpJbnN0YW5jZUlEPnJtVmo0cWo4VmEzZFpQSDlqVHMxZGc9PTwveG1wTU06SW5zdGFuY2VJRD48eG1wTU06RG9jdW1lbnRJRD5ybVZqNHFqOFZhM2RaUEg5alRzMWRnPT08L3htcE1NOkRvY3VtZW50SUQ+PHhtcE1NOlJlbmRpdGlvbkNsYXNzPmRlZmF1bHQ8L3htcE1NOlJlbmRpdGlvbkNsYXNzPjxwZGY6UERGVmVyc2lvbj4xLjc8L3BkZjpQREZWZXJzaW9uPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT48P3hwYWNrZXQgZW5kPSJyIj8+CmVuZHN0cmVhbQplbmRvYmoKNyAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMSAwIFIvTWV0YWRhdGEgNiAwIFI+PgplbmRvYmoKeHJlZgowIDgKMDAwMDAwMDAwMCA2NTUzNSBmDQowMDAwMDAwMDE2IDAwMDAwIG4NCjAwMDAwMDAwNjcgMDAwMDAgbg0KMDAwMDAwMDEyMCAwMDAwMCBuDQowMDAwMDAwMjg5IDAwMDAwIG4NCjAwMDAwMDEzNzkgMDAwMDAgbg0KMDAwMDAwMTUxOSAwMDAwMCBuDQowMDAwMDAyNjU1IDAwMDAwIG4NCnRyYWlsZXIKPDwvU2l6ZSA4L1Jvb3QgNyAwIFIvSW5mbyA1IDAgUi9JRFsocm1WajRxajhWYTNkWlBIOWpUczFkZz09KShybVZqNHFqOFZhM2RaUEg5alRzMWRnPT0pXT4+CnN0YXJ0eHJlZgoyNzE1CiUlRU9G"
+  },
+  "document": {
+    "version": 3,
+    "title": "Untitled-1",
+    "units": "Points",
+    "rulers": "artboard",
+    "color_mode": "Cmyk",
+    "artboards": [
+      {
+        "id": 1,
+        "name": "Artboard 1",
+        "rect": {
+          "x0": 0.0,
+          "y0": 0.0,
+          "x1": 595.2755905511812,
+          "y1": 841.8897637795277
+        },
+        "show_center_mark": false,
+        "show_cross_hairs": false
+      }
+    ],
+    "layers": [
+      {
+        "id": 1,
+        "name": "Layer 1",
+        "kind": {
+          "type": "layer",
+          "color": {
+            "Preset": 0
+          },
+          "template": false,
+          "printable": true,
+          "children": [
+            {
+              "id": 16,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "none"
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            45.84619039252041,
+                            336.4706792516092
+                          ]
+                        },
+                        {
+                          "p": [
+                            468.63002975114046,
+                            336.4706792516092
+                          ]
+                        },
+                        {
+                          "p": [
+                            468.63002975114046,
+                            658.7630068580343
+                          ]
+                        },
+                        {
+                          "p": [
+                            45.84619039252041,
+                            658.7630068580343
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 422.78383935862007,
+                  "h": 322.29232760642503,
+                  "radii": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    45.84619039252041,
+                    336.4706792516092
+                  ]
+                }
+              }
+            },
+            {
+              "id": 2,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            122.39622390660023,
+                            132.72313959697578
+                          ],
+                          "in": [
+                            120.73936965710784,
+                            132.72313959697578
+                          ]
+                        },
+                        {
+                          "p": [
+                            147.5031578074071,
+                            132.72313959697578
+                          ],
+                          "out": [
+                            149.16001205689946,
+                            132.72313959697578
+                          ]
+                        },
+                        {
+                          "p": [
+                            150.5031578074071,
+                            135.72313959697578
+                          ],
+                          "in": [
+                            150.5031578074071,
+                            134.06628534748342
+                          ]
+                        },
+                        {
+                          "p": [
+                            150.5031578074071,
+                            293.1809082241353
+                          ],
+                          "out": [
+                            150.5031578074071,
+                            294.83776247362766
+                          ]
+                        },
+                        {
+                          "p": [
+                            147.5031578074071,
+                            296.1809082241353
+                          ],
+                          "in": [
+                            149.16001205689946,
+                            296.1809082241353
+                          ]
+                        },
+                        {
+                          "p": [
+                            122.39622390660023,
+                            296.1809082241353
+                          ],
+                          "out": [
+                            120.73936965710784,
+                            296.1809082241353
+                          ]
+                        },
+                        {
+                          "p": [
+                            119.39622390660023,
+                            293.1809082241353
+                          ],
+                          "in": [
+                            119.39622390660023,
+                            294.83776247362766
+                          ]
+                        },
+                        {
+                          "p": [
+                            119.39622390660023,
+                            135.72313959697578
+                          ],
+                          "out": [
+                            119.39622390660023,
+                            134.06628534748342
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 163.4577686271595,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    119.39622390660023,
+                    132.72313959697578
+                  ]
+                }
+              }
+            },
+            {
+              "id": 6,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            175.5979248416439,
+                            155.5895969083357
+                          ],
+                          "in": [
+                            173.94107059215153,
+                            155.5895969083357
+                          ]
+                        },
+                        {
+                          "p": [
+                            200.70485874245077,
+                            155.5895969083357
+                          ],
+                          "out": [
+                            202.36171299194314,
+                            155.5895969083357
+                          ]
+                        },
+                        {
+                          "p": [
+                            203.70485874245077,
+                            158.5895969083357
+                          ],
+                          "in": [
+                            203.70485874245077,
+                            156.93274265884332
+                          ]
+                        },
+                        {
+                          "p": [
+                            203.70485874245077,
+                            293.1809082241353
+                          ],
+                          "out": [
+                            203.70485874245077,
+                            294.83776247362766
+                          ]
+                        },
+                        {
+                          "p": [
+                            200.70485874245077,
+                            296.1809082241353
+                          ],
+                          "in": [
+                            202.36171299194314,
+                            296.1809082241353
+                          ]
+                        },
+                        {
+                          "p": [
+                            175.5979248416439,
+                            296.1809082241353
+                          ],
+                          "out": [
+                            173.94107059215153,
+                            296.1809082241353
+                          ]
+                        },
+                        {
+                          "p": [
+                            172.5979248416439,
+                            293.1809082241353
+                          ],
+                          "in": [
+                            172.5979248416439,
+                            294.83776247362766
+                          ]
+                        },
+                        {
+                          "p": [
+                            172.5979248416439,
+                            158.5895969083357
+                          ],
+                          "out": [
+                            172.5979248416439,
+                            156.93274265884332
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 140.5913113157996,
+                  "radii": [
+                    3.0000000000000004,
+                    3.0000000000000004,
+                    3.0000000000000004,
+                    3.0000000000000004
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    172.5979248416439,
+                    155.5895969083357
+                  ]
+                }
+              }
+            },
+            {
+              "id": 7,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            228.79962577668758,
+                            101.72752043083398
+                          ],
+                          "in": [
+                            227.1427715271952,
+                            101.72752043083398
+                          ]
+                        },
+                        {
+                          "p": [
+                            253.90655967749444,
+                            101.72752043083398
+                          ],
+                          "out": [
+                            255.5634139269868,
+                            101.72752043083398
+                          ]
+                        },
+                        {
+                          "p": [
+                            256.90655967749444,
+                            104.72752043083398
+                          ],
+                          "in": [
+                            256.90655967749444,
+                            103.0706661813416
+                          ]
+                        },
+                        {
+                          "p": [
+                            256.90655967749444,
+                            293.18090822413535
+                          ],
+                          "out": [
+                            256.90655967749444,
+                            294.8377624736278
+                          ]
+                        },
+                        {
+                          "p": [
+                            253.90655967749444,
+                            296.18090822413535
+                          ],
+                          "in": [
+                            255.5634139269868,
+                            296.18090822413535
+                          ]
+                        },
+                        {
+                          "p": [
+                            228.79962577668758,
+                            296.18090822413535
+                          ],
+                          "out": [
+                            227.1427715271952,
+                            296.18090822413535
+                          ]
+                        },
+                        {
+                          "p": [
+                            225.79962577668758,
+                            293.18090822413535
+                          ],
+                          "in": [
+                            225.79962577668758,
+                            294.8377624736278
+                          ]
+                        },
+                        {
+                          "p": [
+                            225.79962577668758,
+                            104.72752043083398
+                          ],
+                          "out": [
+                            225.79962577668758,
+                            103.0706661813416
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 194.4533877933014,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    225.79962577668758,
+                    101.72752043083398
+                  ]
+                }
+              }
+            },
+            {
+              "id": 8,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            282.0013267117313,
+                            58.54763437350442
+                          ],
+                          "in": [
+                            280.3444724622389,
+                            58.54763437350442
+                          ]
+                        },
+                        {
+                          "p": [
+                            307.1082606125382,
+                            58.54763437350442
+                          ],
+                          "out": [
+                            308.76511486203054,
+                            58.54763437350442
+                          ]
+                        },
+                        {
+                          "p": [
+                            310.1082606125382,
+                            61.54763437350442
+                          ],
+                          "in": [
+                            310.1082606125382,
+                            59.89078012401204
+                          ]
+                        },
+                        {
+                          "p": [
+                            310.1082606125382,
+                            293.18090822413535
+                          ],
+                          "out": [
+                            310.1082606125382,
+                            294.8377624736277
+                          ]
+                        },
+                        {
+                          "p": [
+                            307.1082606125382,
+                            296.18090822413535
+                          ],
+                          "in": [
+                            308.76511486203054,
+                            296.18090822413535
+                          ]
+                        },
+                        {
+                          "p": [
+                            282.0013267117313,
+                            296.18090822413535
+                          ],
+                          "out": [
+                            280.3444724622389,
+                            296.18090822413535
+                          ]
+                        },
+                        {
+                          "p": [
+                            279.0013267117313,
+                            293.18090822413535
+                          ],
+                          "in": [
+                            279.0013267117313,
+                            294.8377624736277
+                          ]
+                        },
+                        {
+                          "p": [
+                            279.0013267117313,
+                            61.54763437350442
+                          ],
+                          "out": [
+                            279.0013267117313,
+                            59.89078012401204
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 237.63327385063093,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    279.0013267117313,
+                    58.54763437350442
+                  ]
+                }
+              }
+            },
+            {
+              "id": 9,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            335.203027646775,
+                            117.18967255935286
+                          ],
+                          "in": [
+                            333.54617339728264,
+                            117.18967255935286
+                          ]
+                        },
+                        {
+                          "p": [
+                            360.3099615475819,
+                            117.18967255935286
+                          ],
+                          "out": [
+                            361.9668157970743,
+                            117.18967255935286
+                          ]
+                        },
+                        {
+                          "p": [
+                            363.3099615475819,
+                            120.18967255935286
+                          ],
+                          "in": [
+                            363.3099615475819,
+                            118.53281830986047
+                          ]
+                        },
+                        {
+                          "p": [
+                            363.3099615475819,
+                            293.18090822413535
+                          ],
+                          "out": [
+                            363.3099615475819,
+                            294.83776247362766
+                          ]
+                        },
+                        {
+                          "p": [
+                            360.3099615475819,
+                            296.18090822413535
+                          ],
+                          "in": [
+                            361.9668157970743,
+                            296.18090822413535
+                          ]
+                        },
+                        {
+                          "p": [
+                            335.203027646775,
+                            296.18090822413535
+                          ],
+                          "out": [
+                            333.54617339728264,
+                            296.18090822413535
+                          ]
+                        },
+                        {
+                          "p": [
+                            332.203027646775,
+                            293.18090822413535
+                          ],
+                          "in": [
+                            332.203027646775,
+                            294.83776247362766
+                          ]
+                        },
+                        {
+                          "p": [
+                            332.203027646775,
+                            120.18967255935286
+                          ],
+                          "out": [
+                            332.203027646775,
+                            118.53281830986047
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 178.99123566478247,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    332.203027646775,
+                    117.18967255935286
+                  ]
+                }
+              }
+            },
+            {
+              "id": 11,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.0,
+                        "m": 0.0,
+                        "y": 0.0,
+                        "k": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            122.39622390660023,
+                            438.9693500606361
+                          ],
+                          "in": [
+                            120.73936965710784,
+                            438.9693500606361
+                          ]
+                        },
+                        {
+                          "p": [
+                            147.5031578074071,
+                            438.9693500606361
+                          ],
+                          "out": [
+                            149.16001205689946,
+                            438.9693500606361
+                          ]
+                        },
+                        {
+                          "p": [
+                            150.5031578074071,
+                            441.9693500606361
+                          ],
+                          "in": [
+                            150.5031578074071,
+                            440.3124958111438
+                          ]
+                        },
+                        {
+                          "p": [
+                            150.5031578074071,
+                            599.4271186877957
+                          ],
+                          "out": [
+                            150.5031578074071,
+                            601.083972937288
+                          ]
+                        },
+                        {
+                          "p": [
+                            147.5031578074071,
+                            602.4271186877957
+                          ],
+                          "in": [
+                            149.16001205689946,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            122.39622390660023,
+                            602.4271186877957
+                          ],
+                          "out": [
+                            120.73936965710784,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            119.39622390660023,
+                            599.4271186877957
+                          ],
+                          "in": [
+                            119.39622390660023,
+                            601.083972937288
+                          ]
+                        },
+                        {
+                          "p": [
+                            119.39622390660023,
+                            441.9693500606361
+                          ],
+                          "out": [
+                            119.39622390660023,
+                            440.3124958111438
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 163.4577686271595,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    119.39622390660023,
+                    438.9693500606361
+                  ]
+                }
+              }
+            },
+            {
+              "id": 12,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.0,
+                        "m": 0.0,
+                        "y": 0.0,
+                        "k": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            175.5979248416439,
+                            461.835807371996
+                          ],
+                          "in": [
+                            173.94107059215153,
+                            461.835807371996
+                          ]
+                        },
+                        {
+                          "p": [
+                            200.70485874245077,
+                            461.835807371996
+                          ],
+                          "out": [
+                            202.36171299194314,
+                            461.835807371996
+                          ]
+                        },
+                        {
+                          "p": [
+                            203.70485874245077,
+                            464.835807371996
+                          ],
+                          "in": [
+                            203.70485874245077,
+                            463.1789531225037
+                          ]
+                        },
+                        {
+                          "p": [
+                            203.70485874245077,
+                            599.4271186877957
+                          ],
+                          "out": [
+                            203.70485874245077,
+                            601.083972937288
+                          ]
+                        },
+                        {
+                          "p": [
+                            200.70485874245077,
+                            602.4271186877957
+                          ],
+                          "in": [
+                            202.36171299194314,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            175.5979248416439,
+                            602.4271186877957
+                          ],
+                          "out": [
+                            173.94107059215153,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            172.5979248416439,
+                            599.4271186877957
+                          ],
+                          "in": [
+                            172.5979248416439,
+                            601.083972937288
+                          ]
+                        },
+                        {
+                          "p": [
+                            172.5979248416439,
+                            464.835807371996
+                          ],
+                          "out": [
+                            172.5979248416439,
+                            463.1789531225037
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 140.5913113157996,
+                  "radii": [
+                    3.0000000000000004,
+                    3.0000000000000004,
+                    3.0000000000000004,
+                    3.0000000000000004
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    172.5979248416439,
+                    461.835807371996
+                  ]
+                }
+              }
+            },
+            {
+              "id": 13,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.0,
+                        "m": 0.0,
+                        "y": 0.0,
+                        "k": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            228.79962577668758,
+                            407.97373089449434
+                          ],
+                          "in": [
+                            227.1427715271952,
+                            407.97373089449434
+                          ]
+                        },
+                        {
+                          "p": [
+                            253.90655967749444,
+                            407.97373089449434
+                          ],
+                          "out": [
+                            255.5634139269868,
+                            407.97373089449434
+                          ]
+                        },
+                        {
+                          "p": [
+                            256.90655967749444,
+                            410.97373089449434
+                          ],
+                          "in": [
+                            256.90655967749444,
+                            409.3168766450019
+                          ]
+                        },
+                        {
+                          "p": [
+                            256.90655967749444,
+                            599.4271186877957
+                          ],
+                          "out": [
+                            256.90655967749444,
+                            601.0839729372881
+                          ]
+                        },
+                        {
+                          "p": [
+                            253.90655967749444,
+                            602.4271186877957
+                          ],
+                          "in": [
+                            255.5634139269868,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            228.79962577668758,
+                            602.4271186877957
+                          ],
+                          "out": [
+                            227.1427715271952,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            225.79962577668758,
+                            599.4271186877957
+                          ],
+                          "in": [
+                            225.79962577668758,
+                            601.0839729372881
+                          ]
+                        },
+                        {
+                          "p": [
+                            225.79962577668758,
+                            410.97373089449434
+                          ],
+                          "out": [
+                            225.79962577668758,
+                            409.3168766450019
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 194.4533877933014,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    225.79962577668758,
+                    407.97373089449434
+                  ]
+                }
+              }
+            },
+            {
+              "id": 14,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.0,
+                        "m": 0.0,
+                        "y": 0.0,
+                        "k": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "rgb",
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            282.0013267117313,
+                            364.7938448371648
+                          ],
+                          "in": [
+                            280.3444724622389,
+                            364.7938448371648
+                          ]
+                        },
+                        {
+                          "p": [
+                            307.1082606125382,
+                            364.7938448371648
+                          ],
+                          "out": [
+                            308.76511486203054,
+                            364.7938448371648
+                          ]
+                        },
+                        {
+                          "p": [
+                            310.1082606125382,
+                            367.7938448371648
+                          ],
+                          "in": [
+                            310.1082606125382,
+                            366.13699058767236
+                          ]
+                        },
+                        {
+                          "p": [
+                            310.1082606125382,
+                            599.4271186877957
+                          ],
+                          "out": [
+                            310.1082606125382,
+                            601.0839729372881
+                          ]
+                        },
+                        {
+                          "p": [
+                            307.1082606125382,
+                            602.4271186877957
+                          ],
+                          "in": [
+                            308.76511486203054,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            282.0013267117313,
+                            602.4271186877957
+                          ],
+                          "out": [
+                            280.3444724622389,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            279.0013267117313,
+                            599.4271186877957
+                          ],
+                          "in": [
+                            279.0013267117313,
+                            601.0839729372881
+                          ]
+                        },
+                        {
+                          "p": [
+                            279.0013267117313,
+                            367.7938448371648
+                          ],
+                          "out": [
+                            279.0013267117313,
+                            366.13699058767236
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 237.63327385063093,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    279.0013267117313,
+                    364.7938448371648
+                  ]
+                }
+              }
+            },
+            {
+              "id": 15,
+              "appearance": {
+                "items": [
+                  {
+                    "kind": "fill",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.0,
+                        "m": 0.0,
+                        "y": 0.0,
+                        "k": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "stroke",
+                    "paint": {
+                      "type": "solid",
+                      "color": {
+                        "model": "cmyk",
+                        "c": 0.74775904,
+                        "m": 0.67822725,
+                        "y": 0.6693248,
+                        "k": 0.90080005
+                      }
+                    },
+                    "width": 1.0
+                  }
+                ]
+              },
+              "kind": {
+                "type": "path",
+                "path": {
+                  "subpaths": [
+                    {
+                      "anchors": [
+                        {
+                          "p": [
+                            335.203027646775,
+                            423.43588302301316
+                          ],
+                          "in": [
+                            333.54617339728264,
+                            423.43588302301316
+                          ]
+                        },
+                        {
+                          "p": [
+                            360.3099615475819,
+                            423.43588302301316
+                          ],
+                          "out": [
+                            361.9668157970743,
+                            423.43588302301316
+                          ]
+                        },
+                        {
+                          "p": [
+                            363.3099615475819,
+                            426.43588302301316
+                          ],
+                          "in": [
+                            363.3099615475819,
+                            424.7790287735208
+                          ]
+                        },
+                        {
+                          "p": [
+                            363.3099615475819,
+                            599.4271186877957
+                          ],
+                          "out": [
+                            363.3099615475819,
+                            601.083972937288
+                          ]
+                        },
+                        {
+                          "p": [
+                            360.3099615475819,
+                            602.4271186877957
+                          ],
+                          "in": [
+                            361.9668157970743,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            335.203027646775,
+                            602.4271186877957
+                          ],
+                          "out": [
+                            333.54617339728264,
+                            602.4271186877957
+                          ]
+                        },
+                        {
+                          "p": [
+                            332.203027646775,
+                            599.4271186877957
+                          ],
+                          "in": [
+                            332.203027646775,
+                            601.083972937288
+                          ]
+                        },
+                        {
+                          "p": [
+                            332.203027646775,
+                            426.43588302301316
+                          ],
+                          "out": [
+                            332.203027646775,
+                            424.7790287735208
+                          ]
+                        }
+                      ],
+                      "closed": true
+                    }
+                  ]
+                },
+                "live": {
+                  "shape": "rectangle",
+                  "w": 31.106933900806865,
+                  "h": 178.99123566478247,
+                  "radii": [
+                    3.0,
+                    3.0,
+                    3.0,
+                    3.0
+                  ],
+                  "xf": [
+                    1.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                    332.203027646775,
+                    423.43588302301316
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "swatches": [
+      {
+        "name": "[None]",
+        "paint": {
+          "type": "none"
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "White",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.0,
+            "y": 0.0,
+            "k": 0.0
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Black",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.0,
+            "y": 0.0,
+            "k": 1.0
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Red",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.88,
+            "y": 0.85,
+            "k": 0.07
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Orange Red",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.63,
+            "y": 0.85,
+            "k": 0.05
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Orange",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.4,
+            "y": 0.88,
+            "k": 0.03
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Amber",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.3,
+            "y": 0.76,
+            "k": 0.02
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Yellow",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.06,
+            "y": 0.87,
+            "k": 0.01
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Yellow Green",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.03,
+            "m": 0.0,
+            "y": 0.85,
+            "k": 0.12
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Lime",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.29,
+            "m": 0.0,
+            "y": 0.68,
+            "k": 0.22
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Green",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.69,
+            "m": 0.0,
+            "y": 0.59,
+            "k": 0.29
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Emerald",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 1.0,
+            "m": 0.0,
+            "y": 0.53,
+            "k": 0.43
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Teal",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 1.0,
+            "m": 0.0,
+            "y": 0.47,
+            "k": 0.59
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Aqua",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.81,
+            "m": 0.0,
+            "y": 0.36,
+            "k": 0.29
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Cyan Green",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 1.0,
+            "m": 0.0,
+            "y": 0.07,
+            "k": 0.34
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Cyan",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.82,
+            "m": 0.24,
+            "y": 0.0,
+            "k": 0.11
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Azure",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 1.0,
+            "m": 0.4,
+            "y": 0.0,
+            "k": 0.26
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Blue",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.68,
+            "m": 0.66,
+            "y": 0.0,
+            "k": 0.43
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Indigo",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.73,
+            "m": 0.8,
+            "y": 0.0,
+            "k": 0.61
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Violet",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.3,
+            "m": 0.69,
+            "y": 0.0,
+            "k": 0.43
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Purple",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.73,
+            "y": 0.03,
+            "k": 0.42
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Magenta",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 1.0,
+            "y": 0.41,
+            "k": 0.38
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Rose",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.91,
+            "y": 0.58,
+            "k": 0.17
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Pink",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.87,
+            "y": 0.49,
+            "k": 0.07
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Brown",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.11,
+            "y": 0.23,
+            "k": 0.22
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Tan",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.12,
+            "y": 0.24,
+            "k": 0.4
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Coffee",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.14,
+            "y": 0.24,
+            "k": 0.55
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Chocolate",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.14,
+            "y": 0.22,
+            "k": 0.67
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Sand",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.21,
+            "y": 0.45,
+            "k": 0.22
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Copper",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.25,
+            "y": 0.51,
+            "k": 0.35
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Rust",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.3,
+            "y": 0.59,
+            "k": 0.45
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Walnut",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.35,
+            "y": 0.69,
+            "k": 0.54
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Espresso",
+        "paint": {
+          "type": "solid",
+          "color": {
+            "model": "cmyk",
+            "c": 0.0,
+            "m": 0.42,
+            "y": 0.8,
+            "k": 0.62
+          }
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "White, Black",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Linear",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.0,
+                  "m": 0.0,
+                  "y": 0.0,
+                  "k": 0.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.0,
+                  "m": 0.0,
+                  "y": 0.0,
+                  "k": 1.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Radial White, Black",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Radial",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.0,
+                  "m": 0.0,
+                  "y": 0.0,
+                  "k": 0.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.0,
+                  "m": 0.0,
+                  "y": 0.0,
+                  "k": 1.0
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Sunset",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Linear",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.0,
+                  "m": 0.3,
+                  "y": 0.76,
+                  "k": 0.02
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.0,
+                  "m": 0.91,
+                  "y": 0.58,
+                  "k": 0.17
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      },
+      {
+        "name": "Ocean",
+        "paint": {
+          "type": "gradient",
+          "gradient": {
+            "kind": "Linear",
+            "stops": [
+              {
+                "offset": 0.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.82,
+                  "m": 0.24,
+                  "y": 0.0,
+                  "k": 0.11
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              },
+              {
+                "offset": 1.0,
+                "color": {
+                  "model": "cmyk",
+                  "c": 0.68,
+                  "m": 0.66,
+                  "y": 0.0,
+                  "k": 0.43
+                },
+                "opacity": 1.0,
+                "midpoint": 0.5
+              }
+            ]
+          },
+          "angle": 0.0
+        },
+        "global": false,
+        "spot": false
+      }
+    ],
+    "swatch_groups": [
+      {
+        "name": "Grays",
+        "swatches": [
+          {
+            "name": "K=90",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.9
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=80",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.8
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=70",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.7
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=60",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.6
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=50",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.5
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=40",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.4
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=30",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.3
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=20",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.2
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "K=10",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "gray",
+                "k": 0.1
+              }
+            },
+            "global": false,
+            "spot": false
+          }
+        ]
+      },
+      {
+        "name": "Brights",
+        "swatches": [
+          {
+            "name": "Bright Red",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "cmyk",
+                "c": 0.0,
+                "m": 0.89,
+                "y": 0.85,
+                "k": 0.0
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Yellow",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "cmyk",
+                "c": 0.0,
+                "m": 0.1,
+                "y": 1.0,
+                "k": 0.0
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Green",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "cmyk",
+                "c": 1.0,
+                "m": 0.0,
+                "y": 0.49,
+                "k": 0.1
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Blue",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "cmyk",
+                "c": 0.84,
+                "m": 0.53,
+                "y": 0.0,
+                "k": 0.0
+              }
+            },
+            "global": false,
+            "spot": false
+          },
+          {
+            "name": "Bright Violet",
+            "paint": {
+              "type": "solid",
+              "color": {
+                "model": "cmyk",
+                "c": 0.14,
+                "m": 1.0,
+                "y": 0.0,
+                "k": 0.02
+              }
+            },
+            "global": false,
+            "spot": false
+          }
+        ]
+      }
+    ],
+    "graphic_styles": [
+      {
+        "name": "Default Graphic Style",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 1.0,
+                  "g": 1.0,
+                  "b": 1.0
+                }
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                }
+              },
+              "width": 1.0
+            }
+          ]
+        },
+        "id": 1,
+        "unit_box": true
+      },
+      {
+        "name": "Black Outline",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "none"
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                }
+              },
+              "width": 1.0
+            }
+          ]
+        },
+        "id": 2,
+        "unit_box": true
+      },
+      {
+        "name": "Heavy Ink",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.105882354,
+                  "g": 0.078431375,
+                  "b": 0.39215687
+                }
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.0,
+                  "g": 0.0,
+                  "b": 0.0
+                }
+              },
+              "width": 4.0
+            }
+          ]
+        },
+        "id": 3,
+        "unit_box": true
+      },
+      {
+        "name": "Sunshine",
+        "appearance": {
+          "items": [
+            {
+              "kind": "fill",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.9843137,
+                  "g": 0.6901961,
+                  "b": 0.23137255
+                }
+              }
+            },
+            {
+              "kind": "stroke",
+              "paint": {
+                "type": "solid",
+                "color": {
+                  "model": "rgb",
+                  "r": 0.94509804,
+                  "g": 0.3529412,
+                  "b": 0.14117648
+                }
+              },
+              "width": 2.0
+            }
+          ]
+        },
+        "id": 4,
+        "unit_box": true
+      }
+    ],
+    "symbols": [],
+    "guides": [],
+    "grid": {
+      "spacing": 72.0,
+      "subdivisions": 8
+    },
+    "raster_effects_ppi": 300.0,
+    "images": {},
+    "next_id": 17,
+    "metadata": {
+      "author": "",
+      "authorTitle": "",
+      "description": "",
+      "keywords": [],
+      "rating": 0,
+      "copyrightStatus": "unknown",
+      "copyrightNotice": "",
+      "copyrightUrl": "",
+      "created": 1794600125,
+      "modified": 1794603615
+    },
+    "last_view": {
+      "name": "",
+      "center": {
+        "x": 216.31402423031352,
+        "y": 490.59490552935847
+      },
+      "zoom": 1.6146419699617633,
+      "rotation": 0.0
+    }
+  },
+  "images": {}
+}
