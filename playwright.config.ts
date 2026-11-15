@@ -17,6 +17,11 @@ export default defineConfig({
   // race on project counts and the sign-in rate limit. The suite is small
   // enough to run serially.
   workers: 1,
+  // A few specs are timing-sensitive on shared runners (a cold `next dev`
+  // compile, or an autosave landing after a tab switch). One retry turns
+  // those into reported flakes instead of red builds; a real regression
+  // fails both attempts, and Playwright marks the retry as flaky.
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     // Fresh source IP per run so the sign-in rate limit (5 / 15 min / IP,

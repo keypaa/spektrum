@@ -183,8 +183,9 @@ jobs:
           # `ensureBucket` throws on a not-yet-ready store; retry rather than
           # failing the job on a cold start.
           for i in $(seq 1 20); do
-            pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts && exit 0
-            echo "bucket attempt $i failed; retrying" >&2
+            pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts && \
+              pnpm --filter @spektrum/web exec tsx src/cli/s3-probe.ts && exit 0
+            echo "object store attempt $i failed; retrying" >&2
             sleep 3
           done
           exit 1
@@ -269,8 +270,9 @@ jobs:
           # `ensureBucket` throws on a not-yet-ready store; retry rather than
           # failing the job on a cold start.
           for i in $(seq 1 20); do
-            pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts && exit 0
-            echo "bucket attempt $i failed; retrying" >&2
+            pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts && \
+              pnpm --filter @spektrum/web exec tsx src/cli/s3-probe.ts && exit 0
+            echo "object store attempt $i failed; retrying" >&2
             sleep 3
           done
           exit 1

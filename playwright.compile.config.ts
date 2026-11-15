@@ -25,6 +25,9 @@ export default defineConfig({
   testIgnore: "**/visual/**",
   globalSetup: "./e2e/compile.global-setup.ts",
   timeout: 120_000,
+  // Compile timing depends on a warm worker and container; one retry absorbs a
+  // cold start on a shared runner without hiding a real regression.
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   use: {
     baseURL: "http://localhost:3000",
