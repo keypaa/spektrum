@@ -37,8 +37,44 @@ async function openProject(page: Page): Promise<void> {
 
 async function type(page: Page, text: string): Promise<void> {
   await page.getByTestId("monaco-editor").click();
-  await page.keyboard.press("End");
+  // `End` is end-of-line, and the cursor can land anywhere in the document —
+  // typing there injected text into the preamble (before \begin{document}) and
+  // every compile failed with "Missing \begin{document}". Control+End is
+  // end-of-document, so the edit lands in the body.
+  await page.keyboard.press("Control+End");
   await page.keyboard.type(text);
+}
+
+
+/**
+ * Replace a document's content through the API.
+ *
+ * The editor's cursor position is not deterministic, and text appended after
+ * \`end{document}` is ignored by LaTeX — so a test that needs specific content
+ * in the body (a broken macro, a huge file) writes it here instead of typing it.
+ */
+async function setContent(
+  page: Page,
+  projectId: string,
+  content: string,
+): Promise<void> {
+  const tree = await (
+    await page.request.get(`/api/projects/${projectId}/tree`)
+  ).json() as {
+    documents: Array<{ id: string; path: string; updatedAt: string }>;
+  };
+  const doc = tree.documents.find((d) => d.path === "main.tex");
+  if (!doc) throw new Error("main.tex not found");
+  const res = await page.request.patch(
+    `/api/projects/${projectId}/documents/${doc.id}`,
+    {
+      data: { content, baseUpdatedAt: doc.updatedAt },
+      // Mutating routes require an Origin (the CSRF guard); page.request does
+      // not add one.
+      headers: { origin: new URL(page.url()).origin },
+    },
+  );
+  expect(res.ok()).toBe(true);
 }
 
 async function blur(page: Page): Promise<void> {
@@ -95,8 +131,15 @@ test.describe("compile", () => {
     await openProject(page);
     const projectId = new URL(page.url()).pathname.split("/")[2]!;
 
-    await type(page, "\n\\undefinedmacro");
-    await page.keyboard.press("Control+S");
+    await setContent(
+      page,
+      projectId,
+      "\\documentclass{article}\n\\begin{document}\nHello\\undefinedmacro\n\\end{document}\n",
+    );
+    await page.reload();
+    await expect(page.getByTestId("monaco-editor")).toBeVisible();
+    // Any edit re-triggers a compile over the content set above.
+    await type(page, " ");
     await blur(page);
 
     // Wait for the render row to record the error, then reload so the RSC
@@ -173,8 +216,14 @@ test.describe("compile", () => {
       page.locator("[data-testid='pdf-viewport'] canvas").first(),
     ).toBeVisible({ timeout: 60_000 });
 
-    await type(page, "\n\\undefinedmacro");
-    await page.keyboard.press("Control+S");
+    await setContent(
+      page,
+      projectId,
+      "\\documentclass{article}\n\\begin{document}\nHello\\undefinedmacro\n\\end{document}\n",
+    );
+    await page.reload();
+    await expect(page.getByTestId("monaco-editor")).toBeVisible();
+    await type(page, " ");
     await blur(page);
     await expect
       .poll(async () => (await latestRender(page, projectId)).render?.status, {
