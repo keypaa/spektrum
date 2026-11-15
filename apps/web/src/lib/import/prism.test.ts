@@ -53,6 +53,21 @@ describe("parsePrismArchive", () => {
     expect(parsed.projects).toHaveLength(0);
   });
 
+  it("normalises duplicate separators with the shared path rules", () => {
+    const parsed = parsePrismArchive(
+      readZip(
+        writeZip([
+          { path: "P//main.tex", data: enc("x") },
+          { path: "P/sub//note.tex", data: enc("y") },
+        ]),
+      ),
+    );
+    expect(parsed.projects[0]!.files.map((f) => f.path)).toEqual([
+      "main.tex",
+      "sub/note.tex",
+    ]);
+  });
+
   it("drops directory entries and macOS junk", () => {
     const parsed = parsePrismArchive(readZip(writeZip([
       { path: "P/main.tex", data: enc("x") },

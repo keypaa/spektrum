@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { startHealthServer } from "./health";
 
 const servers: Array<ReturnType<typeof startHealthServer>> = [];
@@ -20,5 +20,23 @@ describe("worker health server", () => {
     const res = await fetch(`http://127.0.0.1:${address.port}/health`);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ok");
+  });
+
+  it("survives a port that is already taken instead of crashing", async () => {
+    const first = startHealthServer(0);
+    servers.push(first);
+    const address = first.address();
+    if (address === null || typeof address === "string") throw new Error("no port");
+    const port = address.port;
+
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const second = startHealthServer(port);
+    servers.push(second);
+
+    await new Promise((resolve) => second.once("error", resolve));
+    expect(errors.mock.calls.map((c) => c.join(" ")).join("\n")).toContain(
+      "health server error",
+    );
+    errors.mockRestore();
   });
 });

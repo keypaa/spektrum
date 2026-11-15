@@ -12,7 +12,7 @@ name: spektrum
 services:
   # ---------------------------------------------------------------- reverse proxy
   caddy:
-    image: caddy:2
+    image: caddy:2@sha256:4e2425f6009577e7c651010f16679c28f7d12df3e7b1914f941a7a3370746b3c
     restart: unless-stopped
     ports:
       - "80:80"
@@ -109,7 +109,7 @@ services:
 
   # ------------------------------------------------------------------- backing
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:81e77a4833487b8132fe4b00bedd39dc3f74b8641e387f19312a48f7de218c2e
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
@@ -124,7 +124,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     restart: unless-stopped
     volumes:
       - redis-data:/data
@@ -139,7 +139,7 @@ services:
   # talks to it unchanged (path-style, forcePathStyle). Any S3-compatible
   # service works — point S3_ENDPOINT at it and drop this service.
   seaweedfs:
-    image: chrislusf/seaweedfs:latest
+    image: chrislusf/seaweedfs:latest@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0
     restart: unless-stopped
     command: server -dir=/data -s3 -s3.port=8333
     volumes:

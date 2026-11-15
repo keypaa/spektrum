@@ -16,6 +16,12 @@ export function startHealthServer(port: number): Server {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("not found");
   });
+  // A health port that cannot bind (EADDRINUSE, EACCES) must not take the
+  // worker down: compilation matters more than the probe. The error is logged
+  // and the worker keeps running.
+  server.on("error", (e: NodeJS.ErrnoException) => {
+    console.error(`worker: health server error on :${port}: ${e.code ?? e.message}`);
+  });
   server.listen(port);
   return server;
 }

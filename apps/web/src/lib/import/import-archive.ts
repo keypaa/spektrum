@@ -18,8 +18,8 @@ import {
   projects,
 } from "@spektrum/db/schema";
 import { sha256HexBytes } from "@spektrum/shared/hash";
-import { putObject } from "@spektrum/storage";
-import { parsePrismArchive, type ParsedFile } from "./prism";
+import { deleteObject, putObject } from "@spektrum/storage";
+import { parsePrismArchive, type ParsedFile, type ParsedProject } from "./prism";
 import { readZip, ZIP_LIMITS } from "./zip";
 import type { ImportLimits } from "./limits";
 
@@ -136,8 +136,63 @@ async function importArchiveNow(
       continue;
     }
 
-    await db.transaction(async (tx) => {
-      const [projectRow] = await tx
+    // Objects are written before the row exists, so a rolled-back transaction
+    // would otherwise leave them behind forever.
+    const uploaded: Array<{ bucket: "uploads" | "pdf"; key: string }> = [];
+    try {
+      await db.transaction(async (tx) => {
+        await insertProject(tx, userId, project, archiveHash, uploaded, report);
+      });
+      uploaded.length = 0;
+      report.projects += 1;
+      report.rewrittenPaths += project.rewrites.length;
+      if (project.promotedMain) report.promotedMains += 1;
+    } catch (e) {
+      for (const object of uploaded) {
+        await deleteObject(object.bucket, object.key).catch(() => undefined);
+      }
+      uploaded.length = 0;
+      // Two imports of the same archive can race the unique index (the lock
+      // only covers one process). Losing that race means the archive is
+      // already imported — report it as a duplicate, not as a server error.
+      if (isDuplicateImport(e)) {
+        report.skipped.push({ project: project.name, reason: "duplicate" });
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  return report;
+}
+
+/** True for Postgres' unique-violation on the import batch index. */
+export function isDuplicateImport(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    const candidate = current as { code?: unknown; constraint?: unknown };
+    if (
+      candidate.code === "23505" &&
+      (candidate.constraint === undefined ||
+        String(candidate.constraint).includes("import_batches"))
+    ) {
+      return true;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+async function insertProject(
+  tx: Tx,
+  userId: string,
+  project: ParsedProject,
+  archiveHash: string,
+  uploaded: Array<{ bucket: "uploads" | "pdf"; key: string }>,
+  report: ImportReport,
+): Promise<void> {
+  {
+    const [projectRow] = await tx
         .insert(projects)
         .values({ ownerId: userId, name: project.name })
         .returning({ id: projects.id });
@@ -146,7 +201,7 @@ async function importArchiveNow(
 
       let mainDocumentId: string | null = null;
       for (const file of project.files) {
-        const documentId = await insertDocument(tx, projectId, file);
+        const documentId = await insertDocument(tx, projectId, file, uploaded);
         if (file.path === project.mainPath) mainDocumentId = documentId;
         report.files += 1;
       }
@@ -177,14 +232,7 @@ async function importArchiveNow(
           conversations: project.conversations.length,
         },
       });
-    });
-
-    report.projects += 1;
-    report.rewrittenPaths += project.rewrites.length;
-    if (project.promotedMain) report.promotedMains += 1;
   }
-
-  return report;
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -193,12 +241,14 @@ async function insertDocument(
   tx: Tx,
   projectId: string,
   file: ParsedFile,
+  uploaded: Array<{ bucket: "uploads" | "pdf"; key: string }>,
 ): Promise<string> {
   const inline = file.text !== null && file.bytes.byteLength <= MAX_INLINE_BYTES;
   let blobKey: string | null = null;
   if (!inline) {
     blobKey = `${projectId}/${file.path}`;
     await putObject("uploads", blobKey, file.bytes, contentTypeFor(file.path));
+    uploaded.push({ bucket: "uploads", key: blobKey });
   }
   const [row] = await tx
     .insert(documents)

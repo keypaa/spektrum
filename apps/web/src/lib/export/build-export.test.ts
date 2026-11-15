@@ -3,7 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
 import { documents, projects, users } from "@spektrum/db/schema";
-import { buildProjectExport, uniqueSegments } from "./build-export";
+import {
+  buildProjectExport,
+  ExportTooLargeError,
+  uniqueSegments,
+} from "./build-export";
 import { readZip } from "../import/zip";
 
 const run = Math.random().toString(36).slice(2, 10);
@@ -30,6 +34,18 @@ describe("buildProjectExport", () => {
 
   it("returns null for another owner", async () => {
     expect(await buildProjectExport("nobody", projectId)).toBeNull();
+  });
+
+  it("refuses an export above the byte cap instead of exhausting memory", async () => {
+    await db.insert(documents).values({
+      projectId,
+      path: "huge.tex",
+      kind: "tex",
+      content: "x".repeat(2048),
+    });
+    await expect(
+      buildProjectExport(userId, projectId, { maxBytes: 1024 }),
+    ).rejects.toBeInstanceOf(ExportTooLargeError);
   });
 });
 

@@ -6,7 +6,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/auth/session";
 import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
 import { errorResponse } from "@/auth/route-errors";
-import { buildProjectExport } from "@/lib/export/build-export";
+import {
+  buildProjectExport,
+  ExportTooLargeError,
+} from "@/lib/export/build-export";
 
 export const runtime = "nodejs";
 
@@ -58,6 +61,16 @@ export async function GET(
       },
     });
   } catch (e) {
+    if (e instanceof ExportTooLargeError) {
+      return NextResponse.json(
+        {
+          error: "too_large",
+          message:
+            "This project is too large to export in one archive. Export the projects individually.",
+        },
+        { status: 413 },
+      );
+    }
     return errorResponse(e);
   }
 }

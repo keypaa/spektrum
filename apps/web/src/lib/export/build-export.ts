@@ -17,6 +17,26 @@ export type ExportManifest = {
   files: string[];
 };
 
+/**
+ * Ceiling for one export, in bytes of document content.
+ *
+ * `writeZip` builds the whole archive in memory, so peak RSS is roughly twice
+ * the uncompressed content (the source strings plus the zip). Node's default
+ * heap is ~2 GB on a 64-bit host and ~1 GiB inside a 2 GiB container; the
+ * reference container is smaller than that, so the cap is set where a 512 MB
+ * container (the smallest common serverless tier) stays comfortable.
+ */
+export const MAX_EXPORT_BYTES = 256 * 1024 * 1024;
+
+export class ExportTooLargeError extends Error {
+  constructor(public readonly bytes: number) {
+    super("export_too_large");
+    this.name = "ExportTooLargeError";
+  }
+}
+
+export type ExportLimits = { maxBytes?: number };
+
 type ExportFile = { path: string; data: Uint8Array };
 
 /** A path segment that is safe to use as a zip directory name. */
@@ -95,6 +115,7 @@ function manifestFor(name: string, files: string[]): ExportManifest {
 export async function buildProjectExport(
   userId: string,
   projectId: string,
+  limits: ExportLimits = {},
 ): Promise<{ fileName: string; bytes: Uint8Array } | null> {
   const found = await readDocuments(userId, projectId);
   if (!found) return null;
@@ -112,6 +133,7 @@ export async function buildProjectExport(
     path: `${segment}/spektrum-export.json`,
     data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
   });
+  assertWithinCap(files, limits);
 
   return {
     fileName: `${found.projectName.replace(/[\\/\x00]/g, "-")}.zip`,
@@ -121,6 +143,7 @@ export async function buildProjectExport(
 
 export async function buildAllExport(
   userId: string,
+  limits: ExportLimits = {},
 ): Promise<{ fileName: string; bytes: Uint8Array }> {
   const listed = await listProjects(userId);
   const files: ExportFile[] = [];
@@ -144,10 +167,23 @@ export async function buildAllExport(
       path: `${segment}/spektrum-export.json`,
       data: new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
     });
+    // Checked per project, before the next one is read: the cap bounds peak
+    // memory to itself plus one project.
+    assertWithinCap(files, limits);
   }
 
   return {
     fileName: `spektrum-projects-${new Date().toISOString().slice(0, 10)}.zip`,
     bytes: writeZip(files),
   };
+}
+
+function totalBytes(files: ExportFile[]): number {
+  return files.reduce((sum, file) => sum + file.data.byteLength, 0);
+}
+
+function assertWithinCap(files: ExportFile[], limits: ExportLimits): void {
+  const max = limits.maxBytes ?? MAX_EXPORT_BYTES;
+  const bytes = totalBytes(files);
+  if (bytes > max) throw new ExportTooLargeError(bytes);
 }

@@ -3,10 +3,22 @@ import { describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({ user: { id: "u1", email: "u@x", role: "owner" } as null | { id: string; email: string; role: string }, allowed: true }));
 vi.mock("@/auth/session", async (io) => { const a = await io<typeof import("@/auth/session")>(); return { ...a, requireUser: async () => { if (!state.user) throw new a.UnauthorizedError(); return state.user; } }; });
 vi.mock("@spektrum/shared/rate-limit", () => ({ BUDGETS: { export: { limit: 30, windowMs: 60_000 } }, consume: async () => ({ allowed: state.allowed, retryAfterMs: 1000 }) }));
-vi.mock("@/lib/export/build-export", () => ({
-  buildProjectExport: async (_u: string, id: string) => (id === "11111111-1111-4111-8111-111111111111" ? { fileName: "P.zip", bytes: new Uint8Array([1]) } : null),
-  buildAllExport: async () => ({ fileName: "all.zip", bytes: new Uint8Array([2]) }),
-}));
+vi.mock("@/lib/export/build-export", async (io) => {
+  const actual = await io<typeof import("@/lib/export/build-export")>();
+  return {
+    ...actual,
+    buildProjectExport: vi.fn(
+      async (_u: string, id: string) =>
+        id === "11111111-1111-4111-8111-111111111111"
+          ? { fileName: "P.zip", bytes: new Uint8Array([1]) }
+          : null,
+    ),
+    buildAllExport: vi.fn(async () => ({
+      fileName: "all.zip",
+      bytes: new Uint8Array([2]),
+    })),
+  };
+});
 import { GET as getOne } from "./[projectId]/export/route";
 import { GET as getAll } from "./export/route";
 
@@ -30,5 +42,14 @@ describe("export routes", () => {
     const res = await getAll();
     expect(res.status).toBe(200);
     expect(res.headers.get("content-disposition")).toContain("all.zip");
+  });
+
+  it("answers 413 when the export exceeds the byte cap", async () => {
+    const { ExportTooLargeError } = await import("@/lib/export/build-export");
+    const { buildAllExport } = await import("@/lib/export/build-export");
+    vi.mocked(buildAllExport).mockRejectedValueOnce(new ExportTooLargeError(999));
+    const res = await getAll();
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: string }).error).toBe("too_large");
   });
 });

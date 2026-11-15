@@ -26,6 +26,11 @@ export type ImportReport = {
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count} ${count === 1 ? one : many}`;
 
+/** Prism exports are always .zip; the server sniffs the magic bytes too. */
+export function isZipArchive(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".zip");
+}
+
 const ERROR_COPY: Record<string, string> = {
   unauthorized: "You are not signed in.",
   forbidden: "This archive could not be imported.",
@@ -48,6 +53,12 @@ export function ImportDialog({
 
   const submit = async () => {
     if (!file || pending) return;
+    // Only .zip archives: the server enforces this too (magic bytes), but
+    // refusing early avoids uploading a file that cannot be imported.
+    if (!isZipArchive(file)) {
+      setError("Prism exports are .zip archives — only .zip archives can be imported.");
+      return;
+    }
     setPending(true);
     setError(null);
     setReport(null);
@@ -107,9 +118,19 @@ export function ImportDialog({
           <div className="flex flex-col gap-1 text-sm text-text-editor-primary">
             <div>{plural(report.projects, "project")} imported</div>
             <div>{plural(report.files, "file")}</div>
-            <div>
-              {plural(report.conversationsImported, "conversation")} imported
-            </div>
+            {report.rewrittenPaths > 0 ? (
+              <div>{plural(report.rewrittenPaths, "path")} rewritten</div>
+            ) : null}
+            {report.promotedMains > 0 ? (
+              <div>
+                {plural(report.promotedMains, "main document")} promoted
+              </div>
+            ) : null}
+            {report.conversationsImported > 0 ? (
+              <div>
+                {plural(report.conversationsImported, "conversation")} imported
+              </div>
+            ) : null}
             {report.conversationsSkipped > 0 ? (
               <div>
                 {plural(report.conversationsSkipped, "conversation")} skipped

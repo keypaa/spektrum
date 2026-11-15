@@ -2,6 +2,7 @@
 // `ZipEntry[]`, this turns them into projects, and `import-archive.ts` writes
 // them. Keeping it pure means every path-traversal, junk-entry and re-root
 // rule is unit-testable without a database.
+import { normalizeDocumentPath } from "@spektrum/shared/paths";
 import type { ZipEntry } from "./zip";
 
 export type ParsedFileKind = "tex" | "bib" | "img" | "csv" | "other";
@@ -40,7 +41,6 @@ export type ParsedArchive = {
 
 export type ParseLimits = { maxProjects?: number; maxFileBytes?: number };
 
-const MAX_PATH_LENGTH = 200;
 const DEFAULT_MAX_PROJECTS = 200;
 const DEFAULT_MAX_FILE_BYTES = 26_214_400;
 
@@ -66,14 +66,16 @@ function kindForPath(path: string): ParsedFileKind {
   return KIND_BY_EXT[path.slice(dot + 1).toLowerCase()] ?? "other";
 }
 
-/** True for a path `normalizeDocumentPath` would reject. */
-function isValidEntryPath(path: string): boolean {
-  if (path.trim() === "") return false;
-  if (path.length > MAX_PATH_LENGTH) return false;
-  if (path.startsWith("/")) return false;
-  if (path.includes("\\")) return false;
-  if (/[\u0000-\u001f]/.test(path)) return false;
-  return path.split("/").every((s) => s !== "." && s !== "..");
+/** Validate an entry path with the one implementation the app and worker share
+ *  (`normalizeDocumentPath`), so the importer cannot drift from the editor's
+ *  rules. Returns the normalised path (duplicate separators collapsed) or null
+ *  when the entry must be rejected. */
+function normalizeEntryPath(path: string): string | null {
+  try {
+    return normalizeDocumentPath(path);
+  } catch {
+    return null;
+  }
 }
 
 /** Silently dropped packaging noise, not a security finding. */
@@ -236,22 +238,23 @@ export function parsePrismArchive(
     const path = entry.path;
     if (path.endsWith("/")) continue; // directory entry
     if (isJunkPath(path)) continue;
-    if (!isValidEntryPath(path)) {
+    const normalised = normalizeEntryPath(path);
+    if (normalised === null) {
       // Validate before grouping: a traversal path has no valid first segment,
       // so a "stray root file" reading would silently ignore an attack.
       rejected.push(path);
       continue;
     }
-    const slash = path.indexOf("/");
+    const slash = normalised.indexOf("/");
     if (slash <= 0) continue; // stray root file
-    const name = path.slice(0, slash);
+    const name = normalised.slice(0, slash);
     let bucket = buckets.get(name);
     if (!bucket) {
       bucket = { name, files: [], conversations: [] };
       buckets.set(name, bucket);
     }
 
-    const relative = path.slice(slash + 1);
+    const relative = normalised.slice(slash + 1);
     if (relative.startsWith("preview/")) continue;
 
     if (relative.startsWith("conversations/") && relative.endsWith(".json")) {
@@ -301,8 +304,6 @@ export function parsePrismArchive(
 
 /** Re-root uploads, resolve the main file and apply include rewrites. */
 function finalizeProject(bucket: Bucket): ParsedProject {
-  const projectRejected: string[] = [];
-
   // Files not under an upload directory are placed first so a root-level name
   // always wins the collision; upload files fall back to their prefix.
   const roots: ParsedFile[] = [];
@@ -366,6 +367,8 @@ function finalizeProject(bucket: Bucket): ParsedProject {
     promotedMain,
     conversations: bucket.conversations,
     rewrites,
-    rejectedPaths: projectRejected,
+    // Rejections are recorded once, at parse time, against the archive; there
+    // is no per-project list to keep in sync.
+    rejectedPaths: [],
   };
 }

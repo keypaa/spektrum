@@ -19,7 +19,7 @@ export function ImportMenu() {
         </DropdownMenuTrigger>
         <DropdownMenuContent sideOffset={9} align="end" className="min-w-[200px]">
           <DropdownMenuItem onSelect={() => setArchiveOpen(true)}>
-            Import archive (.zip, .tar.gz)
+            Import archive (.zip)
           </DropdownMenuItem>
           <DropdownMenuItem disabled aria-disabled="true">
             Import Folder

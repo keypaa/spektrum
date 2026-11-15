@@ -92,9 +92,9 @@ describe("DashboardHeader", () => {
     await user.click(screen.getByRole("button", { name: "Import" }));
 
     expect(
-      (await screen.findByRole("menuitem", { name: "Import archive (.zip, .tar.gz)" }))
+      (await screen.findByRole("menuitem", { name: "Import archive (.zip)" }))
         .textContent,
-    ).toBe("Import archive (.zip, .tar.gz)");
+    ).toBe("Import archive (.zip)");
     expect(screen.getByRole("menuitem", { name: "Import Folder" })).toBeTruthy();
   });
 
