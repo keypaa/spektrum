@@ -77,6 +77,23 @@ async function setContent(
   expect(res.ok()).toBe(true);
 }
 
+
+/**
+ * Trigger exactly one compile and return its revision.
+ *
+ * A reload plus an edit produces two compiles, and the newer one supersedes the
+ * row a test is watching. Asking for one compile up front makes the assertion
+ * about a revision we chose, not about whichever job happened to be last.
+ */
+async function compileNow(page: Page, projectId: string): Promise<string> {
+  const res = await page.request.post(`/api/projects/${projectId}/compile`, {
+    data: { mainFile: "main.tex" },
+    headers: { origin: new URL(page.url()).origin },
+  });
+  expect(res.ok()).toBe(true);
+  return ((await res.json()) as { revision: string }).revision;
+}
+
 async function blur(page: Page): Promise<void> {
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
 }
@@ -138,26 +155,25 @@ test.describe("compile", () => {
     );
     await page.reload();
     await expect(page.getByTestId("monaco-editor")).toBeVisible();
-    // Any edit re-triggers a compile over the content set above.
-    await type(page, " ");
-    await blur(page);
+    // Exactly one compile, so the render we wait for cannot be superseded by
+    // a second job.
+    const revision = await compileNow(page, projectId);
 
-    // Wait for the render row to record the error, then reload so the RSC
-    // ships the diagnostics (the SSE stream is not observable from Playwright).
+    // Wait for that revision to record the error, then reload so the RSC ships
+    // the diagnostics (the SSE stream is not observable from Playwright).
     await expect
       .poll(
         async () => {
-          const res = await page.request.get(
-            `/api/projects/${projectId}/render/latest`,
+          const body = (await (
+            await page.request.get(`/api/projects/${projectId}/render/latest`)
+          ).json()) as { render: { revision: string; status: string } | null };
+          return (
+            body.render?.revision === revision && body.render.status === "error"
           );
-          const body = (await res.json()) as {
-            render: { status: string } | null;
-          };
-          return body.render?.status;
         },
         { timeout: 60_000 },
       )
-      .toBe("error");
+      .toBe(true);
     await page.reload();
     await expect(page.getByTestId("monaco-editor")).toBeVisible();
 
@@ -182,26 +198,54 @@ test.describe("compile", () => {
     test.setTimeout(120_000);
     await openProject(page);
     const projectId = new URL(page.url()).pathname.split("/")[2]!;
-    const ok = async (): Promise<boolean> =>
-      (await latestRender(page, projectId)).render?.status === "ok";
+    // Let the compile the app starts on open finish first, so it cannot
+    // supersede the render this test asserts on.
+    await expect
+      .poll(
+        async () => {
+          const render = (await latestRender(page, projectId)).render;
+          return render?.status === "ok" && render.isCurrent;
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
 
-    // Start a compile, then immediately supersede it with a newer edit.
+    // Two quick edits; the newer content must win. Wait for the second save so
+    // the compile below sees the final content, not the one being replaced.
     await type(page, "1");
     await blur(page);
+    const savedSecond = page.waitForResponse(
+      (res) =>
+        res.url().includes("/documents/") && res.request().method() === "PATCH",
+      { timeout: 30_000 },
+    );
     await type(page, "2");
     await blur(page);
-    await expect.poll(ok, { timeout: 60_000 }).toBe(true);
+    await savedSecond;
+    // Let the debounced autosave of the last edit land too, or it supersedes
+    // the compile we are about to ask for.
+    await page.waitForLoadState("networkidle");
 
-    // The final render is the newest revision the server computes for the
-    // current content (not the superseded one).
-    const revision = await page.evaluate(async (id) => {
-      const res = await fetch(`/api/projects/${id}/compile`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mainFile: "main.tex" }),
-      });
-      return ((await res.json()) as { revision: string }).revision;
-    }, projectId);
+    // Ask for one compile of the current content and wait for *that* revision:
+    // polling for "some ok render" would return on the first job, which the
+    // second edit has already superseded.
+    const revision = await compileNow(page, projectId);
+    await expect
+      .poll(
+        async () => {
+          const body = (await (
+            await page.request.get(`/api/projects/${projectId}/render/latest`)
+          ).json()) as {
+            render: { revision: string; status: string } | null;
+          };
+          return (
+            body.render?.revision === revision && body.render.status === "ok"
+          );
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+
     const latest = await latestRender(page, projectId);
     expect(latest.render?.revision).toBe(revision);
     expect(latest.render?.isCurrent).toBe(true);
@@ -223,13 +267,20 @@ test.describe("compile", () => {
     );
     await page.reload();
     await expect(page.getByTestId("monaco-editor")).toBeVisible();
-    await type(page, " ");
-    await blur(page);
+    const revision = await compileNow(page, projectId);
     await expect
-      .poll(async () => (await latestRender(page, projectId)).render?.status, {
-        timeout: 60_000,
-      })
-      .toBe("error");
+      .poll(
+        async () => {
+          const body = (await (
+            await page.request.get(`/api/projects/${projectId}/render/latest`)
+          ).json()) as { render: { revision: string; status: string } | null };
+          return (
+            body.render?.revision === revision && body.render.status === "error"
+          );
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
 
     await expect(page.getByText("Failed")).toBeVisible({ timeout: 30_000 });
     // The last good PDF is still rendered (the viewer keeps the old pdfUrl).
@@ -297,14 +348,17 @@ test.describe("compile", () => {
 
     const before = await cursorTop(second);
 
-    // First tab saves "AAA".
+    // First tab saves "AAA". Wait for the save itself: the render from opening
+    // the project is already "ok", so polling for a render would return before
+    // the write landed.
+    const savedFirst = page.waitForResponse(
+      (res) =>
+        res.url().includes("/documents/") && res.request().method() === "PATCH",
+      { timeout: 30_000 },
+    );
     await type(page, "AAA");
     await blur(page);
-    await expect
-      .poll(async () => (await latestRender(page, projectId)).render?.status, {
-        timeout: 60_000,
-      })
-      .toBe("ok");
+    await savedFirst;
 
     // Second tab saves "BBB": the PATCH must 409.
     const saved = second.waitForResponse(
@@ -317,10 +371,12 @@ test.describe("compile", () => {
     expect((await saved).status()).toBe(409);
 
     // The losing tab reloads the winner's content and keeps its cursor.
-    const winner = await lines(page);
+    // `.view-lines` is Monaco's virtualised viewport, so two tabs scrolled
+    // differently never render the same text; what the conflict must produce is
+    // the winner's edit in the loser's buffer.
     await expect
       .poll(() => lines(second), { timeout: 20_000 })
-      .toBe(winner);
+      .toContain("AAA");
     expect(await cursorTop(second)).toBe(before);
     await second.close();
   });
