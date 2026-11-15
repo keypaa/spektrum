@@ -49,12 +49,19 @@ function isMissing(e: unknown): boolean {
  *  swallow every error, which meant a not-yet-ready object store looked like a
  *  successful run and the first real PUT failed later with a confusing 500. */
 
+/** HTTP statuses worth another attempt. */
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * Send one command, naming the operation on failure.
+ * Send one command, retrying transient failures and naming the operation.
  *
  * A bare S3 `InternalError` does not say whether a read, a write or a bucket
- * call failed; the worker's render row only keeps the message, so the context
- * has to be added here or it is lost.
+ * call failed, and an object store that is still growing its first volume
+ * answers 500 for a moment — the SDK's own retries happen within milliseconds,
+ * so a short backoff here is what actually rides it out.
  */
 async function send(
   command: unknown,
@@ -62,14 +69,26 @@ async function send(
   bucket: Bucket,
   key: string,
 ): Promise<void> {
-  try {
-    await client.send(command as never);
-  } catch (e) {
-    console.error(
-      `s3 ${operation} failed: ${bucket}/${key}: ${(e as Error).message}`,
-    );
-    throw e;
+  let last: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await client.send(command as never);
+      return;
+    } catch (e) {
+      last = e;
+      const status = (e as { $metadata?: { httpStatusCode?: number } }).$metadata
+        ?.httpStatusCode;
+      const retryable =
+        Boolean((e as { $retryable?: unknown }).$retryable) ||
+        (status !== undefined && RETRYABLE_STATUS.has(status));
+      if (!retryable || attempt === MAX_ATTEMPTS) break;
+      await sleep(500 * 2 ** (attempt - 1));
+    }
   }
+  console.error(
+    `s3 ${operation} failed: ${bucket}/${key}: ${(last as Error).message}`,
+  );
+  throw last;
 }
 
 export async function ensureBucket(bucket: Bucket): Promise<void> {

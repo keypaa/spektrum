@@ -180,12 +180,20 @@ jobs:
         run: |
           docker run -d --name seaweedfs -p 8333:8333 -p 9333:9333 \
             chrislusf/seaweedfs:latest@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0 server -dir=/data -s3 -s3.port=8333
-          # A 200 from the S3 port means the HTTP server is up, not that the
-          # filer can serve yet — so gate on a real bucket create instead.
-          for i in $(seq 1 30); do
-            docker logs seaweedfs 2>&1 | grep -q " filer" && break
-            sleep 1
+          # The port answering means nothing: SeaweedFS also has to have a
+          # *volume node* before it can store anything. Ask the master to assign
+          # in the bucket we care about and restart the store if it cannot.
+          for i in $(seq 1 20); do
+            if curl -fsS "http://localhost:9333/dir/assign?collection=spektrum-pdf" 2>/dev/null | grep -q '"fid"'; then
+              echo "object store can assign volumes"
+              exit 0
+            fi
+            echo "store not ready (attempt $i); restarting it" >&2
+            docker restart seaweedfs >/dev/null
+            sleep 5
           done
+          echo "object store never became writable" >&2
+          exit 1
       - name: Create the buckets
         run: |
           # `ensureBucket` throws on a not-yet-ready store; retry rather than
@@ -283,11 +291,18 @@ jobs:
         run: |
           docker run -d --name seaweedfs-visual -p 8333:8333 -p 9333:9333 \
             chrislusf/seaweedfs:latest@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0 server -dir=/data -s3 -s3.port=8333
-          # Gate on the filer being up, not on the port answering.
-          for i in $(seq 1 30); do
-            docker logs seaweedfs-visual 2>&1 | grep -q " filer" && break
-            sleep 1
+          # Gate on the master being able to assign a volume, not on the port
+          # answering: SeaweedFS accepts connections before it can store data.
+          for i in $(seq 1 20); do
+            if curl -fsS "http://localhost:9333/dir/assign?collection=spektrum-pdf" 2>/dev/null | grep -q '"fid"'; then
+              echo "object store can assign volumes"
+              exit 0
+            fi
+            echo "store not ready (attempt $i); restarting it" >&2
+            docker restart seaweedfs-visual >/dev/null
+            sleep 5
           done
+          exit 1
       - name: Create the buckets
         run: |
           # `ensureBucket` throws on a not-yet-ready store; retry rather than
