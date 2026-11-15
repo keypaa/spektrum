@@ -35,6 +35,9 @@ export async function GET(
       headers: {
         "content-type": "text/plain; charset=utf-8",
         "content-disposition": disposition,
+        // A download is never rendered in the page: stop the browser from
+        // sniffing a different type for an uploaded .html/.svg.
+        "x-content-type-options": "nosniff",
       },
     });
   } catch (e) {

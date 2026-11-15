@@ -40,9 +40,10 @@ export async function GET(
         status: 206,
         headers: {
           "Content-Type": "application/pdf",
-          "Accept-Ranges": "bytes",
           "Content-Length": String(end - start + 1),
           "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Accept-Ranges": "bytes",
+          "X-Content-Type-Options": "nosniff",
         },
       });
     }
@@ -51,8 +52,9 @@ export async function GET(
     return new Response(new Uint8Array(object.body), {
       headers: {
         "Content-Type": "application/pdf",
-        "Accept-Ranges": "bytes",
         "Content-Length": String(object.size),
+        "Accept-Ranges": "bytes",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (e) {

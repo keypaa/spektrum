@@ -12,6 +12,7 @@ import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
 import { errorResponse } from "@/auth/route-errors";
 import { importArchive } from "@/lib/import/import-archive";
 import { limitsFromEnv } from "@/lib/import/limits";
+import { assertZipMagic, SniffError } from "@/lib/upload/sniff";
 import { ZipError } from "@/lib/import/zip";
 
 export const runtime = "nodejs";
@@ -60,6 +61,15 @@ export async function POST(req: NextRequest) {
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
+    // Content type is decided from the bytes, not the file name.
+    try {
+      assertZipMagic(bytes);
+    } catch (e) {
+      if (e instanceof SniffError) {
+        return NextResponse.json({ error: "bad_request" }, { status: 400 });
+      }
+      throw e;
+    }
     const report = await importArchive(user.id, bytes, limits);
     return NextResponse.json({ report });
   } catch (e) {
