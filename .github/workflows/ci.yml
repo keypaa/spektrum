@@ -143,6 +143,7 @@ jobs:
   # This job stays non-blocking until calibration is actively resumed.
   compile:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16-alpine
@@ -213,7 +214,7 @@ jobs:
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
       - name: Compile e2e
-        run: pnpm exec playwright test --config playwright.compile.config.ts e2e/compile.spec.ts
+        run: pnpm exec playwright test --config playwright.compile.config.ts e2e/compile.spec.ts --max-failures=1
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           REDIS_URL: redis://localhost:6379
