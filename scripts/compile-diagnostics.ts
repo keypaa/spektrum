@@ -71,12 +71,10 @@ const main = async (): Promise<void> => {
   for (const render of latest) {
     console.log(
       `render ${render.id} ${render.status} ${render.createdAt.toISOString()}:`,
-      (render.log ?? "")
-        .split("\n")
-        .slice(-4)
-        .join(" | ")
-        .slice(0, 300),
     );
+    // The interesting part of a TeX log is the tail: the error and the context
+    // lines that produced it.
+    console.log((render.log ?? "").split("\n").slice(-25).join("\n"));
   }
 
   clearTimeout(watchdog);
