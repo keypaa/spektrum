@@ -268,6 +268,13 @@ test("settings: a preference persists across a reload", async ({ page }) => {
   // opposite after a reload (a previous run may have left it on).
   const sw = dialog.getByRole("switch", { name: "Disable Word Wrap" });
   const before = await sw.getAttribute("aria-checked");
+  // Wait for the debounced PUT instead of sleeping: under load the request can
+  // outlast any fixed delay, and reloading before it lands would read the old
+  // value back.
+  const saved = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/user/preferences") && r.request().method() === "PUT",
+  );
   await sw.click();
   const after = before === "true" ? "false" : "true";
   await page.waitForFunction(
@@ -277,8 +284,7 @@ test("settings: a preference persists across a reload", async ({ page }) => {
         ?.getAttribute("aria-checked") === expected,
     after,
   );
-  // Let the provider's 300 ms debounce send the PUT before reloading.
-  await page.waitForTimeout(700);
+  await saved;
   await page.reload();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
   await page.getByRole("button", { name: /account$/i }).click();
