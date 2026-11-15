@@ -10,6 +10,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "admin:create-owner": "tsx src/cli/create-owner.ts",
+    "admin:ban": "tsx src/cli/admin.ts ban",
+    "admin:suspend": "tsx src/cli/admin.ts suspend",
+    "admin:unban": "tsx src/cli/admin.ts unban",
     "visual:seed": "tsx src/cli/visual-seed.ts",
     "e2e:seed": "tsx src/cli/e2e-seed.ts",
     "visual:ai-seed": "tsx src/cli/visual-ai-seed.ts"
