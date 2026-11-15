@@ -1,0 +1,3 @@
+# Nightly backup (host cron). Install with:  crontab docker/backup.cron
+# Paths are relative to the repo root; scripts/backup.sh cds there itself.
+0 3 * * * cd /opt/spektrum && ./scripts/backup.sh >> /var/log/spektrum-backup.log 2>&1

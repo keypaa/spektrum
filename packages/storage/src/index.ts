@@ -7,6 +7,7 @@ import {
   GetBucketPolicyCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -67,6 +68,28 @@ export async function putObject(
       ContentType: contentType,
     }),
   );
+}
+
+/** Every object in a bucket, paginated past the 1000-key page limit. */
+export async function listObjects(
+  bucket: Bucket,
+): Promise<Array<{ key: string; size: number }>> {
+  const out: Array<{ key: string; size: number }> = [];
+  let continuation: string | undefined;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucketName(bucket),
+        ContinuationToken: continuation,
+      }),
+    );
+    for (const item of page.Contents ?? []) {
+      if (item.Key === undefined) continue;
+      out.push({ key: item.Key, size: Number(item.Size ?? 0) });
+    }
+    continuation = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuation);
+  return out;
 }
 
 export async function getObject(

@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -11,9 +12,7 @@ describe("scripts/deploy.sh", () => {
     expect(() => {
       // `bash -n` parses without executing; a syntax error is the only thing
       // it can report.
-      require("node:child_process").execFileSync("bash", ["-n", script], {
-        stdio: "pipe",
-      });
+      execFileSync("bash", ["-n", script], { stdio: "pipe" });
     }).not.toThrow();
   });
 
