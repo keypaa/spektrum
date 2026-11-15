@@ -1,0 +1,154 @@
+# Reference production stack (spec §19). Host-agnostic: nothing here names a
+# cloud provider, and every host-specific value comes from .env.
+#
+#   cp .env.example .env && $EDITOR .env
+#   ./scripts/deploy.sh
+#
+# Only Caddy publishes ports. Postgres, Redis and the object store stay on the
+# compose network. The worker is the only container that reaches the Docker
+# daemon (it compiles in a throwaway TeX Live container — see docker/texlive).
+name: spektrum
+
+services:
+  # ---------------------------------------------------------------- reverse proxy
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL is required (e.g. https://app.example.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required for TLS}
+      # Optional: the host Caddy sends errors to, or empty. Kept out of the
+      # CSP when unset (see docker/Caddyfile).
+      SENTRY_INGEST_HOST: ${SENTRY_INGEST_HOST:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_started
+
+  # ------------------------------------------------------------------------- app
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    image: spektrum-web:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+  # --------------------------------------------------------------------- worker
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    image: spektrum-worker:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NODE_ENV: production
+      # The worker spawns this image per compile; the code default stays
+      # `:dev` so local and CI keep working, and compose overrides it here.
+      TEXLIVE_IMAGE: ${TEXLIVE_IMAGE:-spektrum-texlive:local}
+      HEALTH_PORT: ${HEALTH_PORT:-3001}
+    volumes:
+      # Docker socket: the worker needs it to run the compile sandbox. It is
+      # the single highest-risk mount in the stack — see the launch runbook.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The socket's owner group differs per host; DOCKER_GID lets the worker
+    # reach it without running as root.
+    group_add:
+      - "${DOCKER_GID:-999}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+  # ------------------------------------------------------------ schema + buckets
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/migrate.Dockerfile
+    image: spektrum-migrate:${IMAGE_TAG:-local}
+    restart: "no"
+    env_file: ../.env
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        pnpm --filter @spektrum/db migrate &&
+        pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------- backing
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-spektrum}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-spektrum}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object store. MinIO's images were withdrawn from Docker Hub
+  # and quay.io now requires auth; SeaweedFS speaks the same S3 API and the app
+  # talks to it unchanged (path-style, forcePathStyle). Any S3-compatible
+  # service works — point S3_ENDPOINT at it and drop this service.
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    restart: unless-stopped
+    command: server -dir=/data -s3 -s3.port=8333
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8333/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  caddy-data:
+  caddy-config:
+  postgres-data:
+  redis-data:
+  seaweedfs-data:
