@@ -26,6 +26,7 @@
     "@playwright/test": "1.65.0",
     "@spektrum/storage": "workspace:*",
     "@types/node": "^26.0.0",
+    "@types/pg": "8.18.0",
     "@types/pngjs": "^6.0.5",
     "eslint": "^10.14.0",
     "pixelmatch": "8.0.0",
