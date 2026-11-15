@@ -21,6 +21,9 @@ import { sha256HexBytes } from "@spektrum/shared/hash";
 import { putObject } from "@spektrum/storage";
 import { parsePrismArchive, type ParsedFile } from "./prism";
 import { readZip, ZIP_LIMITS } from "./zip";
+import type { ImportLimits } from "./limits";
+
+export type { ImportLimits };
 
 /** The document inline-content cap, in bytes (spec §4). */
 export const MAX_INLINE_BYTES = 524_288;
@@ -34,13 +37,6 @@ export type ImportReport = {
   conversationsSkipped: number;
   rejectedPaths: string[];
   skipped: Array<{ project: string; reason: "duplicate" }>;
-};
-
-export type ImportLimits = {
-  maxFileBytes?: number;
-  maxTotalBytes?: number;
-  maxEntries?: number;
-  maxProjects?: number;
 };
 
 const MIME_BY_EXT: Record<string, string> = {

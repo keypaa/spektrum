@@ -18,6 +18,9 @@ export const BUDGETS = {
   compileHourly: { limit: 60, windowMs: 3_600_000 },
   ai: { limit: 30, windowMs: 60_000 },
   upload: { limit: 20, windowMs: 60_000 },
+  // spec §10.5 / §13.2: a whole Prism archive per request
+  import: { limit: 10, windowMs: 60_000 },
+  export: { limit: 30, windowMs: 60_000 },
   // audit addition: the invite-redemption route lives under /api/auth/* but is
   // our own handler, so Better Auth's limiter does not cover it
   inviteRedeem: { limit: 5, windowMs: 15 * 60_000 },
