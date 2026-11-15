@@ -2,6 +2,7 @@
 import { Worker } from "bullmq";
 import { connectRedis, handler, QUEUE_NAME } from "./queue";
 import { recoverStaleLocks, recoverStaleRuns } from "./recover";
+import { startHealthServer } from "./health";
 
 const redis = connectRedis();
 await recoverStaleRuns();
@@ -25,3 +26,9 @@ process.on("SIGTERM", () => void stop("SIGTERM"));
 process.on("SIGINT", () => void stop("SIGINT"));
 
 console.log("worker: ready");
+
+const healthPort = Number(process.env.HEALTH_PORT ?? 3001);
+if (Number.isFinite(healthPort)) {
+  startHealthServer(healthPort);
+  console.log(`worker: health on :${healthPort}`);
+}
