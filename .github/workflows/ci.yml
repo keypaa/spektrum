@@ -122,14 +122,17 @@ jobs:
       - run: pnpm --filter @spektrum/web build
       - run: pnpm test:e2e
         env:
-          E2E_WEB_COMMAND: pnpm --filter @spektrum/web start
+          # `next start` runs with NODE_ENV=production, where the editor
+          # deliberately exposes no test handle (`__spektrum_editor`), so the
+          # suite runs against the dev server — the same way it is run locally.
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          E2E_DB_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
       - run: pnpm test:ai
         env:
-          E2E_WEB_COMMAND: pnpm --filter @spektrum/web exec next start -p 3000
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          E2E_DB_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           LLM_KEY_ENCRYPTION_SECRET: e2e-key-encryption-secret-32ch!x
 
   # Visual calibration did NOT reach the ≤ 0.15 % target (accepted shortfall;

@@ -1,27 +1,7 @@
-import { execFileSync } from "node:child_process";
 import { expect, test } from "@playwright/test";
 import { login, OWNER_EMAIL } from "./helpers";
+import { psql } from "./db";
 
-
-function psql(sql: string): string {
-  return execFileSync(
-    "docker",
-    [
-      "exec",
-      "spektrum-postgres",
-      "psql",
-      "-U",
-      "spektrum",
-      "-d",
-      "spektrum_test",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-tAc",
-      sql,
-    ],
-    { encoding: "utf8" },
-  ).trim();
-}
 
 function resetOwnerState(): void {
   psql(`
