@@ -25,4 +25,8 @@ export async function login(
   console.log("SIGNIN", (await response).status());
   await expect(page).toHaveURL("/");
   await expect(page.getByRole("heading", { name: "Your Projects" })).toBeVisible();
+  // The heading is server-rendered, so it can be visible before React
+  // hydrates; the first click would then be dropped and every spec that
+  // starts with one would fail at random.
+  await page.waitForLoadState("networkidle");
 }

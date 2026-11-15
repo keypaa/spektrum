@@ -126,7 +126,9 @@ test("tabs survive a reload with the last active tab", async ({ page }) => {
 });
 
 test("switching tabs loads the other document's content", async ({ page }) => {
-  test.setTimeout(60_000);
+  // Two documents, two server round trips and an autosave on a shared dev
+  // server that has already compiled the rest of the suite.
+  test.setTimeout(120_000);
   await page.goto("/");
   await login(page);
   await page.getByRole("button", { name: "New", exact: true }).click();
@@ -177,11 +179,11 @@ test("switching tabs loads the other document's content", async ({ page }) => {
   await edit("NOTES_MARKER");
 
   // Switch back to main.tex: its content must load, not an empty buffer.
-  await page.getByTestId("tab-main.tex").click();
-  await expect.poll(editorText, { timeout: 15_000 }).toContain("MAIN_MARKER");
+  await page.getByTestId("tab-main.tex").click({ timeout: 20_000 });
+  await expect.poll(editorText, { timeout: 20_000 }).toContain("MAIN_MARKER");
   // And back to notes.tex.
-  await page.getByTestId("tab-notes.tex").click();
-  await expect.poll(editorText, { timeout: 15_000 }).toContain("NOTES_MARKER");
+  await page.getByTestId("tab-notes.tex").click({ timeout: 20_000 });
+  await expect.poll(editorText, { timeout: 20_000 }).toContain("NOTES_MARKER");
 });
 
 test("an edit autosaves and survives a reload", async ({ page }) => {

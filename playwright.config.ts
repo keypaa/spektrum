@@ -5,7 +5,11 @@ export default defineConfig({
   // The visual suite has its own config (playwright.visual.config.ts) and its
   // own two-server setup; the behavioural suite must never pick it up.
   testIgnore: ["**/visual/**", "**/compile.spec.ts", "**/ai.spec.ts"],
-  timeout: 30_000,
+  // `next dev` compiles each route on demand. A route the suite has not hit
+  // yet (or whose cache was evicted) can take longer than 30 s to compile on a
+  // loaded machine, which surfaced as a click timeout rather than a real
+  // failure. Assertions still report their own reason.
+  timeout: 60_000,
   // Every spec drives the same owner account and database; parallel workers
   // race on project counts and the sign-in rate limit. The suite is small
   // enough to run serially.
