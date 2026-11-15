@@ -6,15 +6,19 @@ export function DataControlsSection() {
       <div className="text-base font-normal text-text-editor-primary">
         Export all projects (zip)
       </div>
+      {/* A plain navigation: the browser follows the location, so the
+          Content-Disposition of the response is the download's file name. */}
       <button
         type="button"
-        aria-disabled="true"
-        className="h-8 w-fit cursor-not-allowed rounded-lg bg-[color:var(--button-secondary-bg)] px-3 text-sm text-[color:var(--button-secondary-text)] opacity-50"
+        className="h-8 w-fit rounded-lg bg-[color:var(--button-secondary-bg)] px-3 text-sm text-[color:var(--button-secondary-text)]"
+        onClick={() => {
+          window.location.href = "/api/projects/export";
+        }}
       >
         Download zip
       </button>
       <div className="text-sm text-text-editor-secondary">
-        Import and export arrive in Phase 5.
+        Import is available from the dashboard Import menu.
       </div>
     </div>
   );

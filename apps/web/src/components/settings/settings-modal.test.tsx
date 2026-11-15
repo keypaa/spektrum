@@ -127,14 +127,14 @@ describe("SettingsModal", () => {
     expect(within(dialog).queryByText("*.tmp")).toBeNull();
   });
 
-  it("Data Controls ships Download zip disabled", async () => {
+  it("Data Controls ships Download zip enabled (Phase 5 export)", async () => {
     renderHost();
     await userEvent.click(screen.getByText("open settings"));
     const dialog = screen.getByRole("dialog", { name: "Settings" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Data Controls" }));
     expect(
-      within(dialog).getByRole("button", { name: "Download zip" }).getAttribute("aria-disabled"),
-    ).toBe("true");
+      within(dialog).getByRole("button", { name: "Download zip" }).getAttribute("disabled"),
+    ).toBeNull();
   });
 
   it("Beta features stores the opt-in outside the preferences row (D40)", async () => {
