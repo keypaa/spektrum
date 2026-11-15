@@ -13,7 +13,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 COMPOSE=(docker compose -f docker/compose.prod.yml)
-ENV_FILE=".env"
+ENV_FILE="${SPEKTRUM_ENV_FILE:-.env}"
+# Absolute so a test can point at a temporary file.
+[[ "$ENV_FILE" == /* ]] || ENV_FILE="$PWD/$ENV_FILE"
 DEST_ROOT="${BACKUP_DEST_ROOT:-backups}"
 DEST="$DEST_ROOT/$(date +%F)"
 
@@ -24,7 +26,7 @@ fi
 
 # shellcheck disable=SC1091
 set -a
-. "./$ENV_FILE"
+. "$ENV_FILE"
 set +a
 
 mkdir -p "$DEST"

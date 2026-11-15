@@ -1,15 +1,22 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parsePrismArchive } from "./prism";
 import { readZip, writeZip } from "./zip";
 
 const enc = (s: string) => new TextEncoder().encode(s);
-const fixture = () => readZip(new Uint8Array(readFileSync(resolve(import.meta.dirname, "../../../../../e2e/fixtures/prism-projects-2026-11-05.zip"))));
+const FIXTURE = resolve(import.meta.dirname, "../../../../../e2e/fixtures/prism-projects-2026-11-05.zip");
+const fixture = () => readZip(new Uint8Array(readFileSync(FIXTURE)));
+
+// The real archive is a local-only file (it contains real papers and chat
+// transcripts), so the test that needs it skips with a clear reason rather
+// than failing with ENOENT in a fresh clone.
+const hasFixture = existsSync(FIXTURE);
 
 describe("parsePrismArchive", () => {
-  it("parses the real archive: 15 projects, drops preview and macOS junk", () => {
+  it.skipIf(!hasFixture)("parses the real archive: 15 projects, drops preview and macOS junk", () => {
+    if (!hasFixture) console.warn(`skipped: ${FIXTURE} is not present`);
     const parsed = parsePrismArchive(fixture());
     expect(parsed.projects.length).toBe(15);
     expect(parsed.projects.every((p) => p.files.every((f) => !f.path.startsWith("preview/")))).toBe(true);

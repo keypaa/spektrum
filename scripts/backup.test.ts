@@ -20,9 +20,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 const script = resolve(import.meta.dirname, "backup.sh");
 const restoreScript = resolve(import.meta.dirname, "restore.sh");
-const repoRoot = resolve(import.meta.dirname, "..");
-const envFile = join(repoRoot, ".env");
-const createdEnv = !existsSync(envFile);
+// The env file lives in the scratch dir, never at the repo root: the ops
+// project runs these scripts' tests in parallel, and a shared `.env` raced.
+let envFile = "";
 
 const scratch: string[] = [];
 const makeScratch = () => {
@@ -33,7 +33,7 @@ const makeScratch = () => {
 
 afterEach(() => {
   while (scratch.length > 0) rmSync(scratch.pop()!, { recursive: true, force: true });
-  if (createdEnv && existsSync(envFile)) rmSync(envFile);
+  rmSync(envFile, { force: true });
 });
 
 /** Fake docker/pnpm on PATH. `pruneFails` makes the prune step exit non-zero. */
@@ -62,17 +62,21 @@ exit 0
 function runBackup(destRoot: string, pruneFails = false) {
   const bin = makeScratch();
   const log = fakeBin(bin, { pruneFails });
-  if (createdEnv) {
-    writeFileSync(
-      envFile,
-      ["POSTGRES_USER=spektrum", "POSTGRES_DB=spektrum", "S3_BUCKET=b", "S3_PDF_BUCKET=p", ""].join("\n"),
-    );
-  }
+  envFile = join(bin, "backup.env");
+  writeFileSync(
+    envFile,
+    ["POSTGRES_USER=spektrum", "POSTGRES_DB=spektrum", "S3_BUCKET=b", "S3_PDF_BUCKET=p", ""].join("\n"),
+  );
   mkdirSync(destRoot, { recursive: true });
   const result = execFileSync("bash", [script], {
     stdio: "pipe",
     encoding: "utf8",
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, BACKUP_DEST_ROOT: destRoot },
+    env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        SPEKTRUM_ENV_FILE: envFile,
+        BACKUP_DEST_ROOT: destRoot,
+      },
   });
   return { log: readFileSync(log, "utf8"), result };
 }

@@ -206,7 +206,21 @@ destructive migration means restoring the dump, not downgrading the schema.
 - **The worker image is multi-arch**: the Docker CLI is fetched for
   `TARGETARCH` (`amd64` → `x86_64`, `arm64` → `aarch64`).
 
-## 10. Troubleshooting
+## 10. Local-only files (not in git)
+
+Some inputs are deliberately kept out of the repository:
+
+| Path | Why | Who needs it |
+|---|---|---|
+| `e2e/fixtures/prism-projects-2026-11-05.zip` | a real Prism export: papers, images and chat transcripts | the round-trip acceptance test (`describe.skipIf` skips it when absent) and the one archive-driven parser test |
+| `zenno/recon/js/`, `css/`, `html/`, `screenshots/`, `fonts/`, `tokens-*.css` | third-party vendor bundles, captures and fonts | nobody — they are reference material |
+
+`zenno/recon/extracted/` **is** committed: `blank-main.tex`, `example-main.tex` and `editor-ui.md` are read by `src/cli/e2e-seed.ts`, `src/cli/visual-seed.ts` and the templates test.
+
+To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-05.zip` and run
+`STORAGE_IT=1 S3_ENDPOINT=… pnpm exec vitest run apps/web/src/lib/import/roundtrip.test.ts`.
+
+## 11. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

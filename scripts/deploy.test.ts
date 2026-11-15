@@ -5,7 +5,6 @@
 import { execFileSync } from "node:child_process";
 import {
   chmodSync,
-  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -16,14 +15,12 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const script = resolve(import.meta.dirname, "deploy.sh");
-const repoRoot = resolve(import.meta.dirname, "..");
-const envFile = join(repoRoot, ".env");
-
-const createdEnv = !existsSync(envFile);
+// The env file lives in the scratch dir, never at the repo root: the ops
+// project runs these scripts' tests in parallel, and a shared `.env` raced.
+let envFile = "";
 
 afterEach(() => {
-  // The script sources the repo's real .env; remove ours, keep the operator's.
-  if (createdEnv && existsSync(envFile)) rmSync(envFile);
+  rmSync(envFile, { force: true });
 });
 
 type Run = { log: string; status: number; stderr: string };
@@ -48,12 +45,11 @@ exit 0
   writeFileSync(join(bin, "curl"), curl, { mode: 0o755 });
   chmodSync(join(bin, "docker"), 0o755);
 
-  if (createdEnv) {
-    writeFileSync(
-      envFile,
-      ["PUBLIC_URL=https://app.example.com", "ACME_EMAIL=ops@example.com", ""].join("\n"),
-    );
-  }
+  envFile = join(bin, "deploy.env");
+  writeFileSync(
+    envFile,
+    ["PUBLIC_URL=https://app.example.com", "ACME_EMAIL=ops@example.com", ""].join("\n"),
+  );
 
   try {
     execFileSync("bash", [script], {
@@ -62,6 +58,7 @@ exit 0
       env: {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
+        SPEKTRUM_ENV_FILE: envFile,
         HEALTH_ATTEMPTS: "1",
         HEALTH_INTERVAL: "1",
         ...extraEnv,
@@ -88,7 +85,12 @@ describe("scripts/deploy.sh", () => {
     const commands = run.log
       .split("\n")
       .filter((line) => line.startsWith("docker "))
-      .map((line) => line.replace(/^docker compose -f docker\/compose\.prod\.yml --env-file \.env /, ""));
+      .map((line) =>
+        line.replace(
+          /^docker compose -f docker\/compose\.prod\.yml --env-file \S+ /,
+          "",
+        ),
+      );
 
     expect(commands).toContain("build");
     expect(commands).not.toContain("pull");

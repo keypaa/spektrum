@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
@@ -14,7 +14,11 @@ const run = Math.random().toString(36).slice(2, 10);
 const userId = `rt-${run}`;
 const userId2 = `rt2-${run}`;
 
-const fixture = () => new Uint8Array(readFileSync(resolve(import.meta.dirname, "../../../../../e2e/fixtures/prism-projects-2026-11-05.zip")));
+const FIXTURE = resolve(import.meta.dirname, "../../../../../e2e/fixtures/prism-projects-2026-11-05.zip");
+const fixture = () => new Uint8Array(readFileSync(FIXTURE));
+// The archive is local-only (real papers + chat transcripts); the round trip
+// needs both it and a bucket.
+const hasFixture = existsSync(FIXTURE);
 const tex = (entries: ReturnType<typeof readZip>) => entries.filter((e) => e.path.endsWith(".tex")).map((e) => `${e.path}\0${new TextDecoder().decode(e.data)}`).sort();
 
 beforeAll(async () => {
@@ -37,7 +41,7 @@ afterAll(async () => {
 });
 
 // The real archive contains images/PDFs that go through S3; skip where no bucket.
-describe.skipIf(!process.env.STORAGE_IT)("Prism round trip", () => {
+describe.skipIf(!process.env.STORAGE_IT || !hasFixture)("Prism round trip", () => {
   it("imports, exports and re-imports with every .tex byte identical", async () => {
     await importArchive(userId, fixture());
     const [p] = await db.select({ id: projects.id }).from(projects).where(eq(projects.ownerId, userId)).limit(1);

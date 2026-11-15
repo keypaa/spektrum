@@ -16,7 +16,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 COMPOSE=(docker compose -f docker/compose.prod.yml)
-ENV_FILE=".env"
+ENV_FILE="${SPEKTRUM_ENV_FILE:-.env}"
+# Absolute so a test can point at a temporary file.
+[[ "$ENV_FILE" == /* ]] || ENV_FILE="$PWD/$ENV_FILE"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "missing $ENV_FILE — copy .env.example to .env and fill it in" >&2
@@ -26,7 +28,7 @@ fi
 # shellcheck disable=SC1091
 set -a
 # shellcheck source=/dev/null
-. "./$ENV_FILE"
+. "$ENV_FILE"
 set +a
 
 if [[ -z "${PUBLIC_URL:-}" || -z "${ACME_EMAIL:-}" ]]; then

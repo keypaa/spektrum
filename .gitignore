@@ -12,3 +12,13 @@ test-results/
 e2e/visual/artifacts/
 # superpowers SDD scratch workspaces
 .superpowers/
+
+# Local-only captures: third-party vendor bundles, screenshots and fonts, plus
+# the real Prism archive used as the round-trip oracle. Neither belongs in git.
+zenno/recon/js/
+zenno/recon/screenshots/
+zenno/recon/fonts/
+zenno/recon/css/
+zenno/recon/html/
+zenno/recon/tokens-*.css
+e2e/fixtures/*.zip
