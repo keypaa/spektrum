@@ -111,6 +111,16 @@ export default defineConfig({
           },
         },
       },
+      {
+        // Root-level tooling tests: shell scripts and the deployment kit.
+        // They run no server and touch no database, so `bash -n` and
+        // `caddy validate` are the whole job.
+        name: "ops",
+        test: {
+          include: ["scripts/**/*.test.ts", "docker/**/*.test.ts"],
+          environment: "node",
+        },
+      },
     ],
   },
 });

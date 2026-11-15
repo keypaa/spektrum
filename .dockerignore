@@ -1,0 +1,18 @@
+# Build context is the repo root, so this is the only .dockerignore Docker reads.
+.git
+.github
+.superpowers
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+e2e
+zenno
+playwright*.config.ts
+**/*.log
+.env
+.env.*
+!.env.example
+*.md
+!README.md

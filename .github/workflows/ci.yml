@@ -163,8 +163,21 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Start MinIO
-        run: docker compose -f docker/compose.dev.yml up -d minio createbuckets
+      - name: Start SeaweedFS (S3 API)
+        run: |
+          docker run -d --name seaweedfs -p 8333:8333 -p 9333:9333 \
+            chrislusf/seaweedfs:latest server -dir=/data -s3 -s3.port=8333
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8333/ >/dev/null && break
+            sleep 1
+          done
+      - name: Create the buckets
+        run: pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts
+        env:
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_SECRET_KEY: spektrum-secret
+          S3_ACCESS_KEY: spektrum
       - name: Build the texlive image
         run: docker build -t spektrum-texlive:dev docker/texlive
       - name: Install Chromium
@@ -188,7 +201,7 @@ jobs:
         env:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           REDIS_URL: redis://localhost:6379
-          S3_ENDPOINT: http://localhost:9000
+          S3_ENDPOINT: http://localhost:8333
           S3_BUCKET: spektrum-uploads
           S3_PDF_BUCKET: spektrum-pdf
           S3_ACCESS_KEY: spektrum
@@ -227,8 +240,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Start MinIO
-        run: docker compose -f docker/compose.dev.yml up -d minio createbuckets
+      - name: Start SeaweedFS (S3 API)
+        run: |
+          docker run -d --name seaweedfs-visual -p 8333:8333 -p 9333:9333 \
+            chrislusf/seaweedfs:latest server -dir=/data -s3 -s3.port=8333
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8333/ >/dev/null && break
+            sleep 1
+          done
+      - name: Create the buckets
+        run: pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts
+        env:
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_SECRET_KEY: spektrum-secret
+          S3_ACCESS_KEY: spektrum
       - name: Build
         run: pnpm build
       - name: Create + migrate visual database
@@ -260,3 +286,12 @@ jobs:
           name: visual-artifacts
           path: e2e/visual/artifacts/
           if-no-files-found: ignore
+
+  # The reference deployment kit has to be buildable, not just documented.
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: docker build -f docker/Dockerfile.web -t spektrum-web:ci .
+      - run: docker build -f docker/Dockerfile.worker -t spektrum-worker:ci .
+      - run: docker build -f docker/migrate.Dockerfile -t spektrum-migrate:ci .
