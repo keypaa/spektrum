@@ -50,6 +50,8 @@ export const ZIP_LIMITS: ZipLimits = {
 };
 
 const CHUNK = 16 * 1024;
+/** Fixed archive timestamp: identical content must produce identical bytes. */
+const FIXED_MTIME = new Date("2020-01-01T00:00:00Z");
 
 function concat(chunks: Uint8Array[], size: number): Uint8Array {
   if (chunks.length === 1 && chunks[0]!.byteLength === size) return chunks[0]!;
@@ -159,5 +161,5 @@ export function writeZip(
     }
     zippable[file.path] = file.data;
   }
-  return zipSync(zippable, { level: 6 });
+  return zipSync(zippable, { level: 6, mtime: FIXED_MTIME });
 }

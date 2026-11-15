@@ -12,6 +12,15 @@ describe("zip", () => {
     expect(new TextDecoder().decode(entries[0]!.data)).toBe("hi");
   });
 
+  it("writes identical bytes for identical input, so the archive hash is stable", () => {
+    // A timestamp in the header would make two exports of the same content hash
+    // differently, and re-importing one would not be seen as a duplicate.
+    const files = [{ path: "a.txt", data: enc("same") }];
+    const first = writeZip(files);
+    const second = writeZip(files);
+    expect(Buffer.compare(Buffer.from(first), Buffer.from(second))).toBe(0);
+  });
+
   it("rejects a declared per-file size over the cap before inflating", () => {
     const zip = writeZip([{ path: "big.txt", data: new Uint8Array(4096) }]);
     expect(() => readZip(zip, { ...ZIP_LIMITS, maxFileBytes: 1024 })).toThrow(ZipError);
