@@ -10,6 +10,9 @@ export default defineConfig({
   // loaded machine, which surfaced as a click timeout rather than a real
   // failure. Assertions still report their own reason.
   timeout: 60_000,
+  // Assertions default to 5 s, which is tight on a cold CI runner compiling
+  // routes on demand. A test still fails for its own reason, not on the clock.
+  expect: { timeout: 15_000 },
   // Every spec drives the same owner account and database; parallel workers
   // race on project counts and the sign-in rate limit. The suite is small
   // enough to run serially.

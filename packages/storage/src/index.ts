@@ -43,14 +43,22 @@ function isMissing(e: unknown): boolean {
   return name === "NoSuchKey" || name === "NotFound";
 }
 
-/** Create a bucket if it does not exist (dev/MinIO). */
+/** Create a bucket if it does not exist (dev/MinIO/SeaweedFS).
+ *
+ *  A bucket that already exists is success; anything else throws. This used to
+ *  swallow every error, which meant a not-yet-ready object store looked like a
+ *  successful run and the first real PUT failed later with a confusing 500. */
 export async function ensureBucket(bucket: Bucket): Promise<void> {
   try {
     await client.send(
       new CreateBucketCommand({ Bucket: bucketName(bucket) }),
     );
-  } catch {
-    /* already exists */
+  } catch (e) {
+    const name = (e as { name?: string }).name;
+    if (name === "BucketAlreadyOwnedByYou" || name === "BucketAlreadyExists") {
+      return;
+    }
+    throw e;
   }
 }
 
