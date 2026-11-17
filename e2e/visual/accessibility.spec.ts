@@ -211,6 +211,31 @@ test("the PDF and Logs screens have no emoji and only 16x16 currentColor icons",
 
   await assertReadable("PDF toolbar");
 
+  // The floating Refresh / Go-to-PDF bar is absolutely positioned and belongs
+  // at the bottom of the sheet. It resolved against the 52 px toolbar row
+  // instead, so `bottom-3` pinned it on top of the zoom control (measured:
+  // bar 8..48 overlapping zoom 16..52).
+  await page.mouse.move(1200, 600);
+  const floating = await page.evaluate(() => {
+    const bar = document.querySelector('[data-testid="pdf-floating-bar"]');
+    const zoom = document.querySelector('[data-testid="pdf-zoom"]');
+    const sheet = document.querySelector('[data-testid="pdf-pane"] > div');
+    if (!bar || !zoom || !sheet) return { visible: false as const };
+    const b = bar.getBoundingClientRect();
+    const z = zoom.getBoundingClientRect();
+    const s = sheet.getBoundingClientRect();
+    return {
+      visible: true as const,
+      overlapsToolbar: b.top < z.bottom && b.bottom > z.top,
+      inLowerHalf: b.top > s.top + s.height / 2,
+    };
+  });
+  expect(floating.visible, "floating bar shows on pointer move").toBe(true);
+  if (floating.visible) {
+    expect(floating.overlapsToolbar, "floating bar must not cover the toolbar").toBe(false);
+    expect(floating.inLowerHalf, "floating bar must sit at the bottom of the sheet").toBe(true);
+  }
+
   await page.getByRole("button", { name: "Tools" }).click();
   await page.getByRole("menuitem", { name: "Logs" }).click();
   await expect(page.getByTestId("info-panel")).toBeVisible();

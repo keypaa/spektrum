@@ -1013,7 +1013,12 @@ export function EditorClient({
               both themes; opting in here covers the chrome, the search pill's
               border and any other inherited text on the sheet. */}
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-lg bg-bg-preview text-[color:var(--text-preview-primary)]">
-            <div className="relative z-10">
+            {/* No `relative` here on purpose: PdfChrome's floating bar is
+                absolutely positioned and must resolve against the sheet, not
+                against this 52 px toolbar row — otherwise `bottom-3` pinned it
+                on top of the toolbar. `z-10` still applies (this is a flex
+                item), so the toolbar stays above the viewer. */}
+            <div className="z-10">
               <PdfChrome
                 state={pillState({
                   render: render.status,
