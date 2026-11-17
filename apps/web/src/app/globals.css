@@ -114,4 +114,15 @@
   * {
     border-color: var(--border-outline);
   }
+
+  /* Tailwind v4's preflight no longer gives buttons a pointer cursor, so every
+     control in the app hovered as "not clickable" — the PDF toolbar, Tools, the
+     tab strip, dialogs — while links and the few elements with an explicit
+     cursor-pointer class did. Prism shows a pointer, and so should we. Base
+     layer, so any cursor-* utility (drag handles, text selection) still wins,
+     and disabled controls keep the default arrow. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
