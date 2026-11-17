@@ -274,10 +274,13 @@ export function PdfChrome({
         ) : null}
       </div>
 
+      {/* Inverted island: this pill sits on the light preview sheet but paints
+          its own dark background, so it opts back into the app's foreground
+          instead of inheriting the sheet's dark ink (black on black). */}
       {barVisible ? (
         <div
           data-testid="pdf-floating-bar"
-          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-3xl bg-bg-primary px-2 py-1 shadow-[var(--shadow-surface)]"
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-3xl bg-bg-primary px-2 py-1 text-fg-primary shadow-[var(--shadow-surface)]"
         >
           <button
             type="button"
