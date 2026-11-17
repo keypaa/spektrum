@@ -28,7 +28,10 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        "relative h-5 w-9 flex-none rounded-full border border-[color:var(--switch-border-off)] bg-switch-bg-off transition-colors",
+        // `group` so the thumb (a child) can react to this element's
+        // aria-checked: `aria-checked:` alone only matches an element that
+        // carries the attribute itself, which is why the thumb never moved.
+        "group relative h-5 w-9 flex-none rounded-full border border-[color:var(--switch-border-off)] bg-switch-bg-off transition-colors",
         "aria-checked:bg-switch-bg-on aria-checked:border-switch-bg-on",
         "disabled:cursor-not-allowed disabled:opacity-50",
       )}
@@ -37,7 +40,7 @@ export function Toggle({
         aria-hidden
         className={cn(
           "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-switch-handle-off transition-transform",
-          "aria-checked:translate-x-4 aria-checked:bg-switch-handle-on",
+          "group-aria-checked:translate-x-4 group-aria-checked:bg-switch-handle-on",
         )}
       />
     </button>
