@@ -330,6 +330,10 @@ jobs:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           E2E_OWNER_EMAIL: owner@spektrum.local
           E2E_OWNER_PASSWORD: owner-password-123
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_ACCESS_KEY: spektrum
+          S3_SECRET_KEY: spektrum-secret
       - name: Visual diff
         run: pnpm test:visual
         env:
@@ -337,6 +341,14 @@ jobs:
           E2E_OWNER_EMAIL: owner@spektrum.local
           E2E_OWNER_PASSWORD: owner-password-123
           LLM_API_KEY: test-key
+          # The per-test fixtures (`seedPdfFixture`) re-seed from inside the test
+          # process, so they need the store too. Without these they fell back to
+          # the 9000 default and died with ECONNREFUSED, which masked every
+          # assertion in the PDF/Logs specs — including non-pixel ones.
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_ACCESS_KEY: spektrum
+          S3_SECRET_KEY: spektrum-secret
       - uses: actions/upload-artifact@v4
         if: always()
         with:
