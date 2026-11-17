@@ -75,8 +75,11 @@ const patchFetch = () =>
   vi.fn(async () => new Response("{}", { status: 200 }));
 
 describe("DiffWidget", () => {
-  it("creates the original and modified models and a read-only diff editor", () => {
+  it("creates the original and modified models and a read-only diff editor", async () => {
     renderWidget();
+    // Monaco is imported on demand (a static import broke SSR), so the models
+    // appear a tick after mount.
+    await waitFor(() => expect(created.models).toHaveLength(2));
     expect(created.models.map((m) => m.value)).toEqual(["a\nb\nc\n", "a\nB\nc\n"]);
     expect(created.models.map((m) => m.uri.toString())).toEqual([
       "inmemory://spektrum-diff/original/d1",

@@ -7,7 +7,6 @@
 // content), then the decision is PATCHed back so the persisted part carries it.
 
 import { useEffect, useRef, useState } from "react";
-import { monaco } from "@/editor/monaco-environment";
 import type { DiffPart } from "./diff-accept";
 
 export interface DiffWidgetProps {
@@ -47,28 +46,52 @@ export function DiffWidget({
   useEffect(() => {
     const el = hostRef.current;
     if (!el) return;
-    const originalModel = monaco.editor.createModel(
-      original,
-      "latex",
-      monaco.Uri.parse(`inmemory://spektrum-diff/original/${part.id}`),
-    );
-    const modifiedModel = monaco.editor.createModel(
-      part.proposal.proposedContent,
-      "latex",
-      monaco.Uri.parse(`inmemory://spektrum-diff/modified/${part.id}`),
-    );
-    const diff = monaco.editor.createDiffEditor(el, {
-      readOnly: true,
-      theme,
-      automaticLayout: true,
-      renderSideBySide: true,
-      originalEditable: false,
-    });
-    diff.setModel({ original: originalModel, modified: modifiedModel });
+
+    // On demand, not at module scope: `monaco-editor` touches `window` while it
+    // loads, and a Client Component is still prerendered on the server. A static
+    // import therefore crashed the production build's SSR pass with
+    // "ReferenceError: window is not defined" — the editor route answered 500 —
+    // while `next dev` never evaluated it eagerly and hid the bug. This is the
+    // documented pattern for client-only libraries (Next docs, lazy-loading,
+    // "Loading External Libraries").
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+
+    void import("@/editor/monaco-environment")
+      .then(({ monaco, setupMonacoEnvironment }) => {
+        if (disposed) return;
+        setupMonacoEnvironment();
+        const originalModel = monaco.editor.createModel(
+          original,
+          "latex",
+          monaco.Uri.parse(`inmemory://spektrum-diff/original/${part.id}`),
+        );
+        const modifiedModel = monaco.editor.createModel(
+          part.proposal.proposedContent,
+          "latex",
+          monaco.Uri.parse(`inmemory://spektrum-diff/modified/${part.id}`),
+        );
+        const diff = monaco.editor.createDiffEditor(el, {
+          readOnly: true,
+          theme,
+          automaticLayout: true,
+          renderSideBySide: true,
+          originalEditable: false,
+        });
+        diff.setModel({ original: originalModel, modified: modifiedModel });
+        cleanup = () => {
+          diff.dispose();
+          originalModel.dispose();
+          modifiedModel.dispose();
+        };
+      })
+      .catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : String(reason));
+      });
+
     return () => {
-      diff.dispose();
-      originalModel.dispose();
-      modifiedModel.dispose();
+      disposed = true;
+      cleanup?.();
     };
   }, [part.id, part.proposal.proposedContent, original, theme]);
 
