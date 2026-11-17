@@ -402,27 +402,35 @@ export function EditorClient({
     };
   }, [project.id, revision, lastOk]);
 
-  const onCursor = useCallback(
+  // SyncTeX forward search: put the preview on the place the cursor is in.
+  const revealPdfLine = useCallback(
     (line: number) => {
-      if (cursorTimer.current) clearTimeout(cursorTimer.current);
-      cursorTimer.current = setTimeout(() => {
-        if (!syncMap || !activePath) return;
-        const entry = nearestForward(syncMap.forward[activePath], line);
-        if (entry) {
-          pdfPageRef.current?.scrollTo(entry.page, entry.x, entry.y);
-          const geometry = pdfPageRef.current?.getPageGeometry(entry.page);
-          if (geometry) {
-            pdfPageRef.current?.revealLineRect(entry.page, {
-              x: entry.x * geometry.width,
-              y: entry.y * geometry.height,
-              width: geometry.width * 0.6,
-              height: 14,
-            });
-          }
-        }
-      }, 120);
+      if (!syncMap || !activePath) return;
+      const entry = nearestForward(syncMap.forward[activePath], line);
+      if (!entry) return;
+      pdfPageRef.current?.scrollTo(entry.page, entry.x, entry.y);
+      const geometry = pdfPageRef.current?.getPageGeometry(entry.page);
+      if (geometry) {
+        pdfPageRef.current?.revealLineRect(entry.page, {
+          x: entry.x * geometry.width,
+          y: entry.y * geometry.height,
+          width: geometry.width * 0.6,
+          height: 14,
+        });
+      }
     },
     [syncMap, activePath],
+  );
+
+  // The editor follows along as you move the cursor…
+  const cursorLine = useRef(1);
+  const onCursor = useCallback(
+    (line: number) => {
+      cursorLine.current = line;
+      if (cursorTimer.current) clearTimeout(cursorTimer.current);
+      cursorTimer.current = setTimeout(() => revealPdfLine(line), 120);
+    },
+    [revealPdfLine],
   );
 
 
@@ -1031,11 +1039,7 @@ export function EditorClient({
                 onPage={setPage}
                 onZoom={setZoom}
                 onRefresh={() => void compile()}
-                onGoToPdf={() => {
-                  document
-                    .querySelector('[data-testid="pdf-viewport"]')
-                    ?.scrollIntoView({ block: "start" });
-                }}
+                onGoToPdf={() => revealPdfLine(cursorLine.current)}
                 onSearch={() => setSearchOpen(true)}
                 pdfUrl={pdfUrl}
                 mainFile={initialRender?.mainFile ?? null}

@@ -312,6 +312,7 @@ export function PdfChrome({
           <button
             type="button"
             aria-label="Refresh"
+            title="Recompile"
             onClick={onRefresh}
             className="flex h-8 w-8 items-center justify-center"
           >
@@ -320,6 +321,7 @@ export function PdfChrome({
           <button
             type="button"
             aria-label="Go to PDF"
+            title="Show the current line in the PDF"
             onClick={onGoToPdf}
             className="flex h-8 items-center gap-1 px-2 text-xs"
           >
