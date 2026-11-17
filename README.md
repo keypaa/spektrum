@@ -46,6 +46,15 @@ TEXLIVE_IMAGE=spektrum-texlive:local ./scripts/build-texlive.sh
 ./scripts/deploy.sh
 ```
 
+`deploy.sh` builds, migrates and waits for `/api/health`; re-running it is safe.
+The first owner is created separately, because it needs a password (runbook §3):
+
+```bash
+read -rsp 'owner password: ' OWNER_PASSWORD && export OWNER_PASSWORD
+./scripts/dc.sh run --rm -e OWNER_PASSWORD migrate \
+  pnpm --filter @spektrum/web admin:create-owner --email you@example.com --name "Your Name"
+```
+
 `web`, `worker`, `caddy`, `postgres`, `redis`, `seaweedfs` and a one-shot `migrate`
 service. Only Caddy publishes ports. The full runbook — provisioning, backups, restore,
 rollback, security notes, troubleshooting — is

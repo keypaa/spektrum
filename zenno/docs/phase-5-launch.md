@@ -59,6 +59,12 @@ grep -E '^(BETTER_AUTH_SECRET|LLM_KEY_ENCRYPTION_SECRET|POSTGRES_PASSWORD|S3_SEC
 
 ## 3. Deploy
 
+Export `.env` into your shell first — §4 and §5 use these values directly:
+
+```bash
+set -a; . ./.env; set +a
+```
+
 ```bash
 ./scripts/deploy.sh
 ```
@@ -69,13 +75,27 @@ in which case it pulls pre-built images from that registry — runs the one-shot
 starts `web`, `worker` and `caddy`, then polls `$PUBLIC_URL/api/health`.
 Re-running it is safe.
 
-Then create the first owner (explicit, because it needs a password):
+Then create the first owner (explicit, because it needs a password, minimum 12
+characters):
 
 ```bash
 read -rsp 'owner password: ' OWNER_PASSWORD && export OWNER_PASSWORD
-docker compose -f docker/compose.prod.yml exec -T web \
-  pnpm admin:create-owner --email you@example.com
+./scripts/dc.sh run --rm -e OWNER_PASSWORD migrate \
+  pnpm --filter @spektrum/web admin:create-owner \
+  --email you@example.com --name "Your Name"
 ```
+
+Two details worth knowing:
+
+- **It runs in `migrate`, not `web`.** The `web` image is a Next.js standalone
+  build with no `pnpm` and no source tree, so `exec … web pnpm …` fails with
+  `exec: "pnpm": executable file not found in $PATH`. `migrate` carries the
+  workspace, `tsx` and the CLI sources.
+- **Use `./scripts/dc.sh` for any hand-run compose command.** It adds
+  `--env-file .env` and the ARM override. Without it, a bare `docker compose -f
+  docker/compose.prod.yml …` run from the repo root fails with `required
+  variable ACME_EMAIL is missing`, because compose interpolates `${VAR}` from
+  the project directory (`docker/`), not the repo root.
 
 Signup is closed by default (`ALLOW_PUBLIC_SIGNUP=false`); the owner creates
 invites from the app.
@@ -90,8 +110,8 @@ curl -fsS -H "authorization: Bearer $METRICS_TOKEN" "$PUBLIC_URL/api/metrics" | 
 # process_cpu_user_seconds_total ...
 
 pnpm loadtest "$PUBLIC_URL"
-# /login — p50 … p95 … p99 … · non2xx 0
-# /api/health — p50 … p95 … p99 … · non2xx 0
+# /login — p50 … p97.5 … p99 … · non2xx 0
+# /api/health — p50 … p97.5 … p99 … · non2xx 0
 ```
 
 `/api/metrics` returning 401 means the token header is wrong; 503 means
@@ -106,8 +126,13 @@ pnpm admin:unban  <email> --actor <adminEmail>
 ```
 
 `--actor` is mandatory: every action is written to `admin_actions` with an
-attributed admin. Inside the container, prefix with
-`docker compose -f docker/compose.prod.yml exec -T web`.
+attributed admin. On a deployed stack, run them in the `migrate` image (the
+`web` image has no `pnpm` — see §3):
+
+```bash
+./scripts/dc.sh run --rm migrate \
+  pnpm --filter @spektrum/web admin:ban someone@example.com --actor you@example.com
+```
 
 ## 6. Backups
 
@@ -226,14 +251,16 @@ To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-
 |---|---|
 | `/api/metrics` → 503 | `METRICS_TOKEN` is unset or empty in production. Set it (or remove the line from `.env`) and restart `web`. |
 | `/api/metrics` → 401 | Wrong `Authorization: Bearer` value. |
-| Every mutating route → 500, health → 200 | A required env value is present but invalid. `docker compose logs web` shows the aggregated `Invalid environment configuration` list; an empty `KEY=` counts as unset. |
-| Health → `{"ok":false,"db":"down"}` | Postgres not ready or `DATABASE_URL` wrong; `docker compose logs postgres`. |
-| Worker restarts | No Docker socket access: check `DOCKER_GID` matches the host's `docker` group. |
-| Compiles fail with "no such image" | `TEXLIVE_IMAGE` not built on this host: `./scripts/build-texlive.sh`. |
+| Every mutating route → 500, health → 200 | A required env value is present but invalid. `./scripts/dc.sh logs web` shows the aggregated `Invalid environment configuration` list; an empty `KEY=` counts as unset. |
+| Health → `{"ok":false,"db":"down"}` | Postgres not ready or `DATABASE_URL` wrong; `./scripts/dc.sh logs postgres`. |
+| Worker restarts | No Docker socket access. `deploy.sh` warns when `DOCKER_GID` does not match `/var/run/docker.sock`; set it to `getent group docker \| cut -d: -f3` and redeploy. |
+| Compiles fail with "no such image" | `TEXLIVE_IMAGE` not built on this host (`deploy.sh` warns at deploy time): `./scripts/build-texlive.sh`. |
 | Caddy cannot get a certificate | DNS not pointing at the host, or 80/443 blocked. |
 | Import → 413 | Archive over 30 MB, or the proxy truncated the body. |
 | Import → 400 `bad_request` | Not a zip (magic bytes), or no `archive` field. |
-| Pull fails: `no matching manifest for linux/arm64` | The host is ARM and the override was skipped. `scripts/deploy.sh`, `backup.sh` and `restore.sh` append `docker/compose.arm64.yml` automatically on aarch64; a hand-run `docker compose` command needs it too. See §13. |
+| `exec: "pnpm": executable file not found in $PATH` | A workspace CLI was run in `web`, which is a standalone build with no `pnpm`. Run it in `migrate`: `./scripts/dc.sh run --rm migrate pnpm --filter @spektrum/web …` (§3). |
+| `required variable ACME_EMAIL is missing` | The command skipped `--env-file`. Use `./scripts/dc.sh …`, which passes it (§3). |
+| Pull fails: `no matching manifest for linux/arm64` | The host is ARM and the override was skipped. `scripts/deploy.sh`, `backup.sh` and `restore.sh` append `docker/compose.arm64.yml` automatically on aarch64; hand-run commands get it from `./scripts/dc.sh` too. See §13. |
 
 ## 12. The compile e2e
 
@@ -269,12 +296,19 @@ same tags to their arm64 manifests, so images stay pinned on both
 architectures instead of the pins being dropped for ARM.
 
 `scripts/lib/compose.sh` detects `aarch64`/`arm64` and appends that file, and
-`deploy.sh`, `backup.sh` and `restore.sh` all source it — so the documented
-commands work unchanged. Only a hand-typed `docker compose` invocation needs
-both `-f` flags:
+`deploy.sh`, `backup.sh`, `restore.sh` and `dc.sh` all source it — so the
+documented commands work unchanged:
 
 ```bash
-docker compose -f docker/compose.prod.yml -f docker/compose.arm64.yml ps
+./scripts/dc.sh ps
+```
+
+Only a hand-typed `docker compose` invocation needs both `-f` flags and the
+env file:
+
+```bash
+docker compose -f docker/compose.prod.yml -f docker/compose.arm64.yml \
+  --env-file .env ps
 ```
 
 The app images (`web`, `worker`, `migrate`) and the TeX Live image need no

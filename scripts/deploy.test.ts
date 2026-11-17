@@ -2,9 +2,10 @@
 // The deploy path is exercised, not grepped: a fake `docker` on PATH records
 // the exact commands the script issues, and a fake `curl` answers the health
 // probe. That is what catches "pull a service that was never pushed".
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -34,6 +35,7 @@ function runDeploy(extraEnv: Record<string, string> = {}): Run {
 printf 'docker %s\\n' "$*" >> "${log}"
 case "$1 $2" in
   "compose pull") exit 1 ;;   # a service with only a local build: cannot pull
+  "image inspect") [[ -n "\${FAKE_NO_IMAGE:-}" ]] && exit 1; exit 0 ;;
   *) exit 0 ;;
 esac
 `;
@@ -51,24 +53,24 @@ exit 0
     ["PUBLIC_URL=https://app.example.com", "ACME_EMAIL=ops@example.com", ""].join("\n"),
   );
 
-  try {
-    execFileSync("bash", [script], {
-      stdio: "pipe",
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        PATH: `${bin}:${process.env.PATH}`,
-        SPEKTRUM_ENV_FILE: envFile,
-        HEALTH_ATTEMPTS: "1",
-        HEALTH_INTERVAL: "1",
-        ...extraEnv,
-      },
-    });
-  } catch (e) {
-    const err = e as { stderr?: string; stdout?: string };
-    return { log: readFileSync(log, "utf8"), status: 1, stderr: `${err.stderr ?? ""}` };
-  }
-  return { log: readFileSync(log, "utf8"), status: 0, stderr: "" };
+  // spawnSync, not execFileSync: the warnings go to stderr and the assertions
+  // need them even when the deploy succeeds.
+  const result = spawnSync("bash", [script], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      SPEKTRUM_ENV_FILE: envFile,
+      HEALTH_ATTEMPTS: "1",
+      HEALTH_INTERVAL: "1",
+      ...extraEnv,
+    },
+  });
+  return {
+    log: existsSync(log) ? readFileSync(log, "utf8") : "",
+    status: result.status ?? 1,
+    stderr: result.stderr ?? "",
+  };
 }
 
 describe("scripts/deploy.sh", () => {
@@ -97,6 +99,22 @@ describe("scripts/deploy.sh", () => {
     expect(commands.indexOf("build")).toBeLessThan(commands.indexOf("up -d web worker caddy"));
     expect(commands.indexOf("wait migrate")).toBeLessThan(commands.indexOf("up -d web worker caddy"));
     expect(commands.some((c) => c.startsWith("up -d migrate"))).toBe(true);
+  });
+
+  it("warns — but still deploys — when the TeX Live image is missing", () => {
+    const run = runDeploy({ FAKE_NO_IMAGE: "1" });
+    expect(run.status).toBe(0);
+    expect(run.stderr).toContain("TeX Live image");
+    expect(run.stderr).toContain("build-texlive.sh");
+  });
+
+  it("warns when DOCKER_GID does not match the docker socket", () => {
+    const socket = join(mkdtempSync(join(tmpdir(), "spektrum-sock-")), "docker.sock");
+    writeFileSync(socket, "");
+    const run = runDeploy({ DOCKER_SOCKET: socket, DOCKER_GID: "424242" });
+    expect(run.status).toBe(0);
+    expect(run.stderr).toContain("DOCKER_GID=424242");
+    expect(run.stderr).toContain("/docker.sock is owned by group");
   });
 
   it("pulls instead of building when IMAGE_REGISTRY is set", () => {
