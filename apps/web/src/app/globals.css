@@ -81,7 +81,16 @@
   --color-text-nav-tertiary: var(--text-nav-tertiary);
   --color-project-list-divider: var(--project-list-divider);
   --color-fg-warning: var(--fg-warning);
+  --color-fg-error: var(--fg-error);
   --color-tools-text-warning: var(--tools-text-warning);
+  --color-tools-fg: var(--tools-fg);
+  --color-switch-bg-off: var(--switch-bg-off);
+  --color-switch-bg-on: var(--switch-bg-on);
+  --color-switch-handle-off: var(--switch-handle-off);
+  --color-switch-handle-on: var(--switch-handle-on);
+  --color-button-secondary-text-hover: var(--button-secondary-text-hover);
+  /* --accent is an HSL triple, like --background and --input above. */
+  --color-accent: hsl(var(--accent));
 
   --font-sans: "Crixet Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "roboto_mono", ui-monospace, "SF Mono", Menlo, monospace;
