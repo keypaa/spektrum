@@ -172,9 +172,49 @@ test("the PDF and Logs screens have no emoji and only 16x16 currentColor icons",
   await login(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("pdf-pane")).toBeVisible();
+
+  // Ink identical to the surface behind it is invisible. Both right-pane
+  // surfaces here are light while the dark theme's foreground is light, so
+  // inheriting the app's colour painted white-on-white: the PDF toolbar's
+  // icons and labels disappeared. Assert the invariant at both stops, because
+  // the panel replaces the PDF pane rather than stacking on it.
+  const assertReadable = async (label: string): Promise<void> => {
+    const invisible = await page.evaluate(() => {
+      const backgroundOf = (element: Element): string => {
+        for (let node: Element | null = element; node; node = node.parentElement) {
+          const background = getComputedStyle(node).backgroundColor;
+          if (background && background !== "rgba(0, 0, 0, 0)" && background !== "transparent") {
+            return background;
+          }
+        }
+        return "rgba(0, 0, 0, 0)";
+      };
+      const controls = [
+        ...document.querySelectorAll(
+          '[data-testid="pdf-pane"] button, [data-testid="info-panel"] button, [data-testid="info-panel"] [role="tab"]',
+        ),
+      ];
+      return controls
+        .map((element) => ({
+          label:
+            element.getAttribute("aria-label") ??
+            element.textContent?.trim() ??
+            element.tagName.toLowerCase(),
+          ink: getComputedStyle(element).color,
+          surface: backgroundOf(element),
+        }))
+        .filter((control) => control.ink === control.surface)
+        .map((control) => `${control.label} (${control.ink} on ${control.surface})`);
+    });
+    expect(invisible, `${label} renders ink on its own background`).toEqual([]);
+  };
+
+  await assertReadable("PDF toolbar");
+
   await page.getByRole("button", { name: "Tools" }).click();
   await page.getByRole("menuitem", { name: "Logs" }).click();
   await expect(page.getByTestId("info-panel")).toBeVisible();
+  await assertReadable("Logs panel");
 
   const result = await page.evaluate((emoji) => {
     const re = new RegExp(emoji, "u");

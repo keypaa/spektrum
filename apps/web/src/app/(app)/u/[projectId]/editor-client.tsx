@@ -961,7 +961,7 @@ export function EditorClient({
 
       {panel ? (
         <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">
-          <div className="h-full overflow-hidden rounded-t-lg bg-bg-preview">
+          <div className="h-full overflow-hidden rounded-t-lg bg-bg-sidepanel">
             <InfoPanel tab={panel} onTab={setPanel} onClose={() => setPanel(null)}>
               {panel === "Logs" ? (
                 <Logs
@@ -1006,7 +1006,13 @@ export function EditorClient({
         </div>
       ) : pdfUrl ? (
         <div data-testid="pdf-pane" className="flex h-full min-h-0 flex-col bg-bg-code p-2">
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-lg bg-bg-preview">
+          {/* The sheet stays light in both themes (tokens.css keeps --bg-preview
+              near-white even in dark mode), while the app's foreground is light
+              in dark mode — so the toolbar on it inherited white-on-white and
+              its icons and labels disappeared. The preview ink token is dark in
+              both themes; opting in here covers the chrome, the search pill's
+              border and any other inherited text on the sheet. */}
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-lg bg-bg-preview text-[color:var(--text-preview-primary)]">
             <div className="relative z-10">
               <PdfChrome
                 state={pillState({

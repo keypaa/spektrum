@@ -40,7 +40,7 @@ export function InfoPanel({
   return (
     <div
       data-testid="info-panel"
-      className="flex h-full min-h-0 flex-col bg-bg-preview"
+      className="flex h-full min-h-0 flex-col bg-bg-sidepanel"
     >
       <div
         role="tablist"
