@@ -54,34 +54,50 @@ const validate = (): string => {
   }
 };
 
+const adapt = (): Record<string, unknown> => {
+  const adapted = execFileSync(
+    "docker",
+    [
+      "run",
+      "--rm",
+      "-e",
+      "PUBLIC_URL=https://app.example.com",
+      "-e",
+      "ACME_EMAIL=ops@example.com",
+      "-e",
+      "SENTRY_INGEST_HOST=",
+      "-v",
+      `${caddyfile}:/etc/caddy/Caddyfile:ro`,
+      "caddy:2",
+      "caddy",
+      "adapt",
+      "--config",
+      "/etc/caddy/Caddyfile",
+    ],
+    { stdio: "pipe", timeout: 120_000, encoding: "utf8" },
+  );
+  return JSON.parse(adapted) as Record<string, unknown>;
+};
+
+/** Every object whose `handler` is `name`, anywhere in the adapted config. */
+const handlersNamed = (
+  node: unknown,
+  name: string,
+): Array<Record<string, unknown>> => {
+  if (Array.isArray(node)) return node.flatMap((child) => handlersNamed(child, name));
+  if (node === null || typeof node !== "object") return [];
+  const object = node as Record<string, unknown>;
+  const own = object.handler === name ? [object] : [];
+  return [...own, ...Object.values(object).flatMap((child) => handlersNamed(child, name))];
+};
+
 describe.skipIf(!dockerAvailable())("Caddyfile", () => {
   it("passes `caddy validate`", () => {
     expect(validate()).toContain("Valid configuration");
   });
 
   it("collects metrics on the admin endpoint only, not on the public site", () => {
-    const adapted = execFileSync(
-      "docker",
-      [
-        "run",
-        "--rm",
-        "-e",
-        "PUBLIC_URL=https://app.example.com",
-        "-e",
-        "ACME_EMAIL=ops@example.com",
-        "-e",
-        "SENTRY_INGEST_HOST=",
-        "-v",
-        `${caddyfile}:/etc/caddy/Caddyfile:ro`,
-        "caddy:2",
-        "caddy",
-        "adapt",
-        "--config",
-        "/etc/caddy/Caddyfile",
-      ],
-      { stdio: "pipe", timeout: 120_000, encoding: "utf8" },
-    );
-    const config = JSON.parse(adapted) as Record<string, unknown>;
+    const config = adapt();
 
     /** Every `handler` name anywhere in the adapted config. */
     const handlers = (node: unknown): string[] => {
@@ -96,5 +112,27 @@ describe.skipIf(!dockerAvailable())("Caddyfile", () => {
     // public route; the global option configures the admin endpoint instead.
     expect(handlers(config)).not.toContain("metrics");
     expect(readFileSync(caddyfile, "utf8")).toMatch(/^\tmetrics$/m);
+  });
+
+  // next.config.ts already sets these five, and a plain `header` directive
+  // appends to them: every response then carried two CSPs, which browsers
+  // intersect. Caddy must overwrite (`>`), which adapts to `set`, not `add`.
+  it("overwrites the app's security headers instead of appending", () => {
+    const [headers] = handlersNamed(adapt(), "headers");
+    expect(headers).toBeDefined();
+    const response = headers.response as {
+      set?: Record<string, string[]>;
+      add?: Record<string, string[]>;
+    };
+    for (const name of [
+      "Content-Security-Policy",
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "Referrer-Policy",
+      "Permissions-Policy",
+    ]) {
+      expect(Object.keys(response.set ?? {})).toContain(name);
+      expect(Object.keys(response.add ?? {})).not.toContain(name);
+    }
   });
 });

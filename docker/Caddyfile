@@ -24,12 +24,18 @@
 	# so `worker-src blob:` and `'unsafe-inline'` are required. Third-party
 	# origins are deliberately absent: the editor bundle is self-hosted.
 	# SENTRY_INGEST_HOST is optional and only present when Sentry is configured.
+	#
+	# `>` overwrites instead of appending: apps/web/next.config.ts sets the same
+	# five headers, and without the prefix every response carried two CSPs, which
+	# browsers intersect. With Sentry configured, Caddy allowed the ingest host
+	# and Next did not, so the intersection silently blocked ingest. Caddy wins at
+	# the edge; the Next header is still there for a deployment without Caddy.
 	header {
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' {$SENTRY_INGEST_HOST}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-		X-Content-Type-Options nosniff
-		X-Frame-Options DENY
-		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		>Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' {$SENTRY_INGEST_HOST}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		>X-Content-Type-Options nosniff
+		>X-Frame-Options DENY
+		>Referrer-Policy strict-origin-when-cross-origin
+		>Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 
