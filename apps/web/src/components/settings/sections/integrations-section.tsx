@@ -13,6 +13,23 @@ interface KeyStatus {
   last4?: string;
 }
 
+/**
+ * The route answers a refusal with `{ error, message }` — "API key is too
+ * short", "must not contain whitespace", "too long", "unauthorized". Showing a
+ * single generic sentence instead left the operator with no way to tell a
+ * mistyped key from an expired session, so surface the reason.
+ */
+async function refusalReason(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: string; message?: string };
+    if (body.message) return body.message;
+    if (body.error === "unauthorized") return "Your session expired — sign in again.";
+  } catch {
+    // Non-JSON body: fall through to the generic message.
+  }
+  return fallback;
+}
+
 export function IntegrationsSection() {
   const [status, setStatus] = useState<KeyStatus | null>(null);
   const [key, setKey] = useState("");
@@ -44,7 +61,7 @@ export function IntegrationsSection() {
         body: JSON.stringify({ apiKey: trimmed }),
       });
       if (!response.ok) {
-        setError("Could not save the key.");
+        setError(await refusalReason(response, "Could not save the key."));
         return;
       }
       setStatus((await response.json()) as KeyStatus);
@@ -66,7 +83,7 @@ export function IntegrationsSection() {
         setStatus({ configured: false });
         setKey("");
       } else {
-        setError("Could not remove the key.");
+        setError(await refusalReason(response, "Could not remove the key."));
       }
     } catch {
       setError("Could not remove the key.");

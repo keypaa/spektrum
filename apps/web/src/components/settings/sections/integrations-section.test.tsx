@@ -79,4 +79,44 @@ describe("IntegrationsSection — LLM API key", () => {
     expect(screen.queryByText(/sk-plaintext-key-9999/)).toBeNull();
     expect(document.body.textContent).not.toContain("sk-plaintext-key-9999");
   });
+
+  // The route explains rejections; a single "Could not save the key." hid
+  // whether the key was malformed or the session had gone.
+  it("shows the server's reason when the key is rejected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) =>
+        (init?.method ?? "GET") === "PUT"
+          ? new Response(
+              JSON.stringify({
+                error: "bad_request",
+                message: "API key must not contain whitespace",
+              }),
+              { status: 400 },
+            )
+          : new Response(JSON.stringify({ configured: false }), { status: 200 }),
+      ),
+    );
+    render(<IntegrationsSection />);
+    await screen.findByText("Not configured");
+    await userEvent.type(screen.getByLabelText("API key"), "sk-secret-1234");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(await screen.findByText("API key must not contain whitespace")).toBeTruthy();
+  });
+
+  it("explains an expired session instead of a generic failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) =>
+        (init?.method ?? "GET") === "PUT"
+          ? new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })
+          : new Response(JSON.stringify({ configured: false }), { status: 200 }),
+      ),
+    );
+    render(<IntegrationsSection />);
+    await screen.findByText("Not configured");
+    await userEvent.type(screen.getByLabelText("API key"), "sk-secret-1234");
+    await userEvent.click(screen.getByRole("button", { name: "Add key" }));
+    expect(await screen.findByText("Your session expired — sign in again.")).toBeTruthy();
+  });
 });
