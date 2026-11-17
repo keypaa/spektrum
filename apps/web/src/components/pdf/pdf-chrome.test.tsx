@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -94,6 +94,31 @@ describe("PdfChrome", () => {
   it("renders the pill without applying a filter to the chrome", () => {
     render(<PdfChrome {...base} state="compiled" darkMode />);
     expect(screen.getByTestId("pdf-pill")).toBeTruthy();
+  });
+
+  // The bar auto-hides 2 s after the last pointer *move*. It used to do that
+  // even while the pointer was resting on it, so the bar vanished from under the
+  // cursor and the click landed on the page beneath.
+  it("keeps the floating bar while the pointer is over it", () => {
+    vi.useFakeTimers();
+    try {
+      render(<PdfChrome {...base} state="compiled" />);
+      const bar = screen.getByTestId("pdf-floating-bar");
+      fireEvent.pointerEnter(bar);
+
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(screen.queryByTestId("pdf-floating-bar")).not.toBeNull();
+
+      fireEvent.pointerLeave(bar);
+      act(() => {
+        vi.advanceTimersByTime(2_100);
+      });
+      expect(screen.queryByTestId("pdf-floating-bar")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

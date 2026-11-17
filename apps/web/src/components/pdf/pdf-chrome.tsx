@@ -97,18 +97,32 @@ export function PdfChrome({
 }: PdfChromeProps): React.ReactElement {
   const [barVisible, setBarVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True while the pointer is inside the bar. The window-level pointermove
+  // handler below fires *after* pointerenter, so without this flag it would
+  // immediately re-arm the hide timer the enter handler just cancelled.
+  const hovering = useRef(false);
+
+  const cancelHide = (): void => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = null;
+  };
+
+  const scheduleHide = (): void => {
+    cancelHide();
+    if (hovering.current) return;
+    hideTimer.current = setTimeout(() => setBarVisible(false), 2000);
+  };
 
   useEffect(() => {
     const show = (): void => {
       setBarVisible(true);
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-      hideTimer.current = setTimeout(() => setBarVisible(false), 2000);
+      scheduleHide();
     };
     show();
     window.addEventListener("pointermove", show);
     return () => {
       window.removeEventListener("pointermove", show);
-      if (hideTimer.current) clearTimeout(hideTimer.current);
+      cancelHide();
     };
   }, []);
 
@@ -276,10 +290,23 @@ export function PdfChrome({
 
       {/* Inverted island: this pill sits on the light preview sheet but paints
           its own dark background, so it opts back into the app's foreground
-          instead of inheriting the sheet's dark ink (black on black). */}
+          instead of inheriting the sheet's dark ink (black on black).
+
+          Hovering cancels the auto-hide: the bar used to disappear 2 s after
+          the last pointer *move*, i.e. while you were holding still over it, so
+          the click landed on the page underneath. */}
       {barVisible ? (
         <div
           data-testid="pdf-floating-bar"
+          onPointerEnter={() => {
+            hovering.current = true;
+            cancelHide();
+            setBarVisible(true);
+          }}
+          onPointerLeave={() => {
+            hovering.current = false;
+            scheduleHide();
+          }}
           className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-3xl bg-bg-primary px-2 py-1 text-fg-primary shadow-[var(--shadow-surface)]"
         >
           <button
