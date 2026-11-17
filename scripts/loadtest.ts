@@ -4,13 +4,18 @@
 //
 // Runs autocannon against /login (unauthenticated, the proxy's cookie gate is
 // the interesting part) and /api/health (the probe a load balancer hammers),
-// then prints p50/p95/p99 and exits non-zero if anything answered non-2xx.
+// then prints p50/p97.5/p99 and exits non-zero if anything answered non-2xx.
+//
+// autocannon emits a fixed percentile set and has no `p95`; asking for it
+// yields undefined and crashes the report, so these are the ones it really has.
 import autocannon from "autocannon";
 
 type Result = {
   non2xx: number;
-  latency: { p50: number; p95: number; p99: number };
+  latency: { p50: number; p97_5: number; p99: number };
+  // bytes per second — labelled separately in the report, never as req/s.
   throughput: { average: number };
+  requests: { average: number };
 };
 
 const CONNECTIONS = 10;
@@ -41,8 +46,9 @@ export async function run(baseUrl: string): Promise<number> {
     const url = `${base}${path}`;
     const result = await measure(url);
     console.log(
-      `${url} — p50 ${ms(result.latency.p50)} p95 ${ms(result.latency.p95)} ` +
-        `p99 ${ms(result.latency.p99)} · ${Math.round(result.throughput.average)} req/s · ` +
+      `${url} — p50 ${ms(result.latency.p50)} p97.5 ${ms(result.latency.p97_5)} ` +
+        `p99 ${ms(result.latency.p99)} · ${Math.round(result.requests.average)} req/s · ` +
+        `${(result.throughput.average / 1024 / 1024).toFixed(1)} MB/s · ` +
         `non2xx ${result.non2xx}`,
     );
     if (result.non2xx > 0) failed = true;

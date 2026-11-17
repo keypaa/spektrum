@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => ({
   options: [] as Array<{ url: string; connections: number; duration: number }>,
-  results: [] as Array<{ non2xx: number; latency: { p50: number; p95: number; p99: number }; throughput: { average: number } }>,
+  results: [] as Array<{
+    non2xx: number;
+    latency: { p50: number; p97_5: number; p99: number };
+    throughput: { average: number };
+    requests: { average: number };
+  }>,
 }));
 
 vi.mock("autocannon", () => ({
@@ -14,8 +19,9 @@ vi.mock("autocannon", () => ({
     calls.options.push(options);
     const result = calls.results.shift() ?? {
       non2xx: 0,
-      latency: { p50: 1, p95: 2, p99: 3 },
+      latency: { p50: 1, p97_5: 2, p99: 3 },
       throughput: { average: 100 },
+      requests: { average: 100 },
     };
     setImmediate(() => cb(null, result));
     return { on: () => {} };
@@ -53,14 +59,19 @@ describe("loadtest", () => {
     await run("http://localhost:3000");
     const printed = log.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(printed).toContain("p50");
-    expect(printed).toContain("p95");
+    expect(printed).toContain("p97.5");
+    // throughput.average is bytes/sec; reporting it as req/s produced absurd
+    // numbers (~3,657,011 req/s), and a missing key would print NaN.
+    expect(printed).toContain("req/s");
+    expect(printed).toContain("MB/s");
+    expect(printed).not.toContain("NaN");
     expect(printed).toContain("p99");
   });
 
   it("exits non-zero when any response is not 2xx", async () => {
     calls.results = [
-      { non2xx: 0, latency: { p50: 1, p95: 2, p99: 3 }, throughput: { average: 100 } },
-      { non2xx: 5, latency: { p50: 1, p95: 2, p99: 3 }, throughput: { average: 100 } },
+      { non2xx: 0, latency: { p50: 1, p97_5: 2, p99: 3 }, throughput: { average: 100 }, requests: { average: 100 } },
+      { non2xx: 5, latency: { p50: 1, p97_5: 2, p99: 3 }, throughput: { average: 100 }, requests: { average: 100 } },
     ];
     const code = await run("http://localhost:3000");
     expect(code).toBe(1);
