@@ -10,7 +10,6 @@ import {
   IconChevronDown,
   IconDownload,
   IconError,
-  IconFit,
   IconMoreHorizontal,
   IconRefresh,
   IconSearch,
@@ -193,7 +192,7 @@ export function PdfChrome({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="flex h-9 items-center rounded-full px-2 text-sm hover:bg-[color:var(--bg-preview-hover)]">
+        <div className="flex h-9 items-center rounded-full px-2 text-sm">
           <input
             aria-label="Page"
             type="number"
@@ -216,9 +215,8 @@ export function PdfChrome({
               type="button"
               data-testid="pdf-zoom"
               aria-label="Zoom"
-              className="flex h-9 items-center gap-1 rounded-full px-3 text-sm hover:bg-[color:var(--bg-preview-hover)]"
+              className="flex h-9 items-center gap-1 rounded-full px-3 text-sm"
             >
-              <IconFit size={14} />
               <span>{zoom} %</span>
               <IconChevronDown size={14} />
             </button>
@@ -245,7 +243,7 @@ export function PdfChrome({
           type="button"
           aria-label="Search"
           onClick={onSearch}
-          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[color:var(--bg-preview-hover)]"
+          className="flex h-9 w-9 items-center justify-center rounded-full"
         >
           <IconSearch size={16} />
         </button>
@@ -255,7 +253,7 @@ export function PdfChrome({
             <button
               type="button"
               aria-label="More"
-              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[color:var(--bg-preview-hover)]"
+              className="flex h-9 w-9 items-center justify-center rounded-full"
             >
               <IconMoreHorizontal size={16} />
             </button>
@@ -284,7 +282,7 @@ export function PdfChrome({
             href={pdfUrl}
             download
             aria-label="Download"
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[color:var(--bg-preview-hover)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full"
           >
             <IconDownload size={16} />
           </a>

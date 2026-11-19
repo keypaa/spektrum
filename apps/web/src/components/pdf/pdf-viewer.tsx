@@ -25,9 +25,17 @@ export interface PdfViewerHandle {
 /** Horizontal padding of the viewport (p-2 on both sides). */
 const VIEWPORT_PADDING = 16;
 
+/**
+ * Percentage that makes a page as wide as the viewport allows.
+ *
+ * Floors rather than rounds, and keeps 1 px in hand: rounding to the nearest
+ * percent can land a fraction of a pixel *over* the content box, which is
+ * exactly enough to raise a horizontal scrollbar — the "zoom to fit" complaint.
+ */
 export function fitPercent(containerWidth: number, pageWidth: number): number | null {
-  if (!(containerWidth > 0) || !(pageWidth > 0)) return null;
-  return Math.round(((containerWidth - VIEWPORT_PADDING) / pageWidth) * 100);
+  const available = containerWidth - VIEWPORT_PADDING - 1;
+  if (!(available > 0) || !(pageWidth > 0)) return null;
+  return Math.floor((available / pageWidth) * 100);
 }
 
 interface PdfViewerProps {
