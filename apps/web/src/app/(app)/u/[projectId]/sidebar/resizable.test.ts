@@ -1,9 +1,26 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { clampWidth, readStoredWidth, writeStoredWidth } from "./resizable";
+import {
+  clampWidth,
+  readStoredWidth,
+  widthFromPointer,
+  writeStoredWidth,
+} from "./resizable";
 
 afterEach(() => {
   localStorage.clear();
+});
+
+describe("widthFromPointer", () => {
+  it("uses the pointer position directly for a left-hand pane", () => {
+    expect(widthFromPointer(300, 1810, false)).toBe(300);
+  });
+
+  it("measures in from the right edge for a right-hand pane", () => {
+    // 1810 wide viewport, pointer 200px in from the right, 16px of grid
+    // padding reserved on that edge.
+    expect(widthFromPointer(1610, 1810, true, 16)).toBe(184);
+  });
 });
 
 describe("clampWidth", () => {

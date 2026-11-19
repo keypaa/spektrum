@@ -13,6 +13,17 @@ export function clampWidth(px: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, px));
 }
 
+/** Pointer position → pane width. A right-hand pane measures in from the
+ *  viewport's right edge, minus any chrome on that edge. */
+export function widthFromPointer(
+  clientX: number,
+  viewportWidth: number,
+  fromRight: boolean,
+  edgeOffset = 0,
+): number {
+  return fromRight ? viewportWidth - clientX - edgeOffset : clientX;
+}
+
 export function readStoredWidth(
   key: string,
   fallback: number,
@@ -46,17 +57,22 @@ export interface ResizablePaneOptions {
   min: number;
   max: number;
   rootRef: RefObject<HTMLElement | null>;
+  /** Right-hand panes measure from the viewport's right edge. */
+  fromRight?: boolean;
+  /** Space reserved on the measured edge (e.g. the grid's right padding). */
+  edgeOffset?: number;
 }
 
 export function useResizablePane(options: ResizablePaneOptions): {
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   dragging: boolean;
 } {
-  const { storageKey, cssVar, initial, min, max, rootRef } = options;
+  const { storageKey, cssVar, initial, min, max, rootRef, fromRight = false, edgeOffset = 0 } = options;
   const [dragging, setDragging] = useState(false);
   const width = useRef(readStoredWidth(storageKey, initial, min, max));
 
-  const apply = useCallback(
+  /** Set the width directly (mount / restore path). */
+  const applyWidth = useCallback(
     (px: number) => {
       width.current = clampWidth(px, min, max);
       rootRef.current?.style.setProperty(cssVar, `${width.current}px`);
@@ -64,13 +80,21 @@ export function useResizablePane(options: ResizablePaneOptions): {
     [cssVar, min, max, rootRef],
   );
 
+  /** Pointer position → width → apply (drag path). */
+  const applyFromPointer = useCallback(
+    (clientX: number) => {
+      applyWidth(widthFromPointer(clientX, window.innerWidth, fromRight, edgeOffset));
+    },
+    [applyWidth, fromRight, edgeOffset],
+  );
+
   // Apply the stored/initial width when the root mounts.
   const applied = useRef(false);
   const ensureApplied = useCallback(() => {
     if (applied.current || !rootRef.current) return;
     applied.current = true;
-    apply(width.current);
-  }, [apply, rootRef]);
+    applyWidth(width.current);
+  }, [applyWidth, rootRef]);
 
   useEffect(() => {
     ensureApplied();
@@ -85,7 +109,7 @@ export function useResizablePane(options: ResizablePaneOptions): {
       setDragging(true);
 
       const move = (ev: PointerEvent) => {
-        apply(ev.clientX);
+        applyFromPointer(ev.clientX);
       };
       const up = (ev: PointerEvent) => {
         target.releasePointerCapture(ev.pointerId);
@@ -97,7 +121,7 @@ export function useResizablePane(options: ResizablePaneOptions): {
       target.addEventListener("pointermove", move);
       target.addEventListener("pointerup", up);
     },
-    [apply, ensureApplied, storageKey],
+    [applyFromPointer, ensureApplied, storageKey],
   );
 
   return { onPointerDown, dragging };
