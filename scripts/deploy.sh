@@ -102,4 +102,7 @@ never written to disk or to this script:
 It runs in the migrate image on purpose: the web image is a standalone build
 with no pnpm.
 
+To stop the stack again: ./scripts/stop.sh (keeps the data volumes;
+--purge deletes them, --images also removes the application images).
+
 EOF

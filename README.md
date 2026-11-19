@@ -55,9 +55,13 @@ read -rsp 'owner password: ' OWNER_PASSWORD && export OWNER_PASSWORD
   pnpm --filter @spektrum/web admin:create-owner --email you@example.com --name "Your Name"
 ```
 
+Shut it down with `./scripts/stop.sh` — it keeps the data volumes, so a later
+`deploy.sh` resumes with the same projects. `--purge` deletes them (destructive),
+`--images` also removes the application images.
+
 `web`, `worker`, `caddy`, `postgres`, `redis`, `seaweedfs` and a one-shot `migrate`
 service. Only Caddy publishes ports. The full runbook — provisioning, backups, restore,
-rollback, security notes, troubleshooting — is
+shutdown, rollback, security notes, troubleshooting — is
 [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md).
 
 ## How it is built

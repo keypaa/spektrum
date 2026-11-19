@@ -162,7 +162,33 @@ backup:
 To rehearse without touching production, restore into a scratch Postgres
 container and point a temporary `DATABASE_URL` at it.
 
-## 7. Rollback
+## 7. Shutting down
+
+```bash
+./scripts/stop.sh
+```
+
+Stops and removes the containers and the network, and **keeps the data
+volumes** — Postgres, Redis, the SeaweedFS object store and Caddy's state — so a
+later `./scripts/deploy.sh` resumes with the same projects, renders and owner.
+
+Two opt-in flags, neither implied by the other:
+
+| Flag | Effect |
+|---|---|
+| `--purge` | also deletes the volumes. **Destructive and irreversible**: the database, every uploaded object and the TLS state go. The next deploy starts from an empty instance. |
+| `--images` | also removes `spektrum-web`, `spektrum-worker` and `spektrum-migrate` (tag from `IMAGE_TAG`). The next deploy rebuilds them. |
+
+It uses the same compose resolution as `deploy.sh` (`scripts/lib/compose.sh`),
+so the ARM pins and `--env-file` handling are identical; a bare
+`docker compose -f docker/compose.prod.yml down` from the repo root would fail
+on the missing `ACME_EMAIL`, exactly like any other hand-run compose command.
+
+This covers the production stack only. The local test infrastructure is a
+separate compose project: `pnpm dev:infra:down` stops it (its data volumes are
+kept as well).
+
+## 8. Rollback
 
 Re-run the deploy with the previous tag once the images are tagged in a
 registry, or restore the data:
@@ -179,7 +205,7 @@ IMAGE_TAG=<previous> IMAGE_REGISTRY=<registry> ./scripts/deploy.sh
 Migrations are forward-only (`drizzle-kit migrate`), so a rollback across a
 destructive migration means restoring the dump, not downgrading the schema.
 
-## 8. Security notes
+## 9. Security notes
 
 - **Only Caddy publishes ports.** Postgres, Redis and SeaweedFS stay on the
   compose network. Caddy's admin endpoint (2019) is bound inside the container
@@ -202,7 +228,7 @@ destructive migration means restoring the dump, not downgrading the schema.
   segments, directory and macOS junk, zip bombs by actual inflated bytes).
 - **Audit**: `pnpm audit --prod --audit-level=high` is a CI gate.
 
-## 9. Known limitations (deliberate)
+## 10. Known limitations (deliberate)
 
 - **Import is synchronous** (`200 { report }`), not a job with SSE progress.
   The real archive (3.4 MB, 15 projects) imports in well under the request
@@ -231,7 +257,7 @@ destructive migration means restoring the dump, not downgrading the schema.
 - **The worker image is multi-arch**: the Docker CLI is fetched for
   `TARGETARCH` (`amd64` → `x86_64`, `arm64` → `aarch64`).
 
-## 10. Local-only files (not in git)
+## 11. Local-only files (not in git)
 
 Some inputs are deliberately kept out of the repository:
 
@@ -245,7 +271,7 @@ Some inputs are deliberately kept out of the repository:
 To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-05.zip` and run
 `STORAGE_IT=1 S3_ENDPOINT=… pnpm exec vitest run apps/web/src/lib/import/roundtrip.test.ts`.
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -260,9 +286,9 @@ To run the round trip, drop the archive at `e2e/fixtures/prism-projects-2026-11-
 | Import → 400 `bad_request` | Not a zip (magic bytes), or no `archive` field. |
 | `exec: "pnpm": executable file not found in $PATH` | A workspace CLI was run in `web`, which is a standalone build with no `pnpm`. Run it in `migrate`: `./scripts/dc.sh run --rm migrate pnpm --filter @spektrum/web …` (§3). |
 | `required variable ACME_EMAIL is missing` | The command skipped `--env-file`. Use `./scripts/dc.sh …`, which passes it (§3). |
-| Pull fails: `no matching manifest for linux/arm64` | The host is ARM and the override was skipped. `scripts/deploy.sh`, `backup.sh` and `restore.sh` append `docker/compose.arm64.yml` automatically on aarch64; hand-run commands get it from `./scripts/dc.sh` too. See §13. |
+| Pull fails: `no matching manifest for linux/arm64` | The host is ARM and the override was skipped. `scripts/deploy.sh`, `backup.sh` and `restore.sh` append `docker/compose.arm64.yml` automatically on aarch64; hand-run commands get it from `./scripts/dc.sh` too. See §14. |
 
-## 12. The compile e2e
+## 13. The compile e2e
 
 `compile` is a required CI job: seven specs covering type → PDF, errors at the
 right line, supersede semantics, the last-good PDF, a 20-page document, the
@@ -284,7 +310,7 @@ Two things make it fragile in a way worth knowing:
 tail of the TeX log for any run — use it before guessing. The object store's own
 log is the other half: `docker logs seaweedfs`.
 
-## 13. ARM (aarch64) hosts
+## 14. ARM (aarch64) hosts
 
 Free-tier ARM instances are a good fit for this stack, and they work unchanged
 apart from one compose detail.
