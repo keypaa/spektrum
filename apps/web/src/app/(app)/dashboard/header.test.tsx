@@ -6,6 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardHeader } from "./header";
 import type { Layout } from "./layout-toggle";
 
+// NewMenu (rendered by the header) navigates after creating a project.
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 // jsdom has no ResizeObserver; Radix's popper calls it when a menu opens.
 class ResizeObserverStub {
   observe() {}

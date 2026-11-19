@@ -12,16 +12,18 @@ import {
   softDeleteProject,
 } from "./projects";
 
-export async function createBlankProject(): Promise<void> {
+export async function createBlankProject(): Promise<string> {
   const user = await requireUser();
-  await createProject(user.id, "New Project", "blank");
+  const project = await createProject(user.id, "New Project", "blank");
   revalidatePath("/");
+  return project.id;
 }
 
-export async function createExampleProject(): Promise<void> {
+export async function createExampleProject(): Promise<string> {
   const user = await requireUser();
-  await createProject(user.id, "New Project", "example");
+  const project = await createProject(user.id, "New Project", "example");
   revalidatePath("/");
+  return project.id;
 }
 
 export async function createFolderAction(name: string): Promise<void> {

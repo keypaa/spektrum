@@ -8,6 +8,10 @@ import type { Sort } from "./column-header";
 import type { Layout } from "./layout-toggle";
 import { ProjectList } from "./project-list";
 
+// The empty state and the New menu both navigate after creating a project.
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();

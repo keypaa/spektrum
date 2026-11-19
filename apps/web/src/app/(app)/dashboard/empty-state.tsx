@@ -2,8 +2,10 @@
 
 import { Button } from "@spektrum/ui";
 import { createBlankProject } from "@/lib/actions";
+import { useRouter } from "next/navigation";
 
 export function EmptyState() {
+  const router = useRouter();
   return (
     <div
       data-testid="project-empty-state"
@@ -17,8 +19,13 @@ export function EmptyState() {
       <div className="text-sm font-light text-text-nav-tertiary">
         Start with a hosted project on Prism
       </div>
-      {/* m-4 + px-4 py-2 text-sm font-light = the 149×36 CSS pill in ref 43. */}
-      <Button size="sm" className="m-4 h-9 px-4 font-light" onClick={() => void createBlankProject()}>
+      {/* m-4 + px-4 py-2 text-sm font-light = the 149×36 CSS pill in ref 43.
+          Opens the new project directly, like Prism does. */}
+      <Button
+        size="sm"
+        className="m-4 h-9 px-4 font-light"
+        onClick={() => void createBlankProject().then((id) => router.push(`/u/${id}`))}
+      >
         Start from Scratch
       </Button>
       <div className="h-[150px] w-px" aria-hidden="true" />
