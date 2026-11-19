@@ -32,6 +32,7 @@ const base = {
   zoom: 100,
   onPage: vi.fn(),
   onZoom: vi.fn(),
+  onZoomToFit: vi.fn(),
   onRefresh: vi.fn(),
   onGoToPdf: vi.fn(),
   onSearch: vi.fn(),
@@ -89,6 +90,15 @@ describe("PdfChrome", () => {
     expect(await screen.findByText("Zoom to fit")).toBeTruthy();
     expect(await screen.findByText("50 %")).toBeTruthy();
     expect(await screen.findByText("400 %")).toBeTruthy();
+  });
+
+  it("measures the fit instead of snapping to 100%", async () => {
+    const onZoomToFit = vi.fn();
+    render(<PdfChrome {...base} state="compiled" onZoomToFit={onZoomToFit} />);
+    await userEvent.click(screen.getByTestId("pdf-zoom"));
+    await userEvent.click(await screen.findByText("Zoom to fit"));
+    // The chrome no longer owns the number: the viewer measures it.
+    expect(onZoomToFit).toHaveBeenCalledTimes(1);
   });
 
   it("renders the pill without applying a filter to the chrome", () => {

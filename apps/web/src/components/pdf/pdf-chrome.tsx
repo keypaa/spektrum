@@ -65,6 +65,8 @@ export interface PdfChromeProps {
   zoom: number;
   onPage: (page: number) => void;
   onZoom: (zoom: number) => void;
+  /** Measured fit-to-width; `onZoom(100)` was a hardcoded stand-in. */
+  onZoomToFit: () => void;
   onRefresh: () => void;
   onGoToPdf: () => void;
   onSearch: () => void;
@@ -84,6 +86,7 @@ export function PdfChrome({
   zoom,
   onPage,
   onZoom,
+  onZoomToFit,
   onRefresh,
   onGoToPdf,
   onSearch,
@@ -190,7 +193,7 @@ export function PdfChrome({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="flex h-9 items-center rounded-full border border-[color:var(--border-preview)] px-2 text-sm">
+        <div className="flex h-9 items-center rounded-full px-2 text-sm hover:bg-[color:var(--bg-preview-hover)]">
           <input
             aria-label="Page"
             type="number"
@@ -213,7 +216,7 @@ export function PdfChrome({
               type="button"
               data-testid="pdf-zoom"
               aria-label="Zoom"
-              className="flex h-9 items-center gap-1 rounded-full border border-[color:var(--border-preview)] px2 px-3 text-sm"
+              className="flex h-9 items-center gap-1 rounded-full px-3 text-sm hover:bg-[color:var(--bg-preview-hover)]"
             >
               <IconFit size={14} />
               <span>{zoom} %</span>
@@ -221,7 +224,7 @@ export function PdfChrome({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => onZoom(100)}>
+            <DropdownMenuItem onSelect={onZoomToFit}>
               Zoom to fit
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => zoomBy(1.2)}>
@@ -242,7 +245,7 @@ export function PdfChrome({
           type="button"
           aria-label="Search"
           onClick={onSearch}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"
+          className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[color:var(--bg-preview-hover)]"
         >
           <IconSearch size={16} />
         </button>
@@ -252,7 +255,7 @@ export function PdfChrome({
             <button
               type="button"
               aria-label="More"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[color:var(--bg-preview-hover)]"
             >
               <IconMoreHorizontal size={16} />
             </button>
@@ -281,7 +284,7 @@ export function PdfChrome({
             href={pdfUrl}
             download
             aria-label="Download"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"
+            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[color:var(--bg-preview-hover)]"
           >
             <IconDownload size={16} />
           </a>

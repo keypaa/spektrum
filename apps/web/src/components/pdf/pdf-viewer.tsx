@@ -14,6 +14,20 @@ export interface PdfViewerHandle {
     rect: { x: number; y: number; width: number; height: number },
   ): void;
   getPageGeometry(page: number): { width: number; height: number } | null;
+  /**
+   * Percentage that makes page 1 as wide as the viewport allows, or null when
+   * the document or host is not ready. "Zoom to fit" is this number — it used
+   * to be a hardcoded 100, which is why the control did nothing.
+   */
+  fitWidth(): Promise<number | null>;
+}
+
+/** Horizontal padding of the viewport (p-2 on both sides). */
+const VIEWPORT_PADDING = 16;
+
+export function fitPercent(containerWidth: number, pageWidth: number): number | null {
+  if (!(containerWidth > 0) || !(pageWidth > 0)) return null;
+  return Math.round(((containerWidth - VIEWPORT_PADDING) / pageWidth) * 100);
 }
 
 interface PdfViewerProps {
@@ -204,6 +218,14 @@ export function PdfViewer({
         return element
           ? { width: element.clientWidth, height: element.clientHeight }
           : null;
+      },
+      fitWidth: async () => {
+        const doc = docRef.current;
+        const host = hostRef.current;
+        if (!doc || !host) return null;
+        const page = await doc.getPage(1);
+        const base = page.getViewport({ scale: 1 });
+        return fitPercent(host.clientWidth, base.width);
       },
     };
     return () => {

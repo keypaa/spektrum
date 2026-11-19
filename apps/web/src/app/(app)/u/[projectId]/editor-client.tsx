@@ -1071,6 +1071,13 @@ export function EditorClient({
                 zoom={zoom}
                 onPage={setPage}
                 onZoom={setZoom}
+                onZoomToFit={() => {
+                  void pdfPageRef.current?.fitWidth().then((percent) => {
+                    if (percent !== null) {
+                      setZoom(Math.min(400, Math.max(50, percent)));
+                    }
+                  });
+                }}
                 onRefresh={() => void compile()}
                 onGoToPdf={() => revealPdfLine(cursorLine.current)}
                 onSearch={() => setSearchOpen(true)}
