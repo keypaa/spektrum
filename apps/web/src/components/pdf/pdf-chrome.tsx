@@ -192,7 +192,7 @@ export function PdfChrome({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="flex h-9 items-center rounded-full px-2 text-sm">
+        <div className="flex h-9 items-center rounded-full border border-[color:var(--border-preview)] px-2 text-sm">
           <input
             aria-label="Page"
             type="number"
@@ -215,7 +215,7 @@ export function PdfChrome({
               type="button"
               data-testid="pdf-zoom"
               aria-label="Zoom"
-              className="flex h-9 items-center gap-1 rounded-full px-3 text-sm"
+              className="flex h-9 items-center gap-1 rounded-full border border-[color:var(--border-preview)] px-3 text-sm"
             >
               <span>{zoom} %</span>
               <IconChevronDown size={14} />
@@ -243,7 +243,7 @@ export function PdfChrome({
           type="button"
           aria-label="Search"
           onClick={onSearch}
-          className="flex h-9 w-9 items-center justify-center rounded-full"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"
         >
           <IconSearch size={16} />
         </button>
@@ -253,7 +253,7 @@ export function PdfChrome({
             <button
               type="button"
               aria-label="More"
-              className="flex h-9 w-9 items-center justify-center rounded-full"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"
             >
               <IconMoreHorizontal size={16} />
             </button>
@@ -282,7 +282,7 @@ export function PdfChrome({
             href={pdfUrl}
             download
             aria-label="Download"
-            className="flex h-9 w-9 items-center justify-center rounded-full"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"
           >
             <IconDownload size={16} />
           </a>
