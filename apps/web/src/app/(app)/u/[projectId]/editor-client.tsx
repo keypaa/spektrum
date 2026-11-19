@@ -45,6 +45,7 @@ import { useRenderStream } from "@/lib/render-client";
 import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
 import { PdfChrome, pillState } from "@/components/pdf/pdf-chrome";
+import { CompileErrorBanner } from "./compile-error-banner";
 import { PdfSearch } from "@/components/pdf/pdf-search";
 import { InfoPanel, INFO_TABS, type InfoTab } from "@/components/info-panel/info-panel";
 import { Logs } from "@/components/info-panel/logs";
@@ -123,6 +124,18 @@ export function EditorClient({
     max: 480,
     rootRef,
   });
+  // The preview pane measures from the right edge, minus the grid's pr-4.
+  const { onPointerDown: onPreviewPointerDown, dragging: previewDragging } =
+    useResizablePane({
+      storageKey: "spektrum_editor_preview_pane_v1",
+      cssVar: "--right-pane-width",
+      initial: 677,
+      min: 360,
+      max: 1400,
+      rootRef,
+      fromRight: true,
+      edgeOffset: 16,
+    });
   const { preferences } = usePreferences();
   const router = useRouter();
   // Resolve "system" against the theme the pre-paint script actually applied
@@ -454,6 +467,19 @@ export function EditorClient({
     render.status?.event === "result"
       ? render.status.diagnostics
       : latestDiagnostics;
+
+  // A failed compile must be visible where you are looking. The pill alone
+  // changes "Compiled" → "Failed" while the previous PDF stays on screen, and
+  // the log text lives behind Tools → Logs, so the failure read as a stale PDF.
+  const failed =
+    render.status?.event === "status"
+      ? render.status.state === "error"
+      : render.status?.event === "result"
+        ? false
+        : initialRender?.status === "error";
+  const errorDiagnostic = failed
+    ? (diagnostics.find((d) => d.severity === "error") ?? diagnostics[0] ?? null)
+    : null;
   useEffect(() => {
     if (render.status?.event === "result")
       setLastOk(render.status.revision);
@@ -967,6 +993,9 @@ export function EditorClient({
         </div>
       </div>
 
+      {/* Right column (PDF / info panel). Wrapped so the divider between it and
+          the editor can be dragged; the hook writes --right-pane-width. */}
+      <div className="relative min-h-0 min-w-0">
       {panel ? (
         <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">
           <div className="h-full overflow-hidden rounded-t-lg bg-bg-sidepanel">
@@ -1014,6 +1043,10 @@ export function EditorClient({
         </div>
       ) : pdfUrl ? (
         <div data-testid="pdf-pane" className="flex h-full min-h-0 flex-col bg-bg-code p-2">
+          <CompileErrorBanner
+            diagnostic={errorDiagnostic}
+            onOpenLogs={() => setPanel("Logs")}
+          />
           {/* The sheet stays light in both themes (tokens.css keeps --bg-preview
               near-white even in dark mode), while the app's foreground is light
               in dark mode — so the toolbar on it inherited white-on-white and
@@ -1078,6 +1111,17 @@ export function EditorClient({
       ) : (
         <PdfPane />
       )}
+        {/* 1 px separator; drag to resize the preview (360–1400). */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize preview pane"
+          onPointerDown={onPreviewPointerDown}
+          className={`absolute inset-y-0 left-0 w-px cursor-col-resize bg-[color:var(--border-log)] ${
+            previewDragging ? "bg-[color:var(--border-brand)]" : ""
+          }`}
+        />
+      </div>
 
       <ShareDialog
         open={shareOpen}
