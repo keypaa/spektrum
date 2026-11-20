@@ -1,7 +1,7 @@
 // Client helpers for the document API (Task 4 endpoints), plus the file-name
 // normalisation the New file dialog uses.
 
-import type { DocumentRecord } from "@/lib/documents";
+import type { DocumentRecord, UploadResult } from "@/lib/documents";
 
 async function readError(res: Response): Promise<string> {
   try {
@@ -24,6 +24,21 @@ export async function createDocumentRequest(
   if (!res.ok) throw new Error(await readError(res));
   const body = (await res.json()) as { document: DocumentRecord };
   return body.document;
+}
+
+/** Upload files into the project's workspace (drag-drop, button and chat). */
+export async function uploadDocumentsRequest(
+  projectId: string,
+  files: File[],
+): Promise<UploadResult> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  const res = await fetch(`/api/projects/${projectId}/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error((await readError(res)) || "Upload failed");
+  return (await res.json()) as UploadResult;
 }
 
 /** Read one document's content by path (spec §19.2's GET ?path=). */

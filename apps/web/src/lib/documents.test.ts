@@ -19,6 +19,7 @@ import {
   renameDocument,
   saveDocument,
   seedProjectDocuments,
+  uploadFiles,
 } from "./documents";
 import { revisionHash } from "@spektrum/shared/revision";
 import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "./templates";
@@ -109,6 +110,32 @@ describe("normalizeDocumentPath", () => {
   it("rejects an over-long name", () => {
     const long = `${"a".repeat(201)}.tex`;
     expect(() => normalizeDocumentPath(long)).toThrow(DocumentPathError);
+  });
+});
+
+describe("uploadFiles", () => {
+  it("keeps each upload's own name, stores text inline and skips duplicate paths", async () => {
+    const ownerId = await makeOwner();
+    const projectId = await makeProject(ownerId);
+    const bytes = new TextEncoder().encode("hello\n");
+
+    const first = await uploadFiles(ownerId, projectId, [
+      { name: "paper.tex", bytes },
+      { name: "../paper.tex", bytes },
+    ]);
+    expect(first.documents).toHaveLength(1);
+    expect(first.documents[0]!.path).toBe("paper.tex");
+    expect(first.skipped).toEqual(["../paper.tex"]);
+
+    const stored = await getDocumentById(ownerId, projectId, first.documents[0]!.id);
+    expect(stored?.content).toBe("hello\n");
+    expect(stored?.blobKey).toBeNull();
+
+    const second = await uploadFiles(ownerId, projectId, [
+      { name: "paper.tex", bytes },
+    ]);
+    expect(second.documents).toHaveLength(0);
+    expect(second.skipped).toEqual(["paper.tex"]);
   });
 });
 

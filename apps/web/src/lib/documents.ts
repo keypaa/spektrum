@@ -19,6 +19,8 @@ import {
   type DocumentPathErrorCode,
 } from "@spektrum/shared/paths";
 import { listRevisionDocuments } from "@spektrum/db/documents";
+import { deleteObject, putObject } from "@spektrum/storage";
+import { UploadNameError, uploadPathFor } from "./upload/upload-path";
 
 // Re-exported for the route handlers and tests that import them from here.
 export { DocumentPathError, normalizeDocumentPath, type DocumentPathErrorCode };
@@ -26,6 +28,30 @@ export { listRevisionDocuments };
 import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "./templates";
 
 export type DocumentKind = "tex" | "bib" | "img" | "csv" | "other";
+
+/** Files at or under this size are stored inline in `documents.content`. */
+const UPLOAD_INLINE_BYTES = 524_288;
+
+export interface UploadInput {
+  name: string;
+  bytes: Uint8Array;
+  contentType?: string | undefined;
+}
+
+export interface UploadResult {
+  documents: DocumentSummary[];
+  skipped: string[];
+}
+
+/** UTF-8 text without NULs is editable; anything else is a binary blob. */
+function decodeUpload(bytes: Uint8Array): string | null {
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return text.includes("\u0000") ? null : text;
+  } catch {
+    return null;
+  }
+}
 
 export interface DocumentSummary {
   id: string;
@@ -36,6 +62,8 @@ export interface DocumentSummary {
 
 export interface DocumentRecord extends DocumentSummary {
   content: string | null;
+  /** Present on reads; binary uploads live in the `uploads` bucket. */
+  blobKey?: string | null;
 }
 
 export class DuplicatePathError extends Error {
@@ -189,7 +217,11 @@ export async function getDocumentById(
   id: string,
 ): Promise<DocumentRecord | null> {
   const rows = await db
-    .select({ ...summaryColumns, content: documents.content })
+    .select({
+      ...summaryColumns,
+      content: documents.content,
+      blobKey: documents.blobKey,
+    })
     .from(documents)
     .innerJoin(projects, eq(documents.projectId, projects.id))
     .where(
@@ -197,7 +229,9 @@ export async function getDocumentById(
     )
     .limit(1);
   const row = rows[0];
-  return row ? { ...toSummary(row), content: row.content } : null;
+  return row
+    ? { ...toSummary(row), content: row.content, blobKey: row.blobKey }
+    : null;
 }
 
 async function pathExists(
@@ -403,4 +437,92 @@ export async function deleteDocument(
       and(eq(documents.id, documentId), eq(documents.projectId, projectId)),
     );
   await touchProject(ownerId, projectId);
+}
+
+/**
+ * Add dropped / picked / chat-attached files to the project's workspace.
+ *
+ * Files keep their own name at the project root so `main.tex` can reference
+ * them directly. Existing paths are skipped rather than silently overwritten,
+ * and blobs are written before the row so a failed transaction can clean them
+ * up. This is the one ingestion path shared by drag-drop, the sidebar button
+ * and the composer — chat attachments therefore become real workspace files.
+ */
+export async function uploadFiles(
+  ownerId: string,
+  projectId: string,
+  files: UploadInput[],
+): Promise<UploadResult> {
+  await requireProject(ownerId, projectId);
+  const result: UploadResult = { documents: [], skipped: [] };
+  const uploadedKeys: string[] = [];
+
+  // Decide paths before opening the transaction. `pathExists` runs on the
+  // outer pool (it takes no tx), so an insert made earlier in this batch would
+  // otherwise be invisible to the next check — two files with the same name
+  // would collide on documents_project_path_key. The local set closes that
+  // hole; the DB check still catches files uploaded in an earlier request.
+  const seen = new Set<string>();
+  const accepted: Array<{ path: string; file: UploadInput }> = [];
+  for (const file of files) {
+    let path: string;
+    try {
+      path = uploadPathFor(file.name);
+    } catch (e) {
+      if (e instanceof UploadNameError) {
+        result.skipped.push(file.name);
+        continue;
+      }
+      throw e;
+    }
+    if (seen.has(path) || (await pathExists(ownerId, projectId, path))) {
+      result.skipped.push(file.name);
+      continue;
+    }
+    seen.add(path);
+    accepted.push({ path, file });
+  }
+
+  try {
+    await db.transaction(async (tx) => {
+      for (const { path, file } of accepted) {
+        const text =
+          file.bytes.byteLength <= UPLOAD_INLINE_BYTES
+            ? decodeUpload(file.bytes)
+            : null;
+        let blobKey: string | null = null;
+        if (text === null) {
+          blobKey = `${projectId}/${path}`;
+          await putObject(
+            "uploads",
+            blobKey,
+            file.bytes,
+            file.contentType ?? "application/octet-stream",
+          );
+          uploadedKeys.push(blobKey);
+        }
+
+        const [row] = await tx
+          .insert(documents)
+          .values({
+            projectId,
+            path,
+            kind: kindForPath(path),
+            content: text,
+            blobKey,
+          })
+          .returning(summaryColumns);
+        if (!row) throw new Error("failed to insert uploaded document");
+        result.documents.push(toSummary(row));
+      }
+    });
+  } catch (e) {
+    for (const key of uploadedKeys) {
+      await deleteObject("uploads", key).catch(() => undefined);
+    }
+    throw e;
+  }
+
+  if (result.documents.length > 0) await touchProject(ownerId, projectId);
+  return result;
 }
