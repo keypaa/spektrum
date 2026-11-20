@@ -4,7 +4,7 @@ import { assertSameOrigin } from "@spektrum/shared/http/guard";
 import { loadWebEnv } from "@spektrum/shared/env";
 import { errorResponse } from "@/auth/route-errors";
 import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
-import { resolveLlmKeyForRequest } from "@/lib/ai/keys";
+import { resolveLlmConfigForRequest } from "@/lib/ai/keys";
 import { getThread } from "@/lib/ai/chat-store";
 import { NoAssistantError, regenerateTitle } from "@/lib/ai/title";
 
@@ -48,7 +48,7 @@ export async function POST(
       );
     }
 
-    const resolved = await resolveLlmKeyForRequest(user.id, user.role);
+    const resolved = await resolveLlmConfigForRequest(user.id, user.role);
     if (!resolved) {
       return NextResponse.json(
         { error: "llm_key_missing", message: "Add your API key in Settings" },
@@ -56,14 +56,13 @@ export async function POST(
       );
     }
 
-    const env = loadWebEnv();
     try {
       const result = await regenerateTitle({
         threadId,
         userId: user.id,
-        baseUrl: env.llmBaseUrl,
+        baseUrl: resolved.baseUrl,
         apiKey: resolved.key,
-        model: env.llmModelFast,
+        model: resolved.fastModel,
         signal: req.signal,
       });
       if (!result) {

@@ -60,6 +60,9 @@ export async function* streamGateway(input: {
         "content-type": "application/json",
         authorization: `Bearer ${apiKey}`,
       },
+      // A user-configured endpoint must not redirect the Bearer token to an
+      // internal service after validateBaseUrl passed.
+      redirect: "error",
       body: JSON.stringify({
         model,
         messages,

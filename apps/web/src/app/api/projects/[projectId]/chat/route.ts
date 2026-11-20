@@ -10,6 +10,7 @@ import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
 import { redactSecrets } from "@spektrum/shared/log/redact";
 import {
   SYSTEM_PROMPT,
+  toolSchemas,
   type MessagePart,
   type ThinkingLevel,
   type ToolName,
@@ -27,7 +28,7 @@ import {
 import { buildContext } from "@/lib/ai/context";
 import { GatewayHttpError, streamGateway } from "@/lib/ai/gateway";
 import { executeTool } from "@/lib/ai/tools";
-import { resolveLlmKeyForRequest } from "@/lib/ai/keys";
+import { resolveLlmConfigForRequest } from "@/lib/ai/keys";
 import { recordUsage } from "@/lib/ai/usage";
 import { generateTitle } from "@/lib/ai/title";
 
@@ -80,7 +81,7 @@ export async function POST(
       );
     }
 
-    const resolved = await resolveLlmKeyForRequest(user.id, user.role);
+    const resolved = await resolveLlmConfigForRequest(user.id, user.role);
     if (!resolved) {
       return NextResponse.json(
         { error: "llm_key_missing", message: "Add your API key in Settings" },
@@ -117,8 +118,7 @@ export async function POST(
     const mainFile = main?.path ?? "main.tex";
 
     const history = await recentTurns(thread.id);
-    const env = loadWebEnv();
-    const model = env.llmModelChat;
+    const model = resolved.chatModel;
     const thinking = body.thinking as ThinkingLevel;
 
     const encoder = new TextEncoder();
@@ -211,11 +211,12 @@ export async function POST(
             >();
 
             for await (const event of streamGateway({
-              baseUrl: env.llmBaseUrl,
+              baseUrl: resolved.baseUrl,
               apiKey: resolved.key,
               model,
               thinking,
               messages,
+              tools: toolSchemas(),
               ...(req.signal ? { signal: req.signal } : {}),
             })) {
               if (event.type === "thinking") {
@@ -420,9 +421,9 @@ export async function POST(
               const title = await generateTitle({
                 firstUserMessage: body.message,
                 firstAssistantReply: assistantText,
-                baseUrl: env.llmBaseUrl,
+                baseUrl: resolved.baseUrl,
                 apiKey: resolved.key,
-                model: env.llmModelFast,
+                model: resolved.fastModel,
                 signal: AbortSignal.timeout(2000),
               });
               if (title) {

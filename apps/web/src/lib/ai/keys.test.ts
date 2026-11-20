@@ -7,7 +7,10 @@ import {
   getLlmKeyStatus,
   saveLlmKey,
 } from "@/auth/llm-key";
-import { resolveLlmKeyForRequest } from "./keys";
+import { loadWebEnv } from "@spektrum/shared/env";
+import { DEFAULT_PREFERENCES } from "@spektrum/shared";
+import { putPreferences } from "@/lib/preferences";
+import { resolveLlmConfigForRequest, resolveLlmKeyForRequest } from "./keys";
 
 const run = Math.random().toString(36).slice(2, 10);
 const userId = `keys-${run}`;
@@ -22,12 +25,84 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await deleteLlmKey(userId);
+  await putPreferences(userId, DEFAULT_PREFERENCES);
   delete process.env.LLM_API_KEY;
 });
 
 afterAll(async () => {
   await db.delete(users).where(eq(users.id, userId));
   await pool.end();
+});
+
+describe("resolveLlmConfigForRequest", () => {
+  it("uses server env defaults until LLM settings are configured", async () => {
+    await saveLlmKey(userId, USER_KEY);
+    const env = loadWebEnv();
+    expect(await resolveLlmConfigForRequest(userId, "member")).toEqual({
+      key: USER_KEY,
+      source: "user",
+      baseUrl: env.llmBaseUrl,
+      chatModel: env.llmModelChat,
+      fastModel: env.llmModelFast,
+    });
+  });
+
+  it("uses the chosen provider, endpoint and models once configured", async () => {
+    await saveLlmKey(userId, USER_KEY);
+    const llm = {
+      configured: true,
+      providerId: "openrouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      chatModel: "openai/gpt-4o",
+      fastModel: "google/gemini-2.5-flash",
+    };
+    await putPreferences(userId, { ...DEFAULT_PREFERENCES, llm });
+    expect(await resolveLlmConfigForRequest(userId, "member")).toEqual({
+      key: USER_KEY,
+      source: "user",
+      baseUrl: llm.baseUrl,
+      chatModel: llm.chatModel,
+      fastModel: llm.fastModel,
+    });
+  });
+
+  it("uses the provider's catalog endpoint when the stored one is blank", async () => {
+    await saveLlmKey(userId, USER_KEY);
+    await putPreferences(userId, {
+      ...DEFAULT_PREFERENCES,
+      llm: {
+        configured: true,
+        providerId: "kilo",
+        baseUrl: "",
+        chatModel: "baidu/ernie-5.5-flash-preview:free",
+        fastModel: "baidu/ernie-5.5-flash-preview:free",
+      },
+    });
+    const config = await resolveLlmConfigForRequest(userId, "member");
+    expect(config?.baseUrl).toBe("https://api.kilo.ai/api/gateway");
+    expect(config?.chatModel).toBe("baidu/ernie-5.5-flash-preview:free");
+  });
+
+  it("ignores an invalid stored endpoint", async () => {
+    await saveLlmKey(userId, USER_KEY);
+    await putPreferences(userId, {
+      ...DEFAULT_PREFERENCES,
+      llm: {
+        configured: true,
+        providerId: "custom",
+        baseUrl: "ftp://bad.example/v1",
+        chatModel: "m",
+        fastModel: "f",
+      },
+    });
+    const env = loadWebEnv();
+    const config = await resolveLlmConfigForRequest(userId, "member");
+    expect(config?.baseUrl).toBe(env.llmBaseUrl);
+  });
+
+  it("returns null without a key", async () => {
+    expect(await resolveLlmConfigForRequest(userId, "member")).toBeNull();
+  });
 });
 
 describe("resolveLlmKeyForRequest", () => {

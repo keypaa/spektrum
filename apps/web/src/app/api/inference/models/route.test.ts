@@ -21,9 +21,20 @@ vi.mock("@spektrum/shared/rate-limit", () => ({
   consume: async () => ({ allowed: state.allowed, retryAfterMs: 1000 }),
 }));
 
-vi.mock("@/lib/ai/keys", () => ({
-  resolveLlmKeyForRequest: async () => ({ key: "test-key", source: "user" }),
-}));
+vi.mock("@/lib/ai/keys", async () => {
+  const { loadWebEnv } = await import("@spektrum/shared/env");
+  const env = loadWebEnv();
+  return {
+    resolveLlmKeyForRequest: async () => ({ key: "test-key", source: "user" }),
+    resolveLlmConfigForRequest: async () => ({
+      key: "test-key",
+      source: "user",
+      baseUrl: env.llmBaseUrl,
+      chatModel: env.llmModelChat,
+      fastModel: env.llmModelFast,
+    }),
+  };
+});
 
 import { GET } from "./route";
 

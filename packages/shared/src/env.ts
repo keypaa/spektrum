@@ -25,7 +25,7 @@ const envVarSchema = z.object({
   BETTER_AUTH_SECRET: envSecret("BETTER_AUTH_SECRET", 32),
   BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a URL"),
   LLM_KEY_ENCRYPTION_SECRET: envSecret("LLM_KEY_ENCRYPTION_SECRET", 32),
-  LLM_BASE_URL: z.string().url().default("https://api.kilocode.ai/v1"),
+  LLM_BASE_URL: z.string().url().default("https://api.kilo.ai/api/gateway"),
   LLM_API_KEY: z.string().optional(),
   LLM_MODEL_CHAT: z.string().default("openai/gpt-4o"),
   LLM_MODEL_FAST: z.string().default("openai/gpt-4o-mini"),

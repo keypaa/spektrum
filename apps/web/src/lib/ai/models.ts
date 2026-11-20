@@ -1,5 +1,5 @@
 import { loadWebEnv } from "@spektrum/shared/env";
-import { resolveLlmKeyForRequest } from "./keys";
+import { resolveLlmConfigForRequest } from "./keys";
 
 export type ModelInfo = { id: string; label: string };
 
@@ -7,45 +7,64 @@ const CACHE_MS = 60_000;
 const cache = new Map<string, { models: ModelInfo[]; expires: number }>();
 
 /**
- * Resolve the gateway's model list for one user, with a 60 s per-user cache.
- * Never throws: a gateway failure returns the env defaults.
+ * Resolve the gateway's model list for one user, with a 60 s cache.
+ *
+ * The key includes the endpoint and models, not just the user id: switching
+ * provider in Settings must not keep serving the previous gateway's list.
+ * Never throws: a gateway failure returns the configured (or env) defaults.
  */
 export async function listModels(
   userId: string,
   role: string,
 ): Promise<ModelInfo[]> {
-  const cached = cache.get(userId);
+  const env = loadWebEnv();
+  const resolved = await resolveLlmConfigForRequest(userId, role);
+  const baseUrl = resolved?.baseUrl ?? env.llmBaseUrl;
+  const models: ModelInfo[] = resolved
+    ? [
+        { id: resolved.chatModel, label: resolved.chatModel },
+        { id: resolved.fastModel, label: resolved.fastModel },
+      ]
+    : [
+        { id: env.llmModelChat, label: env.llmModelChat },
+        { id: env.llmModelFast, label: env.llmModelFast },
+      ];
+  const fallback = models.filter((model, index) =>
+    models.findIndex((m) => m.id === model.id) === index,
+  );
+  const cacheKey = `${userId}:${baseUrl}:${fallback.map((m) => m.id).join(",")}`;
+  const cached = cache.get(cacheKey);
   if (cached && cached.expires > Date.now()) return cached.models;
 
-  const env = loadWebEnv();
-  const fallback: ModelInfo[] = [
-    { id: env.llmModelChat, label: env.llmModelChat },
-    { id: env.llmModelFast, label: env.llmModelFast },
-  ];
-  const resolved = await resolveLlmKeyForRequest(userId, role);
+  const store = (value: ModelInfo[]) => {
+    if (cache.size >= 200) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(cacheKey, { models: value, expires: Date.now() + CACHE_MS });
+  };
+
   if (!resolved) {
-    cache.set(userId, { models: fallback, expires: Date.now() + CACHE_MS });
+    store(fallback);
     return fallback;
   }
 
   try {
-    const response = await fetch(
-      `${env.llmBaseUrl.replace(/\/$/, "")}/models`,
-      {
-        headers: { authorization: `Bearer ${resolved.key}` },
-        signal: AbortSignal.timeout(3000),
-      },
-    );
+    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, {
+      redirect: "error",
+      headers: { authorization: `Bearer ${resolved.key}` },
+      signal: AbortSignal.timeout(3000),
+    });
     if (!response.ok) throw new Error(`models responded ${response.status}`);
     const body = (await response.json()) as { data?: Array<{ id?: string }> };
-    const models = (body.data ?? [])
+    const remote = (body.data ?? [])
       .map((model) => ({ id: model.id ?? "", label: model.id ?? "" }))
       .filter((model) => model.id.length > 0);
-    const result = models.length > 0 ? models : fallback;
-    cache.set(userId, { models: result, expires: Date.now() + CACHE_MS });
+    const result = remote.length > 0 ? remote : fallback;
+    store(result);
     return result;
   } catch {
-    cache.set(userId, { models: fallback, expires: Date.now() + CACHE_MS });
+    store(fallback);
     return fallback;
   }
 }

@@ -40,6 +40,13 @@ describe("DEFAULT_PREFERENCES", () => {
       pdfZoomShortcuts: true,
       revealSidebarOnHover: true,
       hiddenFiles: [...DEFAULT_HIDDEN_FILES],
+      llm: {
+        configured: false,
+        providerId: "kilo",
+        baseUrl: "",
+        chatModel: "",
+        fastModel: "",
+      },
     });
   });
 });
@@ -49,6 +56,39 @@ describe("mergePreferences", () => {
     expect(mergePreferences({})).toEqual(DEFAULT_PREFERENCES);
     expect(mergePreferences(null)).toEqual(DEFAULT_PREFERENCES);
     expect(mergePreferences("nope")).toEqual(DEFAULT_PREFERENCES);
+  });
+
+  it("merges stored LLM settings without losing the other defaults", () => {
+    const merged = mergePreferences({
+      llm: {
+        configured: true,
+        providerId: "openrouter",
+        baseUrl: "https://openrouter.ai/api/v1",
+        chatModel: "openai/gpt-4o",
+        fastModel: "google/gemini-2.5-flash",
+      },
+    });
+    expect(merged.llm).toEqual({
+      configured: true,
+      providerId: "openrouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      chatModel: "openai/gpt-4o",
+      fastModel: "google/gemini-2.5-flash",
+    });
+    expect(merged.editorFontSize).toBe(DEFAULT_PREFERENCES.editorFontSize);
+    // A malformed stored sub-object must not crash the read path.
+    expect(mergePreferences({ llm: { providerId: 42 } }).llm).toEqual(
+      DEFAULT_PREFERENCES.llm,
+    );
+  });
+
+  it("rejects unknown keys in the LLM settings at the API boundary", () => {
+    expect(
+      preferencesSchema.safeParse({
+        ...DEFAULT_PREFERENCES,
+        llm: { ...DEFAULT_PREFERENCES.llm, surprise: true },
+      }).success,
+    ).toBe(false);
   });
 
   it("merges a stored partial key-by-key", () => {

@@ -21,6 +21,22 @@ const MAX_HIDDEN_FILES = 500;
 const interfaceThemeSchema = z.enum(["system", "dark", "light"]);
 
 /**
+ * BYOK provider/model selection. `configured: false` means the server env
+ * defaults (LLM_BASE_URL / LLM_MODEL_CHAT / LLM_MODEL_FAST) are still in use.
+ * The API key itself is never stored here — it stays encrypted on the user row
+ * and is write-only through /api/user/llm-key.
+ */
+export const llmConfigSchema = z
+  .object({
+    configured: z.boolean(),
+    providerId: z.string().min(1).max(64),
+    baseUrl: z.string().max(500),
+    chatModel: z.string().max(200),
+    fastModel: z.string().max(200),
+  })
+  .strict();
+
+/**
  * Strict schema for the API boundary: an unknown key is a 400, not a silent
  * drop. `.strict()` is the difference between this and `mergePreferences`.
  */
@@ -46,6 +62,7 @@ export const preferencesSchema = z
     pdfZoomShortcuts: z.boolean(),
     revealSidebarOnHover: z.boolean(),
     hiddenFiles: z.array(z.string().min(1).max(200)).max(MAX_HIDDEN_FILES),
+    llm: llmConfigSchema,
   })
   .strict();
 
@@ -70,6 +87,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   pdfZoomShortcuts: true,
   revealSidebarOnHover: true,
   hiddenFiles: [...DEFAULT_HIDDEN_FILES],
+  llm: {
+    configured: false,
+    providerId: "kilo",
+    baseUrl: "",
+    chatModel: "",
+    fastModel: "",
+  },
 };
 
 function mergeOne<T>(
@@ -163,6 +187,10 @@ export function mergePreferences(value: unknown): Preferences {
       DEFAULT_PREFERENCES.hiddenFiles,
       hiddenFilesOrNull,
     ),
+    llm: mergeOne(v.llm, DEFAULT_PREFERENCES.llm, (x) => {
+      const parsed = llmConfigSchema.safeParse(x);
+      return parsed.success ? parsed.data : null;
+    }),
   };
 }
 

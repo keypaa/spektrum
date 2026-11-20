@@ -36,9 +36,17 @@ describe("validateApiKeyShape", () => {
     expect(validateApiKeyShape(API_KEY)).toEqual({ ok: true });
   });
 
+  it("accepts long JWT-style provider keys", () => {
+    // Kilo Code gateway keys are JWTs — several hundred characters, not the
+    // short `sk-…` tokens this validator was originally written for.
+    const jwt = `kc.${"Abc012-_xYz".repeat(100)}`;
+    expect(jwt.length).toBeGreaterThan(1000);
+    expect(validateApiKeyShape(jwt)).toEqual({ ok: true });
+  });
+
   it("rejects bad shapes", () => {
     expect(validateApiKeyShape("short").ok).toBe(false);
-    expect(validateApiKeyShape("x".repeat(201)).ok).toBe(false);
+    expect(validateApiKeyShape("x".repeat(4097)).ok).toBe(false);
     expect(validateApiKeyShape("has spaces in it..............").ok).toBe(false);
   });
 });
@@ -79,6 +87,15 @@ describe("llm key storage", () => {
       last4: "ZZ99",
     });
     expect(await resolveLlmKey(userId)).toBe(second);
+  });
+
+  it("round-trips a long JWT-style key without truncation", async () => {
+    const jwt = `kc.${"Abc012-_xYz".repeat(100)}`;
+    await saveLlmKey(userId, jwt);
+    expect(await resolveLlmKey(userId)).toBe(jwt);
+    const status = await getLlmKeyStatus(userId);
+    expect(status.configured).toBe(true);
+    expect(status.last4).toBe(jwt.slice(-4));
   });
 
   it("DELETE nulls both columns immediately", async () => {

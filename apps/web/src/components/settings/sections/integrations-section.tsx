@@ -7,6 +7,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Input } from "@spektrum/ui";
+import {
+  AI_PROVIDERS,
+  CUSTOM_PROVIDER_ID,
+  findProvider,
+  validateBaseUrl,
+} from "@spektrum/shared/ai";
+import { usePreferences } from "@/components/preferences-provider";
+import { SelectRow } from "../select-row";
+import { ModelPicker, type ModelOption } from "../model-picker";
 
 interface KeyStatus {
   configured: boolean;
@@ -31,6 +40,78 @@ async function refusalReason(response: Response, fallback: string): Promise<stri
 }
 
 export function IntegrationsSection() {
+  const { preferences, setPreference } = usePreferences();
+  const llm = preferences.llm;
+  const provider =
+    findProvider(llm.providerId) ?? findProvider(CUSTOM_PROVIDER_ID)!;
+  const baseUrlProblem = llm.baseUrl ? validateBaseUrl(llm.baseUrl) : null;
+
+  const chooseProvider = (id: string): void => {
+    const chosen = findProvider(id);
+    setPreference("llm", {
+      configured: true,
+      providerId: id,
+      baseUrl: chosen?.baseUrl ?? "",
+      chatModel: chosen?.defaultModel ?? "",
+      fastModel: chosen?.defaultFastModel ?? "",
+    });
+  };
+
+  const patchLlm = (patch: Partial<typeof llm>): void => {
+    setPreference("llm", { ...llm, ...patch, configured: true });
+  };
+
+  const [effective, setEffective] = useState<{
+    configured: boolean;
+    chatModel: string;
+    fastModel: string;
+  } | null>(null);
+  const [models, setModels] = useState<ModelOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/inference/models")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!cancelled && body?.models) {
+          setModels(
+            (body.models as Array<{ id: string; label?: string }>).map((model) => ({
+              id: model.id,
+              label: model.label ?? model.id,
+            })),
+          );
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/user/llm-config")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!cancelled && body) setEffective(body as typeof effective);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const effectiveEndpoint = llm.baseUrl || provider.baseUrl;
+  const localComplete =
+    llm.configured && Boolean(llm.chatModel && llm.fastModel && effectiveEndpoint);
+  const activeConfigured = localComplete && validateBaseUrl(effectiveEndpoint).ok;
+  const activeChatModel = localComplete
+    ? llm.chatModel
+    : (effective?.chatModel ?? llm.chatModel);
+  const activeFastModel = localComplete
+    ? llm.fastModel
+    : (effective?.fastModel ?? llm.fastModel);
+
   const [status, setStatus] = useState<KeyStatus | null>(null);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -109,7 +190,7 @@ export function IntegrationsSection() {
           </div>
           <span className="flex-none text-xs text-text-editor-tertiary">
             {configured
-              ? `Configured · sk-…${status?.last4 ?? ""}`
+              ? `Configured · …${status?.last4 ?? ""}`
               : "Not configured"}
           </span>
         </div>
@@ -158,6 +239,89 @@ export function IntegrationsSection() {
             {error}
           </p>
         ) : null}
+      </div>
+
+      <div className="rounded-xl border border-[color:var(--border-outline)] bg-bg-app px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <div className="text-base font-normal text-text-editor-primary">
+              AI provider &amp; model
+            </div>
+            <div className="text-sm text-text-editor-secondary">
+              Choose the gateway and the models used for chat and thread titles.
+            </div>
+            <div className="text-xs text-text-editor-tertiary">
+              Chat: {activeChatModel} · Titles: {activeFastModel}
+            </div>
+          </div>
+          <span className="flex-none text-xs text-text-editor-tertiary">
+            {activeConfigured
+              ? `${provider.label} · ${activeChatModel}`
+              : `Server default · ${activeChatModel}`}
+          </span>
+        </div>
+
+        <SelectRow
+          label="Provider"
+          value={llm.providerId}
+          options={AI_PROVIDERS.map((entry) => ({
+            value: entry.id,
+            label: entry.label,
+          }))}
+          onChange={chooseProvider}
+        />
+
+        <div className="flex flex-col gap-3 pb-1">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="llm-base-url"
+              className="text-xs text-text-editor-secondary"
+            >
+              API endpoint
+            </label>
+            <Input
+              id="llm-base-url"
+              aria-label="API endpoint"
+              value={llm.baseUrl}
+              onChange={(event) => patchLlm({ baseUrl: event.target.value })}
+              placeholder={provider.baseUrl || "https://…/v1"}
+              className="h-8"
+            />
+            {baseUrlProblem && !baseUrlProblem.ok ? (
+              <p role="alert" className="text-xs text-fg-error">
+                {baseUrlProblem.reason}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="text-sm text-text-editor-secondary">Chat model</div>
+              <div className="text-xs text-text-editor-tertiary">
+                Used for every chat reply.
+              </div>
+            </div>
+            <ModelPicker
+              label="Chat model"
+              value={llm.chatModel}
+              options={models}
+              onChange={(value) => patchLlm({ chatModel: value })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="text-sm text-text-editor-secondary">Fast model</div>
+              <div className="text-xs text-text-editor-tertiary">
+                Used for generated thread titles.
+              </div>
+            </div>
+            <ModelPicker
+              label="Fast model"
+              value={llm.fastModel}
+              options={models}
+              onChange={(value) => patchLlm({ fastModel: value })}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-[color:var(--border-outline)] bg-bg-app px-4 py-3">

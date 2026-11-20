@@ -1,6 +1,6 @@
 // BYOK LLM key storage — spec §12.2.
 // users.llm_api_key_ciphertext holds sealSecret(apiKey, aad=`user:<id>`, KEK);
-// llm_api_key_last4 holds the last 4 chars for the UI (sk-…abcd).
+// llm_api_key_last4 holds the last 4 chars for the UI (…abcd).
 // The plaintext is NEVER returned by getLlmKeyStatus; only resolveLlmKey
 // (server-side, inside /api/llm/* proxies) decrypts.
 import { eq } from "drizzle-orm";
@@ -16,9 +16,18 @@ function kek(): Buffer {
 
 export type ApiKeyValidation = { ok: true } | { ok: false; reason: string };
 
+/**
+ * Provider keys are not all short `sk-…` tokens. Kilo Code's gateway keys are
+ * JWTs (header.payload.signature), which are routinely 500–2000 characters.
+ * The old 200-char cap rejected them outright. 4096 still bounds the request
+ * body and the encrypted column while leaving room for any JWT-style key.
+ */
+export const MAX_API_KEY_LENGTH = 4096;
+
 export function validateApiKeyShape(apiKey: string): ApiKeyValidation {
   if (apiKey.length < 20) return { ok: false, reason: "API key is too short" };
-  if (apiKey.length > 200) return { ok: false, reason: "API key is too long" };
+  if (apiKey.length > MAX_API_KEY_LENGTH)
+    return { ok: false, reason: "API key is too long" };
   if (/\s/.test(apiKey)) return { ok: false, reason: "API key must not contain whitespace" };
   return { ok: true };
 }

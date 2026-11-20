@@ -17,6 +17,11 @@ const state = vi.hoisted(() => ({
   title: "Generated",
   appends: [] as Array<{ role: string; content: unknown; id?: string }>,
   usage: 0,
+  baseUrl: "https://configured.example/v1",
+  chatModel: "configured-chat",
+  fastModel: "configured-fast",
+  gatewayInput: null as null | Record<string, unknown>,
+  titleInput: null as null | Record<string, unknown>,
 }));
 
 vi.mock("@/auth/session", async (importOriginal) => {
@@ -38,6 +43,16 @@ vi.mock("@spektrum/shared/rate-limit", () => ({
 vi.mock("@/lib/ai/keys", () => ({
   resolveLlmKeyForRequest: async () =>
     state.key ? { key: "test-key", source: "user" } : null,
+  resolveLlmConfigForRequest: async () =>
+    state.key
+      ? {
+          key: "test-key",
+          source: "user",
+          baseUrl: state.baseUrl,
+          chatModel: state.chatModel,
+          fastModel: state.fastModel,
+        }
+      : null,
 }));
 
 vi.mock("@/lib/projects", () => ({
@@ -74,7 +89,10 @@ vi.mock("@/lib/ai/gateway", () => ({
       super(message);
     }
   },
-  streamGateway: () => state.gateway!(),
+  streamGateway: (input: Record<string, unknown>) => {
+    state.gatewayInput = input;
+    return state.gateway!();
+  },
 }));
 
 vi.mock("@/lib/ai/tools", () => ({
@@ -88,7 +106,10 @@ vi.mock("@/lib/ai/usage", () => ({
 }));
 
 vi.mock("@/lib/ai/title", () => ({
-  generateTitle: async () => state.title,
+  generateTitle: async (input: Record<string, unknown>) => {
+    state.titleInput = input;
+    return state.title;
+  },
 }));
 
 import { GatewayHttpError } from "@/lib/ai/gateway";
@@ -116,9 +137,35 @@ beforeEach(() => {
   state.title = "Generated";
   state.appends = [];
   state.usage = 0;
+  state.gatewayInput = null;
+  state.titleInput = null;
+  state.baseUrl = "https://configured.example/v1";
+  state.chatModel = "configured-chat";
+  state.fastModel = "configured-fast";
 });
 
 describe("POST /chat", () => {
+  it("uses the user's configured endpoint and models", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "reply" };
+      yield { type: "done" };
+    };
+    const res = await POST(req({ message: "hello" }), ctx);
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(state.gatewayInput?.baseUrl).toBe("https://configured.example/v1");
+    expect(state.gatewayInput?.model).toBe("configured-chat");
+    expect(state.gatewayInput?.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          function: expect.objectContaining({ name: "compile" }),
+        }),
+      ]),
+    );
+    expect(state.titleInput?.baseUrl).toBe("https://configured.example/v1");
+    expect(state.titleInput?.model).toBe("configured-fast");
+  });
+
   it("streams text, persists the turn and meters usage", async () => {
     state.gateway = async function* () {
       yield { type: "text", delta: "hi" };

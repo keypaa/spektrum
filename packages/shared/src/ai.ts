@@ -2,6 +2,8 @@ import { z } from "zod";
 import { diffProposalSchema } from "./ai/diff";
 
 export * from "./ai/prompts";
+export * from "./ai/providers";
+export * from "./ai/tools";
 
 export type {
   DiffHunk,
