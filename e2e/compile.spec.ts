@@ -282,7 +282,9 @@ test.describe("compile", () => {
       )
       .toBe(true);
 
-    await expect(page.getByText("Failed")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Failed", { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
     // The last good PDF is still rendered (the viewer keeps the old pdfUrl).
     await expect(
       page.locator("[data-testid='pdf-viewport'] canvas").first(),

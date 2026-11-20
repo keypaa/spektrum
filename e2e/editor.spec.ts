@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, OWNER_EMAIL } from "./helpers";
+import { createBlankProject, login, OWNER_EMAIL } from "./helpers";
 import { psql } from "./db";
 
 function resetOwnerState(): void {
@@ -29,8 +29,7 @@ test("create a file, reload, rename it, delete it", async ({ page }) => {
   await page.goto("/");
   await login(page);
   // A blank project seeds main.tex.
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
 
@@ -78,8 +77,7 @@ test("create a file, reload, rename it, delete it", async ({ page }) => {
 test("tabs survive a reload with the last active tab", async ({ page }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
 
@@ -111,8 +109,7 @@ test("switching tabs loads the other document's content", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
 
@@ -169,8 +166,7 @@ test("switching tabs loads the other document's content", async ({ page }) => {
 test("an edit autosaves and survives a reload", async ({ page }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("monaco-editor")).toBeVisible();
 
@@ -199,8 +195,7 @@ test("an edit autosaves and survives a reload", async ({ page }) => {
 test("an edit then a focus loss persists after reload", async ({ page }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("monaco-editor")).toBeVisible();
 
@@ -233,8 +228,7 @@ test("settings: a preference persists across a reload", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
 
@@ -279,8 +273,7 @@ test("settings: a preference persists across a reload", async ({ page }) => {
 test("the editor context menu opens on right-click and closes on Escape", async ({ page }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("monaco-editor")).toBeVisible();
 
@@ -322,8 +315,7 @@ async function assertIconDom(page: import("@playwright/test").Page): Promise<voi
 test("the editor DOM has no emoji and only 16x16 currentColor icons", async ({ page }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("editor-root")).toBeVisible();
   await assertIconDom(page);
@@ -338,8 +330,7 @@ test("the editor DOM has no emoji and only 16x16 currentColor icons", async ({ p
 test("hidden files disappear from the tree and stay hidden after reload", async ({ page }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("project-sidebar")).toBeVisible();
 

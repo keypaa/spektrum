@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login } from "./helpers";
+import { createBlankProject, login } from "./helpers";
 
 // Task 13's browser check: the LaTeX grammar and the three folding providers
 // are live on the real Monaco instance. The check drives the page's own editor
@@ -32,8 +32,7 @@ test.fixme("Monaco folds the LaTeX grammar's regions, sections and environments"
 }) => {
   await page.goto("/");
   await login(page);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await page.getByRole("link", { name: "New Project" }).first().click();
   await expect(page.getByTestId("monaco-editor")).toBeVisible();
 

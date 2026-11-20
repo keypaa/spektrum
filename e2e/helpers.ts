@@ -5,6 +5,19 @@ export const OWNER_PASSWORD =
   process.env.E2E_OWNER_PASSWORD ?? "owner-password-123";
 
 /**
+ * Create a blank project from the dashboard New menu. The menu navigates
+ * straight into the editor, so return to the dashboard — the behavioural
+ * specs below still exercise project cards and card navigation afterwards.
+ */
+export async function createBlankProject(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "New", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await expect(page).toHaveURL(/\/u\/[0-9a-f-]{36}/);
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+}
+
+/**
  * Shared sign-in for the behavioural e2e suite. Each test gets a fresh
  * x-forwarded-for so the sign-in rate limit (5 / 15 min / IP) never trips.
  */

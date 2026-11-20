@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { login, OWNER_EMAIL } from "./helpers";
+import { createBlankProject, login, OWNER_EMAIL } from "./helpers";
 import { psql } from "./db";
 
 
@@ -106,8 +106,7 @@ test("the New menu creates a blank project", async ({ page }) => {
   await login(page);
 
   await expect(page.locator('[data-testid^="project-card-"]')).toHaveCount(0);
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
 
   await expect(page.locator('[data-testid^="project-card-"]')).toHaveCount(1);
   await expect(page.getByText("New Project", { exact: true })).toBeVisible();
@@ -188,8 +187,7 @@ test("a project name opens the editor", async ({ page }) => {
   await login(page);
 
   // Blank project via the New menu seeds main.tex with the blank template.
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Blank project" }).click();
+  await createBlankProject(page);
   await expect(page.getByText("New Project", { exact: true })).toBeVisible();
   // Creating a project refreshes the list; clicking while that refresh is in
   // flight loses the navigation, so let the network settle first.
