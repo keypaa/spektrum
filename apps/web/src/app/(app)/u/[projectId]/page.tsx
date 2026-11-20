@@ -6,7 +6,7 @@ import { users } from "@spektrum/db/schema";
 import { requireUser, UnauthorizedError } from "@/auth/session";
 import { getLlmKeyStatus } from "@/auth/llm-key";
 import { loadWebEnv } from "@spektrum/shared/env";
-import { getProject } from "@/lib/projects";
+import { getProject, listProjects } from "@/lib/projects";
 import {
   getDocumentById,
   getDocumentByPath,
@@ -75,6 +75,7 @@ export default async function EditorPage({
   return (
     <EditorClient
       project={{ id: project.id, name: project.name }}
+      projects={(await listProjects(user.id)).map(({ id, name }) => ({ id, name }))}
       documents={documents}
       initialDocument={initialDocument}
       mainFilePath={mainFilePath}

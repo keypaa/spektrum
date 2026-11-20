@@ -1,7 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@spektrum/ui";
+import {
+  IconCheck,
   IconChevronDown,
   IconFile,
   IconFileBib,
@@ -10,12 +18,16 @@ import {
   IconFileTex,
   IconPlus,
   IconSearch,
+  IconUpload,
 } from "@spektrum/ui/icons";
 import type { DocumentSummary, DocumentKind } from "@/lib/documents";
 import { matchHiddenFile } from "@/lib/hidden-files";
 import { FileRow } from "./file-row";
 import { ChatList, type ChatThreadSummary } from "./chat-list";
 import { AccountChip } from "./account-chip";
+import { ViewControlsMenu, type ViewVisibility } from "./view-controls";
+import { OutlinePanel } from "./outline-panel";
+import type { OutlineNode } from "@/lib/outline";
 
 export interface ProjectSidebarProps {
   project: { id: string; name: string };
@@ -26,6 +38,14 @@ export interface ProjectSidebarProps {
   onSectionChange(section: "files" | "chats"): void;
   onOpenDocument(path: string): void;
   onNewFile(): void;
+  onUploadFiles(files: File[]): void;
+  projects: Array<{ id: string; name: string }>;
+  onSwitchProject(projectId: string): void;
+  onOpenDashboard(): void;
+  outline: OutlineNode[];
+  onOutlineNavigate(line: number): void;
+  view: ViewVisibility;
+  onViewChange(next: ViewVisibility): void;
   onRenameDocument(doc: DocumentSummary): void;
   onDeleteDocument(doc: DocumentSummary): void;
   onDownloadDocument(doc: DocumentSummary): void;
@@ -65,6 +85,14 @@ export function ProjectSidebar({
   onSectionChange,
   onOpenDocument,
   onNewFile,
+  onUploadFiles,
+  projects,
+  onSwitchProject,
+  onOpenDashboard,
+  outline,
+  onOutlineNavigate,
+  view,
+  onViewChange,
   onRenameDocument,
   onDeleteDocument,
   onDownloadDocument,
@@ -81,6 +109,7 @@ export function ProjectSidebar({
 }: ProjectSidebarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -95,22 +124,54 @@ export function ProjectSidebar({
       data-testid="project-sidebar"
       className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-bg-sidepanel"
     >
-      {/* Header: project name dropdown trigger (inert in Phase 2) + avatar. */}
+      <input
+        ref={uploadInputRef}
+        type="file"
+        multiple
+        aria-label="Choose files to upload"
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (files.length > 0) onUploadFiles(files);
+          event.target.value = "";
+        }}
+      />
+      {/* Header: project switcher + view controls. */}
       <div className="mx-3 mt-1 flex flex-row items-center gap-2">
-        <button
-          type="button"
-          aria-haspopup="menu"
-          aria-label={`Open project menu`}
-          className="flex min-h-9 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-xl border border-[color:var(--border-outline)] px-3 py-1.5 text-left text-sm outline-none transition-colors hover:border-[color:var(--border-modal)] hover:bg-nav-bg-hover"
-        >
-          <span className="min-w-0 flex-1 select-none overflow-hidden text-ellipsis text-nowrap font-medium">
-            {project.name}
-          </span>
-          <IconChevronDown size={16} className="flex-none" />
-        </button>
-        <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-button-secondary-bg text-sm font-medium text-button-secondary-text ring-2 ring-bg-app">
-          {user.name.charAt(0).toUpperCase()}
-        </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Switch project"
+              className="flex min-h-9 w-full min-w-0 cursor-pointer items-center justify-between gap-2 rounded-xl border border-[color:var(--border-outline)] px-3 py-1.5 text-left text-sm outline-none transition-colors hover:border-[color:var(--border-modal)] hover:bg-nav-bg-hover"
+            >
+              <span className="min-w-0 flex-1 select-none overflow-hidden text-ellipsis text-nowrap font-medium">
+                {project.name}
+              </span>
+              <IconChevronDown size={16} className="flex-none" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[220px]">
+            {projects.map((entry) => (
+              <DropdownMenuItem
+                key={entry.id}
+                onSelect={() => {
+                  if (entry.id !== project.id) onSwitchProject(entry.id);
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                {entry.id === project.id ? (
+                  <IconCheck size={14} className="flex-none" />
+                ) : null}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onOpenDashboard}>
+              All projects
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ViewControlsMenu value={view} onChange={onViewChange} />
       </div>
 
       {/* Files / Chats underline row with the search and plus buttons. */}
@@ -142,6 +203,15 @@ export function ProjectSidebar({
             );
           })}
           <div className="-mr-2 ml-auto flex items-center gap-1 pb-2">
+            <button
+              type="button"
+              aria-label="Upload files"
+              title="Upload files"
+              onClick={() => uploadInputRef.current?.click()}
+              className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-text-editor-secondary hover:text-text-editor-primary"
+            >
+              <IconUpload size={16} />
+            </button>
             <button
               type="button"
               aria-label="Search"
@@ -217,7 +287,8 @@ export function ProjectSidebar({
         )}
       </div>
 
-      {/* Bottom user chip: the account menu (settings, shortcuts, sign out). */}
+      {/* Section outline of the active document, then the user chip. */}
+      <OutlinePanel items={outline} onNavigate={onOutlineNavigate} />
       <AccountChip user={user} />
     </div>
   );

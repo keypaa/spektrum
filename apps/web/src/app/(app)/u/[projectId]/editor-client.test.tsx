@@ -40,6 +40,10 @@ function renderShell(overrides: Partial<React.ComponentProps<typeof EditorClient
     <PreferencesProvider initial={DEFAULT_PREFERENCES}>
       <EditorClient
         project={{ id: "p1", name: "My Project" }}
+        projects={[
+          { id: "p1", name: "My Project" },
+          { id: "p2", name: "Other Project" },
+        ]}
         documents={DOCS}
         initialDocument={DOC}
         user={{ name: "Keylhan Paumard", email: "owner@spektrum.local" }}

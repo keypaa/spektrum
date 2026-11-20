@@ -8,7 +8,7 @@
 // editor area and the 88 px composer slot.
 
 import type { ReactElement } from "react";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type {
@@ -20,12 +20,18 @@ import {
   deleteDocumentRequest,
   getDocumentRequest,
   renameDocumentRequest,
+  uploadDocumentsRequest,
 } from "@/lib/document-client";
 import { saveDocumentRequest, type SaveResult } from "@/lib/save-document";
 import { usePreferences } from "@/components/preferences-provider";
 import { ProjectSidebar } from "./sidebar/project-sidebar";
 import type { ChatThreadSummary } from "./sidebar/chat-list";
 import { SIDEBAR_STORAGE_KEY, useResizablePane } from "./sidebar/resizable";
+import {
+  DEFAULT_VIEW,
+  layoutForView,
+  type ViewVisibility,
+} from "./sidebar/view-controls";
 import { EditorContextMenu } from "./editor/editor-context-menu";
 import { NewFileDialog } from "./dialogs/new-file-dialog";
 import { RenameFileDialog } from "./dialogs/rename-file-dialog";
@@ -35,7 +41,11 @@ import { Composer } from "./composer/composer";
 import { useChat } from "./composer/use-chat";
 import { acceptDiff, type DiffPart } from "./composer/diff-accept";
 import { DiffWidget } from "./composer/diff-widget";
-import { FIX_PROMPT, REVIEW_PROMPT } from "@spektrum/shared/ai";
+import {
+  FIX_PROMPT,
+  REVIEW_PROMPT,
+  paperReviewStatusMessage,
+} from "@spektrum/shared/ai";
 import { sha256Hex } from "@spektrum/shared/hash";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
@@ -64,7 +74,9 @@ import { fetchSyncTex } from "@/lib/synctex-client";
 import { nearestForward } from "@/components/pdf/use-sync-scroll";
 import { nearestAnchor } from "@/components/pdf/use-sync-jump";
 import type { Diagnostic, ProjectStats, SyncTexMap } from "@spektrum/shared";
-import { IconTools } from "@spektrum/ui/icons";
+import { IconSliders, IconTools } from "@spektrum/ui/icons";
+import { FileDropOverlay } from "@/components/upload/file-drop-overlay";
+import { parseOutline } from "@/lib/outline";
 
 // Monaco is browser-only; the dynamic import (ssr: false) must come from this
 // client component, not the RSC page.
@@ -82,6 +94,8 @@ const PdfViewer = dynamic(
 
 export interface EditorClientProps {
   project: { id: string; name: string };
+  /** All projects owned by this user, for the sidebar project switcher. */
+  projects: Array<{ id: string; name: string }>;
   documents: DocumentSummary[];
   initialDocument: DocumentRecord | null;
   /** The project's main file path (for the compile request). */
@@ -108,6 +122,7 @@ function byPath(a: DocumentSummary, b: DocumentSummary): number {
 
 export function EditorClient({
   project,
+  projects,
   documents,
   initialDocument,
   mainFilePath = "",
@@ -152,8 +167,11 @@ export function EditorClient({
     return () => observer.disconnect();
   }, []);
   const [activeSection, setActiveSection] = useState<"files" | "chats">("files");
+  const [view, setView] = useState<ViewVisibility>(DEFAULT_VIEW);
+  const layout = layoutForView(view);
   const [docs, setDocs] = useState<DocumentSummary[]>(documents);
   const [buffer, setBuffer] = useState(initialDocument?.content ?? "");
+  const outline = useMemo(() => parseOutline(buffer), [buffer]);
   const [baseline, setBaseline] = useState(initialDocument?.updatedAt ?? "");
   const [loadedId, setLoadedId] = useState(initialDocument?.id ?? null);
   // The path whose content was last applied to the editor model (Task 14 owns
@@ -173,6 +191,14 @@ export function EditorClient({
   const docsRef = useRef(docs);
   docsRef.current = docs;
   const [newFileOpen, setNewFileOpen] = useState(false);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!uploadNote) return;
+    const timer = setTimeout(() => setUploadNote(null), 4000);
+    return () => clearTimeout(timer);
+  }, [uploadNote]);
   const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -319,6 +345,9 @@ export function EditorClient({
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  // Set while leaving the project: a late SSE `meta` event must not navigate
+  // us back into the project we just left.
+  const navigatingAway = useRef(false);
 
   const refreshThreads = useCallback(async () => {
     const response = await fetch(`/api/projects/${project.id}/threads`);
@@ -339,6 +368,7 @@ export function EditorClient({
     },
     onTitle: () => void refreshThreads(),
     onThreadChange: (id) => {
+      if (navigatingAway.current) return;
       setActiveThreadId(id);
       if (id) router.replace(`/u/${project.id}?thread=${id}`, { scroll: false });
       void refreshThreads();
@@ -353,6 +383,25 @@ export function EditorClient({
   const newChat = () => {
     chat.reset();
     router.replace(`/u/${project.id}`, { scroll: false });
+  };
+
+  /** The tab strip's chat button opens a fresh chat in the sidebar. */
+  const openChat = () => {
+    setActiveSection("chats");
+    newChat();
+  };
+
+  const leaveProject = async (href: string): Promise<void> => {
+    navigatingAway.current = true;
+    chat.stop();
+    // Neither the autosave debounce nor the chat stream may outlive this page.
+    await autosave.flush();
+    router.push(href);
+  };
+
+  const switchProject = (id: string): void => {
+    if (id === project.id) return;
+    void leaveProject(`/u/${id}`);
   };
 
   const renameThread = async (thread: ChatThreadSummary, title: string) => {
@@ -794,6 +843,35 @@ export function EditorClient({
     router.refresh();
   };
 
+  const handleUploadFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    setUploading(true);
+    setUploadNote(null);
+    try {
+      const result = await uploadDocumentsRequest(project.id, files);
+      if (result.documents.length > 0) {
+        setDocs((prev) =>
+          [
+            ...prev.filter(
+              (doc) => !result.documents.some((added) => added.path === doc.path),
+            ),
+            ...result.documents,
+          ].sort(byPath),
+        );
+        afterMutation();
+      }
+      if (result.skipped.length > 0) {
+        setUploadNote(
+          `${result.skipped.length} file${result.skipped.length === 1 ? "" : "s"} skipped (already in the project).`,
+        );
+      }
+    } catch (e) {
+      setUploadNote(e instanceof Error ? e.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const createFile = async (path: string) => {
     const doc = await createDocumentRequest(project.id, path);
     setDocs((prev) => [...prev.filter((d) => d.path !== doc.path), doc].sort(byPath));
@@ -833,13 +911,15 @@ export function EditorClient({
       data-testid="editor-root"
       style={
         {
-          "--sidebar-width": "442px",
-          "--right-pane-width": "677px",
+          "--sidebar-width": layout.sidebarWidth,
+          "--right-pane-width": layout.rightPaneWidth,
         } as React.CSSProperties
       }
       className="grid h-screen grid-cols-[var(--sidebar-width)_minmax(480px,1fr)_var(--right-pane-width)] overflow-hidden pr-4"
     >
       <div className="relative min-h-0 min-w-0">
+        {view.sidebar ? (
+          <>
         <ProjectSidebar
           project={project}
           documents={docs}
@@ -849,6 +929,14 @@ export function EditorClient({
           onSectionChange={setActiveSection}
           onOpenDocument={openDocument}
           onNewFile={() => setNewFileOpen(true)}
+          onUploadFiles={(files) => void handleUploadFiles(files)}
+          projects={projects}
+          onSwitchProject={(id) => void switchProject(id)}
+          onOpenDashboard={() => void leaveProject("/")}
+          outline={outline}
+          onOutlineNavigate={(line) => editorRef.current?.revealLine(line)}
+          view={view}
+          onViewChange={setView}
           onRenameDocument={setRenameTarget}
           onDeleteDocument={setDeleteTarget}
           onDownloadDocument={download}
@@ -873,6 +961,20 @@ export function EditorClient({
             dragging ? "bg-[color:var(--border-brand)]" : ""
           }`}
         />
+          </>
+        ) : (
+          <div className="flex h-full flex-col items-center border-r border-[color:var(--border-log)] bg-bg-sidepanel py-3">
+            <button
+              type="button"
+              aria-label="Show sidebar"
+              title="Show sidebar"
+              onClick={() => setView((v) => ({ ...v, sidebar: true }))}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-text-editor-secondary hover:bg-nav-bg-hover hover:text-text-editor-primary"
+            >
+              <IconSliders size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Centre column: header block (84 px), editor area, composer slot. */}
@@ -883,7 +985,7 @@ export function EditorClient({
             active={activePath}
             onActivate={openDocument}
             onClose={(path) => dispatch({ type: "close", path })}
-            onCollapseSidebar={() => {}}
+            onOpenChat={openChat}
             onRecompile={() => void compile()}
             tools={
               <DropdownMenu>
@@ -930,6 +1032,7 @@ export function EditorClient({
             className="h-4 border-b-2 border-[color:var(--border-log)]"
           />
         </div>
+        {view.code ? (
         <div
           data-testid="editor-area-placeholder"
           className="relative min-h-0 flex-1 overflow-hidden bg-bg-code"
@@ -978,6 +1081,10 @@ export function EditorClient({
             />
           ) : null}
         </div>
+        ) : (
+          <div data-testid="editor-area-hidden" className="min-h-0 flex-1 bg-bg-code" />
+        )}
+        {view.assistant ? (
         <div
           data-testid="composer-slot-placeholder"
           className="flex-none border-t border-[color:var(--border-log)]"
@@ -986,16 +1093,27 @@ export function EditorClient({
           <Composer
             chat={chat}
             aiEnabled={aiEnabled}
-            onReview={() => chat.send(REVIEW_PROMPT, "Medium", openTabs)}
+            onReview={() =>
+              chat.send(
+                REVIEW_PROMPT,
+                "Extra high",
+                openTabs,
+                paperReviewStatusMessage(),
+              )
+            }
+            onUploadFiles={(files) => void handleUploadFiles(files)}
             openTabs={openTabs}
             onReviewDiff={(part) => setReviewingId(part.id)}
           />
         </div>
+        ) : null}
       </div>
 
       {/* Right column (PDF / info panel). Wrapped so the divider between it and
           the editor can be dragged; the hook writes --right-pane-width. */}
       <div className="relative min-h-0 min-w-0">
+      {view.pdf ? (
+      <>
       {panel ? (
         <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">
           <div className="h-full overflow-hidden rounded-t-lg bg-bg-sidepanel">
@@ -1069,7 +1187,12 @@ export function EditorClient({
                 page={page}
                 numPages={numPages}
                 zoom={zoom}
-                onPage={setPage}
+                onPage={(next) => {
+                  // The viewer reports the page from scroll position, so just
+                  // setting state would be undone by the sync observer.
+                  setPage(next);
+                  pdfPageRef.current?.goToPage(next);
+                }}
                 onZoom={setZoom}
                 onZoomToFit={() => {
                   void pdfPageRef.current?.fitWidth().then((percent) => {
@@ -1128,6 +1251,8 @@ export function EditorClient({
             previewDragging ? "bg-[color:var(--border-brand)]" : ""
           }`}
         />
+      </>
+      ) : null}
       </div>
 
       <ShareDialog
@@ -1171,6 +1296,13 @@ export function EditorClient({
           if (!open) setDeleteTarget(null);
         }}
       />
+
+      <FileDropOverlay onFiles={(files) => void handleUploadFiles(files)} />
+      {uploading || uploadNote ? (
+        <div className="pointer-events-none fixed bottom-5 left-1/2 z-40 -translate-x-1/2 rounded-full border border-[color:var(--border-outline)] bg-bg-code px-4 py-2 text-xs text-text-editor-primary shadow-lg">
+          {uploading ? "Uploading files…" : uploadNote}
+        </div>
+      ) : null}
     </div>
   );
 }

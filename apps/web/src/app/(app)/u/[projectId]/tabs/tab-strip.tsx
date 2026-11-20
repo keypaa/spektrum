@@ -1,11 +1,7 @@
 "use client";
 
 import type { ReactElement, ReactNode } from "react";
-import {
-  IconClose,
-  IconPanelLeftClose,
-  IconRefresh,
-} from "@spektrum/ui/icons";
+import { IconChat, IconClose, IconRefresh } from "@spektrum/ui/icons";
 import type { DocumentKind } from "@/lib/documents";
 import { kindIcon } from "../sidebar/project-sidebar";
 
@@ -14,7 +10,7 @@ export interface TabStripProps {
   active: string | null;
   onActivate(path: string): void;
   onClose(path: string): void;
-  onCollapseSidebar(): void;
+  onOpenChat(): void;
   onRecompile(): void;
   tools: ReactNode;
   /** Transient autosave status (spec D29); rendered when set. */
@@ -26,7 +22,7 @@ export function TabStrip({
   active,
   onActivate,
   onClose,
-  onCollapseSidebar,
+  onOpenChat,
   onRecompile,
   tools,
   status,
@@ -38,11 +34,12 @@ export function TabStrip({
     >
       <button
         type="button"
-        aria-label="Collapse sidebar"
-        onClick={onCollapseSidebar}
+        aria-label="Open chat"
+        title="Open chat"
+        onClick={onOpenChat}
         className="flex h-8 w-8 flex-none items-center justify-center rounded-md text-text-editor-secondary hover:bg-[color:var(--nav-bg-hover-strong)] hover:text-text-editor-primary"
       >
-        <IconPanelLeftClose size={16} />
+        <IconChat size={16} />
       </button>
       <button
         type="button"
@@ -54,7 +51,7 @@ export function TabStrip({
       </button>
       <div
         role="tablist"
-        className="flex h-full min-w-0 flex-1 items-stretch gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
           const isActive = tab.path === active;
@@ -73,13 +70,13 @@ export function TabStrip({
                   onClose(tab.path);
                 }
               }}
-              className={`group relative flex h-10 min-w-0 max-w-[200px] cursor-pointer items-center gap-2 rounded-t-lg px-3 pt-1.5 text-xs ${
+              className={`group relative flex h-10 min-w-0 max-w-[200px] cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs ${
                 isActive
-                  ? "border-t-2 border-[color:var(--border-brand)] bg-bg-code text-text-editor-primary"
-                  : "bg-transparent text-text-editor-secondary hover:bg-[color:var(--nav-bg-hover-strong)] hover:text-text-editor-primary"
+                  ? "border-[color:var(--border-modal)] bg-bg-tertiary text-text-editor-primary"
+                  : "border-transparent bg-transparent text-text-editor-secondary hover:bg-[color:var(--nav-bg-hover-strong)] hover:text-text-editor-primary"
               }`}
             >
-              <Icon size={14} className="flex-none" />
+              <Icon size={18} className="flex-none" />
               <span className="min-w-0 flex-1 truncate">{tab.path}</span>
               <button
                 type="button"

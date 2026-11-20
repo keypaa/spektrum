@@ -27,6 +27,17 @@ function renderSidebar(overrides: Partial<React.ComponentProps<typeof ProjectSid
     onSectionChange: vi.fn(),
     onOpenDocument: vi.fn(),
     onNewFile: vi.fn(),
+    onUploadFiles: vi.fn(),
+    projects: [
+      { id: "p1", name: "My Project" },
+      { id: "p2", name: "Other Project" },
+    ],
+    onSwitchProject: vi.fn(),
+    onOpenDashboard: vi.fn(),
+    outline: [],
+    onOutlineNavigate: vi.fn(),
+    view: { code: true, pdf: true, sidebar: true, assistant: true },
+    onViewChange: vi.fn(),
     onRenameDocument: vi.fn(),
     onDeleteDocument: vi.fn(),
     onDownloadDocument: vi.fn(),
@@ -122,6 +133,25 @@ describe("ProjectSidebar", () => {
     expect(props.onNewFile).toHaveBeenCalled();
   });
 
+  it("the Upload files button opens a file picker and hands the files over", async () => {
+    const onUploadFiles = vi.fn();
+    renderSidebar({ onUploadFiles });
+    const input = document.querySelector(
+      'input[type="file"][multiple]',
+    ) as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+
+    await userEvent.click(screen.getByRole("button", { name: "Upload files" }));
+    expect(click).toHaveBeenCalled();
+
+    await userEvent.upload(
+      input,
+      new File(["x"], "notes.pdf", { type: "application/pdf" }),
+    );
+    expect(onUploadFiles).toHaveBeenCalledTimes(1);
+    expect(onUploadFiles.mock.calls[0]![0]).toHaveLength(1);
+  });
+
   it("renders the chat threads in the Chats branch, newest first", async () => {
     const { props } = renderSidebar({
       activeSection: "chats",
@@ -148,6 +178,30 @@ describe("ProjectSidebar", () => {
       expect.objectContaining({ path: "main.tex" }),
     );
     expect(props.onDownloadDocument).not.toHaveBeenCalled();
+  });
+
+  it("the project dropdown lists projects and switches to the chosen one", async () => {
+    const { props } = renderSidebar();
+    await userEvent.click(screen.getByRole("button", { name: "Switch project" }));
+
+    const current = screen.getByRole("menuitem", { name: /My Project/ });
+    expect(current).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /Other Project/ })).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("menuitem", { name: /Other Project/ }));
+    expect(props.onSwitchProject).toHaveBeenCalledWith("p2");
+  });
+
+  it("replaces the header avatar with the view controls menu", async () => {
+    const { props } = renderSidebar();
+    // Only the bottom-left account chip remains — no second avatar up top.
+    expect(screen.getAllByRole("button", { name: /account/i })).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "View controls" }));
+    expect(screen.getByTestId("view-controls-menu")).toBeTruthy();
+    await userEvent.click(screen.getByRole("switch", { name: "Sidebar" }));
+    expect(props.onViewChange).toHaveBeenCalledWith(
+      expect.objectContaining({ sidebar: false }),
+    );
   });
 
   it("the account chip shows the name and Personal workspace", () => {
