@@ -27,6 +27,7 @@ afterEach(async () => {
   await deleteLlmKey(userId);
   await putPreferences(userId, DEFAULT_PREFERENCES);
   delete process.env.LLM_API_KEY;
+  delete process.env.LLM_BASE_URL;
 });
 
 afterAll(async () => {
@@ -98,6 +99,26 @@ describe("resolveLlmConfigForRequest", () => {
     const env = loadWebEnv();
     const config = await resolveLlmConfigForRequest(userId, "member");
     expect(config?.baseUrl).toBe(env.llmBaseUrl);
+  });
+
+  it("keeps a server key on the env gateway, not the catalog provider", async () => {
+    process.env.LLM_API_KEY = SERVER_KEY;
+    process.env.LLM_BASE_URL = "https://env-only.example/v1";
+    await putPreferences(userId, {
+      ...DEFAULT_PREFERENCES,
+      llm: {
+        configured: true,
+        providerId: "kilo",
+        baseUrl: "https://custom.example/v1",
+        chatModel: "chat",
+        fastModel: "fast",
+      },
+    });
+    const env = loadWebEnv();
+    const config = await resolveLlmConfigForRequest(userId, "owner");
+    expect(config?.source).toBe("server");
+    expect(config?.baseUrl).toBe(env.llmBaseUrl);
+    expect(config?.chatModel).toBe(env.llmModelChat);
   });
 
   it("returns null without a key", async () => {

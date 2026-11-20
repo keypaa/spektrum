@@ -197,7 +197,7 @@ test("(g) a member cannot regenerate another owner's thread title", async ({ bro
   await memberContext.close();
 });
 
-test("(h) the default turn maps Medium to reasoning_effort and max_tokens", async ({ page }) => {
+test("(h) the default turn maps Extra high to reasoning_effort and max_tokens", async ({ page }) => {
   const mock = await apiRequest.newContext({ baseURL: "http://localhost:4010" });
   await mock.delete("/requests", { headers: { "x-ai-mock-token": "test-token" } });
 
@@ -212,8 +212,8 @@ test("(h) the default turn maps Medium to reasoning_effort and max_tokens", asyn
     body: { reasoning_effort?: string; max_tokens?: number };
   }>;
   const turn = body.find((entry) => (entry.body.max_tokens ?? 0) > 64);
-  expect(turn?.body.reasoning_effort).toBe("medium");
-  expect(turn?.body.max_tokens).toBe(16000);
+  expect(turn?.body.reasoning_effort).toBe("high");
+  expect(turn?.body.max_tokens).toBe(64000);
 });
 
 test("(i) create and delete a file through proposals", async ({ page }) => {

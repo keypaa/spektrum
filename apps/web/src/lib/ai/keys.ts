@@ -1,10 +1,7 @@
 import { resolveLlmKey } from "@/auth/llm-key";
 import { loadWebEnv } from "@spektrum/shared/env";
 import { findProvider, validateBaseUrl } from "@spektrum/shared/ai";
-import {
-  DEFAULT_PREFERENCES,
-  type Preferences,
-} from "@spektrum/shared/preferences";
+import type { Preferences } from "@spektrum/shared/preferences";
 import { getPreferences } from "@/lib/preferences";
 
 export type ResolvedLlmKey = {
@@ -80,7 +77,14 @@ export async function resolveLlmConfigForRequest(
   // must never send it to a URL they typed in Settings.
   const safe =
     resolved.source === "server"
-      ? effectiveLlmConfig(DEFAULT_PREFERENCES.llm, env)
+      ? {
+          // Use the env values verbatim. Feeding default preferences through
+          // effectiveLlmConfig would pick the default provider's catalog URL
+          // instead of the deployment's configured gateway.
+          baseUrl: env.llmBaseUrl,
+          chatModel: env.llmModelChat,
+          fastModel: env.llmModelFast,
+        }
       : effective;
   return {
     ...resolved,
