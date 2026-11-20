@@ -5,6 +5,7 @@ import {
   IconArrowUp,
   IconChevronDown,
   IconMic,
+  IconPaperclip,
   IconPlus,
   IconSparkle,
   IconStop,
@@ -27,18 +28,21 @@ export function Composer({
   chat,
   aiEnabled,
   onReview,
+  onUploadFiles,
   openTabs,
   onReviewDiff,
 }: {
   chat: ReturnType<typeof useChat>;
   aiEnabled: boolean;
   onReview(): void;
+  onUploadFiles(files: File[]): void;
   openTabs: string[];
   onReviewDiff(part: Extract<MessagePart, { type: "diff" }>): void;
 }): React.ReactElement {
   const [value, setValue] = useState("");
-  const [level, setLevel] = useState<ThinkingLevel>("Medium");
+  const [level, setLevel] = useState<ThinkingLevel>("Extra high");
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const plusMenuId = useId();
   const streaming = chat.status === "streaming";
   const disabled = !aiEnabled || (!streaming && !value.trim());
@@ -70,9 +74,25 @@ export function Composer({
 
   return (
     <div className="flex h-full min-h-0 flex-col justify-end px-6 pb-4">
+      <input
+        ref={uploadInputRef}
+        type="file"
+        multiple
+        aria-label="Choose files to upload"
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          if (files.length > 0) onUploadFiles(files);
+          event.target.value = "";
+        }}
+      />
       {chat.parts.length > 0 ? (
         <div className="min-h-0 flex-1 overflow-hidden">
-          <Transcript parts={chat.parts} onReviewDiff={onReviewDiff} />
+          <Transcript
+            parts={chat.parts}
+            onReviewDiff={onReviewDiff}
+            streaming={streaming}
+          />
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
@@ -96,9 +116,18 @@ export function Composer({
         </div>
       )}
 
+      {chat.error ? (
+        <div
+          role="alert"
+          className="mb-2 flex-none rounded-xl border border-[color:var(--border-log)] bg-bg-app px-3 py-2 text-xs text-fg-error"
+        >
+          {chat.error}
+        </div>
+      ) : null}
+
       <div
         data-testid="composer"
-        className="flex min-h-[64px] w-full flex-col rounded-3xl border border-[color:var(--ai-border)] bg-ai-bg px-4 py-3"
+        className="flex min-h-[64px] w-full flex-none flex-col rounded-3xl border border-[color:var(--ai-border)] bg-ai-bg px-4 py-3"
       >
         <textarea
           ref={areaRef}
@@ -134,10 +163,16 @@ export function Composer({
               align="start"
               className="min-w-[220px]"
             >
-              <DropdownMenuItem disabled className="flex-col items-start gap-0.5">
-                <span>Upload files &amp; photos</span>
+              <DropdownMenuItem
+                onSelect={() => uploadInputRef.current?.click()}
+                className="flex-col items-start gap-0.5"
+              >
+                <span className="flex items-center gap-2">
+                  <IconPaperclip size={16} />
+                  Upload files &amp; photos
+                </span>
                 <span className="text-xs text-text-editor-tertiary">
-                  Add files, review your paper, and more
+                  Add files to this project&apos;s workspace
                 </span>
               </DropdownMenuItem>
             </DropdownMenuContent>

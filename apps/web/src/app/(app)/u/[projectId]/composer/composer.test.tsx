@@ -26,16 +26,18 @@ function renderComposer(
   aiEnabled = true,
 ) {
   const onReview = vi.fn();
+  const onUploadFiles = vi.fn();
   render(
     <Composer
       chat={{ ...baseChat, ...overrides }}
       aiEnabled={aiEnabled}
       onReview={onReview}
+      onUploadFiles={onUploadFiles}
       openTabs={["main.tex"]}
       onReviewDiff={vi.fn()}
     />,
   );
-  return { onReview };
+  return { onReview, onUploadFiles };
 }
 
 describe("Composer", () => {
@@ -50,7 +52,7 @@ describe("Composer", () => {
     renderComposer(chat);
     const area = screen.getByLabelText("Ask anything");
     await userEvent.type(area, "hello{Enter}");
-    expect(chat.send).toHaveBeenCalledWith("hello", "Medium", ["main.tex"]);
+    expect(chat.send).toHaveBeenCalledWith("hello", "Extra high", ["main.tex"]);
   });
 
   it("shows Stop while streaming and calls stop", async () => {
@@ -61,9 +63,15 @@ describe("Composer", () => {
     expect(chat.stop).toHaveBeenCalled();
   });
 
+  it("starts every chat at Extra high thinking", () => {
+    renderComposer();
+    expect(screen.getByLabelText("Thinking: Extra high")).toBeTruthy();
+    expect(screen.queryByLabelText("Thinking: Medium")).toBeNull();
+  });
+
   it("switches the thinking level", async () => {
     renderComposer();
-    await userEvent.click(screen.getByLabelText("Thinking: Medium"));
+    await userEvent.click(screen.getByLabelText("Thinking: Extra high"));
     await userEvent.click(screen.getByRole("menuitem", { name: "High" }));
     expect(screen.getByLabelText("Thinking: High")).toBeTruthy();
   });
@@ -82,10 +90,36 @@ describe("Composer", () => {
     expect(onReview).toHaveBeenCalled();
   });
 
+  it("the + menu offers Upload files & photos and opens a file picker", async () => {
+    const { onUploadFiles } = renderComposer();
+    await userEvent.click(screen.getByLabelText("Add files"));
+    const item = screen.getByRole("menuitem", { name: /Upload files & photos/ });
+    expect(item.hasAttribute("disabled")).toBe(false);
+
+    const input = document.querySelector(
+      'input[type="file"][multiple]',
+    ) as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+    await userEvent.click(item);
+    expect(click).toHaveBeenCalled();
+
+    await userEvent.upload(
+      input,
+      new File(["x"], "paper.pdf", { type: "application/pdf" }),
+    );
+    expect(onUploadFiles).toHaveBeenCalledTimes(1);
+    expect(onUploadFiles.mock.calls[0]![0]).toHaveLength(1);
+  });
+
   it("renders the transcript when a thread has parts", () => {
     renderComposer({
       parts: [{ type: "text", text: "assistant reply" }],
     });
     expect(screen.getByText("assistant reply")).toBeTruthy();
+  });
+
+  it("surfaces a failed request instead of showing nothing", () => {
+    renderComposer({ error: "gateway responded 429 (rate limited)" });
+    expect(screen.getByRole("alert").textContent).toContain("429");
   });
 });

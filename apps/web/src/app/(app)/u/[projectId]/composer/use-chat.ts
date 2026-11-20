@@ -10,12 +10,54 @@ import {
   type ToolName,
 } from "@spektrum/shared/ai";
 
+/**
+ * Append one streamed delta. Consecutive deltas of the same kind belong to a
+ * single part — the old mutable `streaming` reference could split a reasoning
+ * stream into several "Thinking" blocks after React batched an update.
+ */
+export function appendStreamDelta(
+  parts: MessagePart[],
+  type: "thinking" | "text",
+  delta: string,
+): MessagePart[] {
+  const last = parts.at(-1);
+  if (last?.type === type) {
+    const next = [...parts];
+    next[next.length - 1] = { ...last, text: last.text + delta };
+    return next;
+  }
+  return [...parts, { type, text: delta }];
+}
+
+/**
+ * Rebuild transcript parts from a stored thread. The store keeps the role on
+ * the message row, not on each part, so user text needs the marker the
+ * transcript uses to align it right.
+ */
+export function partsFromThreadMessages(
+  messages: Array<{ role: string; content: unknown }>,
+): MessagePart[] {
+  return messages.flatMap((message) => {
+    const parts =
+      ((message.content as { parts?: MessagePart[] }).parts ?? []);
+    if (message.role !== "user") return parts;
+    return parts.map((part) =>
+      part.type === "text" ? { ...part, text: `User: ${part.text}` } : part,
+    );
+  });
+}
+
 export interface ChatController {
   threadId: string | null;
   parts: MessagePart[];
   status: "idle" | "streaming" | "error";
   error: string | null;
-  send(text: string, thinking: ThinkingLevel, pinnedPaths: string[]): void;
+  send(
+    text: string,
+    thinking: ThinkingLevel,
+    pinnedPaths: string[],
+    displayText?: string,
+  ): void;
   loadThread(threadId: string): Promise<void>;
   reset(): void;
   setDiffStatus(diffId: string, status: "accepted" | "rejected"): void;
@@ -39,10 +81,13 @@ export function useChat(input: {
   const [status, setStatus] = useState<"idle" | "streaming" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
+  // An unmounted chat must not keep applying SSE events to a dead page.
+  useEffect(() => () => controller.current?.abort(), []);
   const lastSend = useRef<{
     text: string;
     thinking: ThinkingLevel;
     pinnedPaths: string[];
+    displayText?: string | undefined;
   } | null>(null);
 
   const loadThread = useCallback(
@@ -53,12 +98,9 @@ export function useChat(input: {
       if (!response.ok) return;
       const body = (await response.json()) as {
         thread: { id: string };
-        messages: Array<{ content: unknown }>;
+        messages: Array<{ role: string; content: unknown }>;
       };
-      const loaded = body.messages.flatMap(
-        (message) =>
-          ((message.content as { parts?: MessagePart[] }).parts ?? []),
-      );
+      const loaded = partsFromThreadMessages(body.messages);
       setParts(loaded);
       setThreadId(id);
       cb.current.onThreadChange?.(id);
@@ -67,17 +109,22 @@ export function useChat(input: {
   );
 
   const send = useCallback(
-    (text: string, thinking: ThinkingLevel, pinnedPaths: string[]) => {
+    (
+      text: string,
+      thinking: ThinkingLevel,
+      pinnedPaths: string[],
+      displayText?: string,
+    ) => {
       if (cb.current.disabled) return;
       controller.current?.abort();
       const abort = new AbortController();
       controller.current = abort;
-      lastSend.current = { text, thinking, pinnedPaths };
+      lastSend.current = { text, thinking, pinnedPaths, displayText };
       setStatus("streaming");
       setError(null);
       setParts((current) => [
         ...current,
-        { type: "text", text: `User: ${text}` },
+        { type: "text", text: displayText ?? `User: ${text}` },
       ]);
 
       void (async () => {
@@ -108,26 +155,23 @@ export function useChat(input: {
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
           let buffer = "";
-          let streaming: MessagePart | null = null;
+          let newThreadId: string | null = null;
 
           const apply = (event: ChatEvent): void => {
             if (event.event === "meta") {
+              // Navigate only once the stream is finished. Doing it here made
+              // the URL change reload the thread mid-stream, which could
+              // re-append the reply and show it twice.
               setThreadId(event.data.threadId);
-              cb.current.onThreadChange?.(event.data.threadId);
+              newThreadId = event.data.threadId;
             } else if (event.event === "thinking") {
-              if (!streaming || streaming.type !== "thinking") {
-                streaming = { type: "thinking", text: "" };
-                setParts((current): MessagePart[] => [...current, streaming!]);
-              }
-              streaming.text += event.data.delta;
-              setParts((current) => [...current]);
+              setParts((current) =>
+                appendStreamDelta(current, "thinking", event.data.delta),
+              );
             } else if (event.event === "text") {
-              if (!streaming || streaming.type !== "text") {
-                streaming = { type: "text", text: "" };
-                setParts((current): MessagePart[] => [...current, streaming!]);
-              }
-              streaming.text += event.data.delta;
-              setParts((current) => [...current]);
+              setParts((current) =>
+                appendStreamDelta(current, "text", event.data.delta),
+              );
             } else if (event.event === "tool_call") {
               setParts((current): MessagePart[] => [
                 ...current,
@@ -162,6 +206,8 @@ export function useChat(input: {
               cb.current.onTitle?.(event.data.threadId, event.data.title);
             } else if (event.event === "done") {
               setStatus("idle");
+              if (newThreadId) cb.current.onThreadChange?.(newThreadId);
+              newThreadId = null;
             } else if (event.event === "error") {
               setError(event.data.message);
               setStatus("error");
@@ -244,6 +290,7 @@ export function useChat(input: {
         lastSend.current.text,
         lastSend.current.thinking,
         lastSend.current.pinnedPaths,
+        lastSend.current.displayText,
       );
     }
   }, [send]);
@@ -255,6 +302,7 @@ export function useChat(input: {
           lastSend.current.text,
           lastSend.current.thinking,
           lastSend.current.pinnedPaths,
+          lastSend.current.displayText,
         );
       }
     },

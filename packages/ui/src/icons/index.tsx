@@ -97,6 +97,14 @@ export function IconChevronDown({ size, className, ...rest }: IconProps) {
   );
 }
 
+export function IconChevronUp({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <path d="M3 10 8 5l5 5" />
+    </svg>
+  );
+}
+
 export function IconChevronRight({ size, className, ...rest }: IconProps) {
   return (
     <svg {...base({ size, className, ...rest })}>
@@ -214,6 +222,24 @@ export function IconDownload({ size, className, ...rest }: IconProps) {
       <path d="M8 3v7" />
       <path d="M5.5 7.5 8 10l2.5-2.5" />
       <path d="M4 13h8" />
+    </svg>
+  );
+}
+
+export function IconUpload({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <path d="M8 12V3M4.5 6.5 8 3l3.5 3.5" />
+      <path d="M3 11v2.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V11" />
+    </svg>
+  );
+}
+
+export function IconSliders({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <path d="M2 4h12M2 8h12M2 12h12" />
+      <path d="M6 2v4M10 6v4M5 10v4" />
     </svg>
   );
 }
@@ -417,6 +443,15 @@ export function IconStop({ size, className, ...rest }: IconProps) {
   return (
     <svg {...base({ size, className, ...rest })}>
       <rect x="4" y="4" width="8" height="8" rx="1.5" />
+    </svg>
+  );
+}
+
+export function IconCopy({ size, className, ...rest }: IconProps) {
+  return (
+    <svg {...base({ size, className, ...rest })}>
+      <rect x="2.5" y="2.5" width="8" height="8" rx="1.5" />
+      <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
     </svg>
   );
 }
