@@ -101,6 +101,26 @@ describe("PdfChrome", () => {
     expect(onZoomToFit).toHaveBeenCalledTimes(1);
   });
 
+  it("uses custom page steppers that appear on hover", async () => {
+    const onPage = vi.fn();
+    render(<PdfChrome {...base} state="compiled" onPage={onPage} page={2} />);
+    const next = screen.getByRole("button", { name: "Next page" });
+    const previous = screen.getByRole("button", { name: "Previous page" });
+    expect(next.parentElement?.className).not.toContain("opacity-0");
+    expect(screen.getByLabelText("Page").className).toContain("appearance-none");
+
+    await userEvent.click(next);
+    expect(onPage).toHaveBeenLastCalledWith(3);
+    await userEvent.click(previous);
+    expect(onPage).toHaveBeenLastCalledWith(1);
+  });
+
+  it("disables the stepper at the first and last page", () => {
+    render(<PdfChrome {...base} state="compiled" page={1} />);
+    expect((screen.getByRole("button", { name: "Previous page" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Next page" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("renders the pill without applying a filter to the chrome", () => {
     render(<PdfChrome {...base} state="compiled" darkMode />);
     expect(screen.getByTestId("pdf-pill")).toBeTruthy();

@@ -29,7 +29,7 @@ function InertButton({
       type="button"
       aria-label={label}
       aria-disabled="true"
-      className={`flex items-center justify-center text-tools-fg ${className}`}
+      className={`flex items-center justify-center ${className}`}
     >
       {children}
     </button>
@@ -50,14 +50,14 @@ export function PdfPane() {
           <div className="inline-flex min-w-0 shrink-0 items-center overflow-hidden rounded-full border border-[color:var(--border-preview)]">
             <InertButton
               label="Initializing..."
-              className="h-9 max-w-[200px] gap-2 px-3"
+              className="h-9 max-w-[200px] gap-2 px-3 text-[color:var(--text-preview-primary)]"
             >
               <IconSpinner size={16} className="shrink-0 animate-spin" />
               <span className="truncate whitespace-nowrap text-sm">Initializing...</span>
             </InertButton>
             <InertButton
               label="Realtime compilation"
-              className="h-9 w-7 border-l border-[color:var(--border-preview)]"
+              className="h-9 w-7 border-l border-[color:var(--border-preview)] text-[color:var(--text-preview-primary)]"
             >
               <IconChevronDown size={14} />
             </InertButton>
@@ -67,14 +67,14 @@ export function PdfPane() {
         {/* Centred loading placeholder (bundle @113308). */}
         <div className="flex h-full w-full grow items-center justify-center gap-3 p-8">
           <IconSpinner size={16} className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-          <span className="text-xs font-medium text-[color:var(--text-editor-quaternary)]">
+          <span className="text-xs font-medium text-[color:var(--text-preview-primary)]">
             Initializing...
           </span>
         </div>
 
         {/* Floating panel toolbar (CrixetPDFPanelToolbar, bundle @52600):
             [undo][redo] [goto-file] Go to PDF [arrow]. */}
-        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-row items-center justify-between gap-1 rounded-full bg-ai-bg px-3 py-2 shadow-[0_7px_24px_rgba(0,0,0,0.25)]">
+        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-row items-center justify-between gap-1 rounded-full bg-ai-bg px-3 py-2 text-tools-fg shadow-[0_7px_24px_rgba(0,0,0,0.25)]">
           <InertButton label="Undo" className="rounded-l-xl px-1.5 py-1.5">
             <IconUndo size={18} />
           </InertButton>
@@ -84,7 +84,10 @@ export function PdfPane() {
           <InertButton label="Go to file" className="rounded-l-xl p-1">
             <IconFileSearchGlyph />
           </InertButton>
-          <InertButton label="Go to PDF" className="gap-1 rounded-r-xl px-2 py-1">
+          <InertButton
+            label="Go to PDF"
+            className="gap-1 rounded-r-xl px-2 py-1 text-tools-fg"
+          >
             <span className="whitespace-nowrap text-xs font-medium">Go to PDF</span>
             <IconArrowRight size={20} />
           </InertButton>

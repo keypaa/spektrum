@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
   "/_next",
   "/fonts",
   "/favicon.ico",
+  "/icon",
+  "/icon.svg",
 ];
 
 // Better Auth prefixes cookies with __Secure- when the base URL is https
@@ -45,5 +47,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api/auth|api/health|api/metrics|login|invite|_next|fonts|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|api/health|api/metrics|login|invite|_next|fonts|favicon.ico|icon|icon.svg).*)"],
 };

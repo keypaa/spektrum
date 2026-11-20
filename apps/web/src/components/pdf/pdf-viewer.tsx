@@ -14,6 +14,8 @@ export interface PdfViewerHandle {
     rect: { x: number; y: number; width: number; height: number },
   ): void;
   getPageGeometry(page: number): { width: number; height: number } | null;
+  /** Scroll a whole page into view and report it as the current page. */
+  goToPage(page: number): void;
   /**
    * Percentage that makes page 1 as wide as the viewport allows, or null when
    * the document or host is not ready. "Zoom to fit" is this number — it used
@@ -24,16 +26,40 @@ export interface PdfViewerHandle {
 
 /** Horizontal padding of the viewport (p-2 on both sides). */
 const VIEWPORT_PADDING = 16;
+/** Width of a classic vertical scrollbar track, reserved unconditionally. */
+const SCROLLBAR_RESERVE = 16;
 
 /**
  * Percentage that makes a page as wide as the viewport allows.
  *
- * Floors rather than rounds, and keeps 1 px in hand: rounding to the nearest
- * percent can land a fraction of a pixel *over* the content box, which is
- * exactly enough to raise a horizontal scrollbar — the "zoom to fit" complaint.
+ * `containerWidth` is the viewport's offsetWidth — the outer width, including
+ * padding and the scrollbar track. Measuring clientWidth instead is the bug:
+ * it includes the scrollbar gutter when the current page is short, then loses
+ * ~15 px when the fitted page gets taller and the vertical scrollbar appears,
+ * which pushes a horizontal scrollbar into view. Flooring and one spare pixel
+ * keep the page inside the content box in both scrollbar states.
  */
+/** Scroll target that puts a page just below the top of the viewport. */
+export function pageScrollTarget(offsetTop: number): number {
+  return Math.max(0, offsetTop - 8);
+}
+
+/** The page whose top has passed the viewport's top gutter. */
+export function currentPageFromScroll(
+  pages: Iterable<readonly [number, number]>,
+  scrollTop: number,
+): number {
+  const marker = scrollTop + 8;
+  let current = 1;
+  for (const [page, offsetTop] of pages) {
+    if (offsetTop <= marker && page > current) current = page;
+  }
+  return current;
+}
+
 export function fitPercent(containerWidth: number, pageWidth: number): number | null {
-  const available = containerWidth - VIEWPORT_PADDING - 1;
+  const available =
+    containerWidth - VIEWPORT_PADDING - SCROLLBAR_RESERVE - 1;
   if (!(available > 0) || !(pageWidth > 0)) return null;
   return Math.floor((available / pageWidth) * 100);
 }
@@ -227,19 +253,54 @@ export function PdfViewer({
           ? { width: element.clientWidth, height: element.clientHeight }
           : null;
       },
+      goToPage: (page) => {
+        const element = pageEls.current.get(page);
+        const host = hostRef.current;
+        if (!element || !host) return;
+        host.scrollTo({
+          top: pageScrollTarget(element.offsetTop),
+          behavior: "smooth",
+        });
+        onPageChange?.(page);
+      },
       fitWidth: async () => {
         const doc = docRef.current;
         const host = hostRef.current;
         if (!doc || !host) return null;
         const page = await doc.getPage(1);
         const base = page.getViewport({ scale: 1 });
-        return fitPercent(host.clientWidth, base.width);
+        return fitPercent(host.offsetWidth, base.width);
       },
     };
     return () => {
       pageRef.current = null;
     };
   }, [pageRef, onPageChange, numPages]);
+
+  // Manual scrolling must keep the toolbar counter in sync. The viewer
+  // derives the current page from page offsets; the imperative handle above
+  // only reports the destination of a programmatic jump.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || numPages === 0 || !onPageChange) return;
+    let frame = 0;
+    const report = () => {
+      frame = 0;
+      const pages = Array.from(pageEls.current, ([page, element]) => [
+        page,
+        element.offsetTop,
+      ] as const);
+      onPageChange(currentPageFromScroll(pages, host.scrollTop));
+    };
+    const onScroll = () => {
+      if (frame === 0) frame = requestAnimationFrame(report);
+    };
+    host.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      host.removeEventListener("scroll", onScroll);
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
+  }, [numPages, onPageChange, generation]);
 
   return (
     <div

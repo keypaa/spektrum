@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   IconCheck,
   IconChevronDown,
+  IconChevronUp,
   IconDownload,
   IconError,
   IconMoreHorizontal,
@@ -192,7 +193,7 @@ export function PdfChrome({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="flex h-9 items-center rounded-full border border-[color:var(--border-preview)] px-2 text-sm">
+        <div className="group flex h-9 items-center rounded-full border border-[color:var(--border-preview)] px-2 text-sm">
           <input
             aria-label="Page"
             type="number"
@@ -204,9 +205,29 @@ export function PdfChrome({
               if (Number.isFinite(next))
                 onPage(Math.min(Math.max(1, next), Math.max(1, numPages)));
             }}
-            className="w-8 bg-transparent text-center"
+            className="w-8 appearance-none bg-transparent text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <span className="px-1 text-fg-tertiary">of {numPages || "—"}</span>
+          <div className="pointer-events-auto flex items-center gap-0.5 pl-1">
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={page <= 1}
+              onClick={() => onPage(Math.max(1, page - 1))}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-[color:var(--text-preview-primary)] hover:bg-[color:var(--bg-preview-hover)] disabled:opacity-30"
+            >
+              <IconChevronUp size={14} />
+            </button>
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={page >= Math.max(1, numPages)}
+              onClick={() => onPage(Math.min(Math.max(1, numPages), page + 1))}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-[color:var(--text-preview-primary)] hover:bg-[color:var(--bg-preview-hover)] disabled:opacity-30"
+            >
+              <IconChevronDown size={14} />
+            </button>
+          </div>
         </div>
 
         <DropdownMenu>
