@@ -1,14 +1,14 @@
-// The two project templates, verbatim from Prism.
+// The two project templates.
 //
 // Sources: zenno/recon/extracted/blank-main.tex (spec §7.6) and
-// zenno/recon/extracted/example-main.tex (the "What is Prism?" document from
-// screenshot 18). Both are byte-for-byte copies of the shipped bundle's
-// `String.raw` blocks in zenno/recon/js/36qcv_qj-yoz-.js.
+// zenno/recon/extracted/example-main.tex (the captured "What is Prism?"
+// document from screenshot 18). The blank template is a verbatim copy. The
+// example keeps the same structure but uses Spektrum branding.
 //
 // The example document quotes its sample prompts with LaTeX double backticks.
 // A backtick cannot appear inside a template literal, so the string is joined
-// from chunks with BT2 ("``") between them; the templates tests compare the
-// result against the recon extracts byte-for-byte, so any drift fails.
+// from chunks with BT2 ("``") between them; the templates tests check the
+// structure and the rebranded copy.
 //
 // No interpolation: these are plain strings with a trailing newline.
 
@@ -56,14 +56,14 @@ export const EXAMPLE_MAIN_TEX = [
 \begin{document}
 \pagestyle{empty}
 
-\section*{What is Prism?}
+\section*{What is Spektrum?}
 
-\textbf{Prism} is an AI-powered \LaTeX{} editor for writing scientific documents. It supports real-time collaboration with coauthors and includes OpenAI-powered assistance that can help you draft and edit text, reason through ideas, and handle formatting.
+\textbf{Spektrum} is an AI-powered \LaTeX{} editor for writing scientific documents. It supports real-time collaboration with coauthors and includes AI-powered assistance that can help you draft and edit text, reason through ideas, and handle formatting.
 
 \section*{Features}
 
 \begin{multicols}{2}
-Prism includes ChatGPT directly in the editor and can access your project, so you can ask it to do things like:
+Spektrum includes an AI assistant directly in the editor and can access your project, so you can ask it to do things like:
 
 `,
   BT2,

@@ -46,10 +46,13 @@ describe("BLANK_MAIN_TEX", () => {
 });
 
 describe("EXAMPLE_MAIN_TEX", () => {
-  it("matches zenno/recon/extracted/example-main.tex", () => {
-    expect(EXAMPLE_MAIN_TEX).toBe(
-      readFileSync(join(EXTRACTED, "example-main.tex"), "utf8"),
-    );
+  it("uses Spektrum branding instead of the captured Prism copy", () => {
+    expect(EXAMPLE_MAIN_TEX).toContain("\\section*{What is Spektrum?}");
+    expect(EXAMPLE_MAIN_TEX).toContain("\\textbf{Spektrum} is an AI-powered");
+    expect(EXAMPLE_MAIN_TEX).toContain("includes AI-powered assistance");
+    expect(EXAMPLE_MAIN_TEX).not.toContain("Prism");
+    expect(EXAMPLE_MAIN_TEX).not.toContain("OpenAI");
+    expect(EXAMPLE_MAIN_TEX).not.toContain("ChatGPT");
   });
 
   it("starts with \\documentclass and ends with \\end{document}", () => {

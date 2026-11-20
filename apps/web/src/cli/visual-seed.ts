@@ -19,7 +19,7 @@ import {
 import { createHash } from "node:crypto";
 import { ensureBucket, putObject } from "@spektrum/storage";
 import { revisionHash } from "@spektrum/shared/revision";
-import { BLANK_MAIN_TEX } from "../lib/templates";
+import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "../lib/templates";
 import { createOwner } from "./create-owner";
 
 const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
@@ -142,10 +142,7 @@ if (isPdf) {
     .returning({ id: projects.id });
   const projectId = project!.id;
 
-  const example = readFileSync(
-    resolve(import.meta.dirname, "../../../../zenno/recon/extracted/example-main.tex"),
-    "utf8",
-  );
+  const example = EXAMPLE_MAIN_TEX;
   const [main] = await db
     .insert(documents)
     .values({ projectId, path: "main.tex", kind: "tex", content: example })

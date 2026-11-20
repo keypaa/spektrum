@@ -13,6 +13,7 @@ import { db, pool } from "@spektrum/db";
 import { documents, projects, users } from "@spektrum/db/schema";
 import { ensureBucket, putObject } from "@spektrum/storage";
 import { ensureUser } from "./seed-lib";
+import { EXAMPLE_MAIN_TEX } from "../lib/templates";
 
 const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@spektrum.local";
 const OWNER_PASSWORD =
@@ -41,10 +42,7 @@ const [project] = await db
   .returning({ id: projects.id });
 const projectId = project!.id;
 
-const example = readFileSync(
-  resolve(root, "zenno/recon/extracted/example-main.tex"),
-  "utf8",
-);
+const example = EXAMPLE_MAIN_TEX;
 const [main] = await db
   .insert(documents)
   .values({
