@@ -28,6 +28,8 @@ export interface MonacoEditorHandle {
   setPosition(position: { lineNumber: number; column: number }): void;
   trigger(action: string): void;
   revealLine(line: number): void;
+  /** Reveal and select a whole 1-based, inclusive line range. */
+  revealRange(startLine: number, endLine: number): void;
   getEditor(): editor.IStandaloneCodeEditor | null;
 }
 
@@ -43,6 +45,8 @@ export interface MonacoEditorProps {
   onChange(value: string): void;
   /** Cursor moved to a 1-based line (SyncTeX forward sync). */
   onCursorChange?(line: number): void;
+  /** Selection changed; null means the user clicked without selecting. */
+  onSelectionChange?(range: { startLine: number; endLine: number } | null): void;
   onReady?(): void;
   /** Right-click inside the editor (viewport coordinates). */
   onContextMenu?(point: { x: number; y: number }): void;
@@ -65,6 +69,7 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       readOnly = false,
       onChange,
       onCursorChange,
+      onSelectionChange,
       onReady,
       onContextMenu,
     },
@@ -78,6 +83,8 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
     onChangeRef.current = onChange;
     const onCursorChangeRef = useRef(onCursorChange);
     onCursorChangeRef.current = onCursorChange;
+    const onSelectionChangeRef = useRef(onSelectionChange);
+    onSelectionChangeRef.current = onSelectionChange;
   // Suppress the change event for programmatic value replacement (loading a
   // document, conflict recovery) — those must not schedule a save of content
   // the server already has.
@@ -125,6 +132,19 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
       });
       editor.onDidChangeCursorPosition((event) => {
         onCursorChangeRef.current?.(event.position.lineNumber);
+      });
+      editor.onDidChangeCursorSelection((event) => {
+        const selection = event.selection;
+        if (selection.isEmpty()) {
+          onSelectionChangeRef.current?.(null);
+          return;
+        }
+        const start = selection.getStartPosition();
+        const end = selection.getEndPosition();
+        onSelectionChangeRef.current?.({
+          startLine: start.lineNumber,
+          endLine: end.lineNumber,
+        });
       });
       onReady?.();
 
@@ -257,6 +277,17 @@ export const MonacoEditor = forwardRef<MonacoEditorHandle, MonacoEditorProps>(
           if (!editor) return;
           editor.revealLineInCenter(line);
           editor.setPosition({ lineNumber: line, column: 1 });
+        },
+        revealRange: (startLine, endLine) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.revealLineInCenter(startLine);
+          editor.setSelection({
+            startLineNumber: startLine,
+            startColumn: 1,
+            endLineNumber: endLine,
+            endColumn: 1,
+          });
         },
         getEditor: () => editorRef.current,
       }),
