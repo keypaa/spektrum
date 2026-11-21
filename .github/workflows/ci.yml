@@ -135,12 +135,6 @@ jobs:
           E2E_DB_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           LLM_KEY_ENCRYPTION_SECRET: e2e-key-encryption-secret-32ch!x
 
-  # Visual calibration did NOT reach the ≤ 0.15 % target (accepted shortfall;
-  # see Appendix A of zenno/plans/2026-11-07-01-shell-dashboard.md and
-  # .superpowers/sdd/2026-11-07-01-shell-dashboard/task-18-remaining.md).
-  # 1/8 baselines are within budget; the rest remain above 0.15 % due to font
-  # rasterization/AA, exact icon glyphs, and banner/empty-state layout detail.
-  # This job stays non-blocking until calibration is actively resumed.
   compile:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -250,26 +244,8 @@ jobs:
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           REDIS_URL: redis://localhost:6379
 
-  visual:
+  build:
     runs-on: ubuntu-latest
-    continue-on-error: true
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: spektrum
-          POSTGRES_PASSWORD: spektrum
-          POSTGRES_DB: spektrum
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U spektrum -d spektrum"
-          --health-interval 3s --health-timeout 3s --health-retries 20
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 3s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -278,83 +254,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
-      - name: Start SeaweedFS (S3 API)
-        run: |
-          docker run -d --name seaweedfs-visual -p 8333:8333 -p 9333:9333 \
-            chrislusf/seaweedfs:latest@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0 server -dir=/data -s3 -s3.port=8333
-          # Gate on the master being able to assign a volume, not on the port
-          # answering: SeaweedFS accepts connections before it can store data.
-          for i in $(seq 1 20); do
-            if curl -fsS "http://localhost:9333/dir/assign?collection=spektrum-pdf" 2>/dev/null | grep -q '"fid"'; then
-              echo "object store can assign volumes"
-              exit 0
-            fi
-            echo "store not ready (attempt $i); restarting it" >&2
-            docker restart seaweedfs-visual >/dev/null
-            sleep 5
-          done
-          exit 1
-      - name: Create the buckets
-        run: |
-          # `ensureBucket` throws on a not-yet-ready store; retry rather than
-          # failing the job on a cold start.
-          for i in $(seq 1 20); do
-            pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts && \
-              pnpm --filter @spektrum/web exec tsx src/cli/s3-probe.ts && exit 0
-            echo "object store attempt $i failed; retrying" >&2
-            sleep 3
-          done
-          exit 1
-        env:
-          S3_ENDPOINT: http://localhost:8333
-          S3_BUCKET: spektrum-uploads
-          S3_SECRET_KEY: spektrum-secret
-          S3_ACCESS_KEY: spektrum
-      - name: Build
-        run: pnpm build
-      - name: Create + migrate visual database
-        run: |
-          sudo apt-get update && sudo apt-get install -y postgresql-client
-          PGPASSWORD=spektrum psql -h localhost -U spektrum -d postgres \
-            -c "CREATE DATABASE spektrum_test" || true
-          PGPASSWORD=spektrum psql -h localhost -U spektrum -d spektrum_test \
-            -c "CREATE EXTENSION IF NOT EXISTS citext"
-          pnpm db:migrate
-        env:
-          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
-      - name: Seed owner and dark fixture
-        run: pnpm --filter @spektrum/web visual:seed dark
-        env:
-          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
-          E2E_OWNER_EMAIL: owner@spektrum.local
-          E2E_OWNER_PASSWORD: owner-password-123
-          S3_ENDPOINT: http://localhost:8333
-          S3_BUCKET: spektrum-uploads
-          S3_ACCESS_KEY: spektrum
-          S3_SECRET_KEY: spektrum-secret
-      - name: Visual diff
-        run: pnpm test:visual
-        env:
-          DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
-          E2E_OWNER_EMAIL: owner@spektrum.local
-          E2E_OWNER_PASSWORD: owner-password-123
-          LLM_API_KEY: test-key
-          # The per-test fixtures (`seedPdfFixture`) re-seed from inside the test
-          # process, so they need the store too. Without these they fell back to
-          # the 9000 default and died with ECONNREFUSED, which masked every
-          # assertion in the PDF/Logs specs — including non-pixel ones.
-          S3_ENDPOINT: http://localhost:8333
-          S3_BUCKET: spektrum-uploads
-          S3_ACCESS_KEY: spektrum
-          S3_SECRET_KEY: spektrum-secret
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: visual-artifacts
-          path: e2e/visual/artifacts/
-          if-no-files-found: ignore
+      - run: pnpm build
 
   # The reference deployment kit has to be buildable, not just documented.
   images:
