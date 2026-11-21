@@ -43,7 +43,6 @@ function renderComposer(
       aiEnabled={aiEnabled}
       onReview={onReview}
       onUploadFiles={onUploadFiles}
-      openTabs={["main.tex"]}
       onReviewDiff={vi.fn()}
     />,
   );
@@ -62,7 +61,6 @@ function renderPinned(
     aiEnabled: true,
     onReview: vi.fn(),
     onUploadFiles: vi.fn(),
-    openTabs: ["main.tex"],
     onReviewDiff: vi.fn(),
     documents: DOCS,
     selection: null,

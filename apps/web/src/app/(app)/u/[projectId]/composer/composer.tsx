@@ -31,7 +31,6 @@ export function Composer({
   aiEnabled,
   onReview,
   onUploadFiles,
-  openTabs,
   onReviewDiff,
   documents = [],
   selection = null,
@@ -43,7 +42,6 @@ export function Composer({
   aiEnabled: boolean;
   onReview(): void;
   onUploadFiles(files: File[]): void;
-  openTabs: string[];
   onReviewDiff(part: Extract<MessagePart, { type: "diff" }>): void;
   documents?: DocumentSummary[];
   selection?: { path: string; startLine: number; endLine: number } | null;

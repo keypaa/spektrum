@@ -180,6 +180,11 @@ export function EditorClient({
     initialDocument?.path ?? null,
   );
   const [saveNote, setSaveNote] = useState<"saving" | "error" | null>(null);
+  const [selection, setSelection] = useState<{
+    path: string;
+    startLine: number;
+    endLine: number;
+  } | null>(null);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<MonacoEditorHandle>(null);
   const baselineRef = useRef(baseline);
@@ -1051,6 +1056,12 @@ export function EditorClient({
               readOnly={activePath !== loadedPath}
               onChange={onBufferChange}
               onCursorChange={onCursor}
+              onSelectionChange={(range) => {
+                // An empty selection is just a cursor click: keep the chip.
+                if (range && activePath) {
+                  setSelection({ path: activePath, ...range });
+                }
+              }}
               onContextMenu={(point) => setContextMenu(point)}
             />
           ) : null}
@@ -1102,8 +1113,14 @@ export function EditorClient({
               )
             }
             onUploadFiles={(files) => void handleUploadFiles(files)}
-            openTabs={openTabs}
             onReviewDiff={(part) => setReviewingId(part.id)}
+            documents={docs}
+            selection={selection}
+            onClearSelection={() => setSelection(null)}
+            onNavigateToSelection={(range) =>
+              editorRef.current?.revealRange(range.startLine, range.endLine)
+            }
+            beforeSend={() => autosave.flush()}
           />
         </div>
         ) : null}

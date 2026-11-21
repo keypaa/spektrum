@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { forwardRef, useImperativeHandle, type ForwardedRef } from "react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PREFERENCES } from "@spektrum/shared/preferences";
 import { PreferencesProvider } from "@/components/preferences-provider";
@@ -13,9 +14,38 @@ vi.mock("next/navigation", () => ({
 
 // jsdom cannot load Monaco; the dynamic import would otherwise pull the real
 // module into the test.
-vi.mock("@/editor/monaco-editor", () => ({
-  MonacoEditor: () => <div data-testid="monaco-editor" />,
+const state = vi.hoisted(() => ({
+  selectionHandler: null as null | ((range: unknown) => void),
+  revealRange: vi.fn(),
+  composerProps: null as Record<string, unknown> | null,
+  flush: vi.fn(async () => undefined),
 }));
+
+// Monaco is loaded through next/dynamic, so the mock has to sit there.
+vi.mock("next/dynamic", () => ({
+  default: () =>
+    forwardRef((props: Record<string, unknown>, ref: ForwardedRef<unknown>) => {
+      state.selectionHandler = props.onSelectionChange as (range: unknown) => void;
+      useImperativeHandle(ref, () => ({ revealRange: state.revealRange }));
+      return <div data-testid="monaco-editor" />;
+    }),
+}));
+
+vi.mock("./composer/composer", () => ({
+  Composer: (props: Record<string, unknown>) => {
+    state.composerProps = props;
+    return <div data-testid="composer-mock" />;
+  },
+}));
+
+vi.mock("./use-autosave", () => ({
+  useAutosave: () => ({
+    schedule: vi.fn(),
+    flush: state.flush,
+    isDirty: () => false,
+  }),
+}));
+
 import { EditorClient } from "./editor-client";
 import type { DocumentRecord, DocumentSummary } from "@/lib/documents";
 
@@ -53,6 +83,48 @@ function renderShell(overrides: Partial<React.ComponentProps<typeof EditorClient
     </PreferencesProvider>,
   );
 }
+
+describe("EditorClient selection wiring", () => {
+  beforeEach(() => {
+    state.selectionHandler = null;
+    state.revealRange.mockClear();
+    state.flush.mockClear();
+    state.composerProps = null;
+  });
+
+  it("passes Monaco selections to the composer with the active path", () => {
+    renderShell();
+    act(() => state.selectionHandler!({ startLine: 55, endLine: 112 }));
+    expect(state.composerProps?.selection).toEqual({
+      path: "main.tex",
+      startLine: 55,
+      endLine: 112,
+    });
+    act(() => state.selectionHandler!(null));
+    expect(state.composerProps?.selection).toEqual({
+      path: "main.tex",
+      startLine: 55,
+      endLine: 112,
+    });
+  });
+
+  it("clears the selection and reveals a range through the composer callbacks", () => {
+    renderShell();
+    act(() => state.selectionHandler!({ startLine: 55, endLine: 112 }));
+    const props = state.composerProps!;
+    act(() => (props.onClearSelection as () => void)());
+    expect(state.composerProps?.selection).toBeNull();
+    const range = { path: "main.tex", startLine: 55, endLine: 112 };
+    act(() => (props.onNavigateToSelection as (r: typeof range) => void)(range));
+    expect(state.revealRange).toHaveBeenCalledWith(55, 112);
+  });
+
+  it("flushes autosave before the composer sends", async () => {
+    renderShell();
+    await (state.composerProps?.beforeSend as () => Promise<void>)();
+    expect(state.flush).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("EditorClient", () => {
   it("renders the three-column shell with the sidebar, tabs and placeholders", async () => {
