@@ -61,6 +61,18 @@ async function main(): Promise<void> {
     mainContent: MAIN,
   });
   await resetProject(ownerProject.id);
+  // A pinned-PDF fixture. There is no object store in the AI e2e, so the
+  // extractor degrades to a note; the wiring and context section still work.
+  await db
+    .insert(documents)
+    .values({
+      projectId: ownerProject.id,
+      path: "brief.pdf",
+      kind: "img",
+      blobKey: "e2e/brief.pdf",
+      content: null,
+    })
+    .onConflictDoNothing();
 
   const revision = revisionHash(await listRevisionDocuments(ownerProject.id));
   await db

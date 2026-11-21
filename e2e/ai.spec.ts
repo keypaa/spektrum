@@ -61,6 +61,78 @@ async function send(page: Page, text: string): Promise<void> {
   await box.press("Enter");
 }
 
+test("(j) pinned file and selected lines reach the model", async ({ page }) => {
+  await openProject(page, OWNER_PROJECT);
+
+  await page.evaluate(() => {
+    const editor = (
+      window as unknown as {
+        __spektrum_editor?: {
+          setSelection(range: {
+            startLineNumber: number;
+            startColumn: number;
+            endLineNumber: number;
+            endColumn: number;
+          }): void;
+          focus(): void;
+        };
+      }
+    ).__spektrum_editor;
+    editor?.setSelection({
+      startLineNumber: 2,
+      startColumn: 1,
+      endLineNumber: 3,
+      endColumn: 5,
+    });
+    editor?.focus();
+  });
+  await expect(page.getByTestId("selection-chip")).toContainText("2-3");
+
+  const box = page.getByLabel("Ask anything");
+  await box.fill("@bri");
+  await page.getByRole("option", { name: /brief\.pdf/ }).click();
+  await expect(page.getByTestId("pinned-file-chip")).toContainText("brief.pdf");
+
+  const chatRequest = page.waitForRequest(
+    (req) => req.url().includes("/chat") && req.method() === "POST",
+  );
+  await box.fill("check pinned context");
+  await box.press("Enter");
+  const body = (await chatRequest).postDataJSON() as {
+    pinnedPaths?: string[];
+    selection?: { path: string; startLine: number; endLine: number };
+  };
+  expect(body.pinnedPaths).toContain("brief.pdf");
+  expect(body.selection).toEqual({
+    path: "main.tex",
+    startLine: 2,
+    endLine: 3,
+  });
+
+  const mock = await apiRequest.newContext({ baseURL: "http://localhost:4010" });
+  await expect
+    .poll(async () => {
+      const poll = await mock.get("/requests", {
+        headers: { "x-ai-mock-token": "test-token" },
+      });
+      const rows = (await poll.json()) as unknown[];
+      return rows.length;
+    })
+    .toBeGreaterThan(0);
+  const res = await mock.get("/requests", {
+    headers: { "x-ai-mock-token": "test-token" },
+  });
+  const recorded = (await res.json()) as Array<{
+    body: { messages: Array<{ role: string; content: string }> };
+  }>;
+  const system = recorded
+    .map((entry) => entry.body.messages[0]?.content ?? "")
+    .join("\n");
+  expect(system).toContain('<selection path="main.tex" lines="2-3">');
+  expect(system).toContain("2| ");
+  expect(system).toContain('<pdf path="brief.pdf"');
+});
+
 test("(a) send → accept applies the edit and survives a reload", async ({ page }) => {
   await openProject(page, OWNER_PROJECT);
   await send(page, "Rename the introduction");
