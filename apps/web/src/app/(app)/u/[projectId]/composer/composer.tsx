@@ -54,7 +54,6 @@ export function Composer({
   beforeSend?(): Promise<void>;
 }): React.ReactElement {
   const [value, setValue] = useState("");
-  const [caret, setCaret] = useState(0);
   const [pinnedPaths, setPinnedPaths] = useState<string[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -65,8 +64,9 @@ export function Composer({
   const streaming = chat.status === "streaming";
   const disabled = !aiEnabled || (!streaming && !value.trim());
 
-  const mentionQuery =
-    /(?:^|\s)@([^\s@]*)$/.exec(value.slice(0, caret))?.[1] ?? null;
+  // Derive the query from the value itself. Tracking the caret as state made
+  // the picker dependent on how the text was entered (typing, paste, autofill).
+  const mentionQuery = /(?:^|\s)@([^\s@]*)$/.exec(value)?.[1] ?? null;
   const mentionMatches =
     mentionQuery === null
       ? []
@@ -75,13 +75,8 @@ export function Composer({
           .slice(0, 50);
 
   const chooseMention = (path: string): void => {
-    const before = value.slice(0, caret);
-    const match = /(^|\s)@[^\s@]*$/.exec(before);
-    if (match) {
-      const start = before.length - match[0].length + (match[1] ? 1 : 0);
-      setValue(value.slice(0, start) + value.slice(caret));
-      setCaret(start);
-    }
+    const at = value.lastIndexOf("@");
+    if (at !== -1) setValue(value.slice(0, at));
     setPinnedPaths((current) =>
       current.includes(path) ? current : [...current, path],
     );
@@ -116,7 +111,6 @@ export function Composer({
     await beforeSend?.();
     chat.send(text, level, pinnedPaths, undefined, captured ?? undefined);
     setValue("");
-    setCaret(0);
     setPinnedPaths([]);
     setMentionOpen(false);
     onClearSelection();
@@ -233,12 +227,7 @@ export function Composer({
           rows={1}
           onChange={(event) => {
             setValue(event.target.value);
-            setCaret(event.target.selectionStart ?? event.target.value.length);
-            setMentionOpen(
-              /(?:^|\s)@([^\s@]*)$/.test(
-                event.target.value.slice(0, event.target.selectionStart ?? event.target.value.length),
-              ),
-            );
+            setMentionOpen(/(?:^|\s)@([^\s@]*)$/.test(event.target.value));
             setMentionIndex(0);
           }}
           onKeyDown={(event) => {
@@ -280,12 +269,17 @@ export function Composer({
           }}
           className="w-full resize-none bg-transparent text-xs leading-4 text-text-editor-primary outline-none placeholder:text-text-editor-placeholder"
         />
-        {mentionOpen && mentionMatches.length > 0 ? (
+        {mentionOpen ? (
           <div
             role="listbox"
             aria-label="Workspace files"
             className="absolute bottom-16 left-6 z-20 max-h-52 w-72 overflow-y-auto rounded-xl border border-[color:var(--border-outline)] bg-bg-app p-1 shadow-menu"
           >
+            {mentionMatches.length === 0 ? (
+              <p className="px-2 py-2 text-xs text-text-editor-tertiary">
+                No files match your search.
+              </p>
+            ) : null}
             {mentionMatches.map((doc, index) => (
               <button
                 key={doc.id}

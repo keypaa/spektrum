@@ -84,6 +84,13 @@ describe("Composer context chips", () => {
     expect((area as HTMLTextAreaElement).value).not.toContain("@mai");
   });
 
+  it("shows an empty state when an @ query matches no files", async () => {
+    renderPinned();
+    await userEvent.type(screen.getByLabelText("Ask anything"), "@zzz");
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(screen.getByText("No files match your search.")).toBeTruthy();
+  });
+
   it("renders a selection chip and replaces it when the selection changes", async () => {
     const view = renderPinned({ selection: SELECTION });
     expect(screen.getByTestId("selection-chip").textContent).toContain("55-112");
