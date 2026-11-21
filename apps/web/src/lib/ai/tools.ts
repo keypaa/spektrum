@@ -14,6 +14,7 @@ import {
   normalizeDocumentPath,
 } from "@/lib/documents";
 import { getProject } from "@/lib/projects";
+import { extractPdfText } from "./pdf-text";
 import { enqueueProjectCompile } from "@/lib/compile-request";
 import {
   DiffError,
@@ -157,6 +158,23 @@ export async function executeTool(
                 : new TextEncoder().encode(doc.content).length,
           })),
         },
+      };
+    }
+
+    case "read_pdf": {
+      const path = safePath(String(data.path));
+      if (!path) return { ok: false, summary: "invalid path", fatal: false };
+      const extracted = await extractPdfText(
+        ctx.userId,
+        ctx.projectId,
+        path,
+        data.pages as [number, number] | undefined,
+      );
+      ctx.touchedPaths.add(path);
+      return {
+        ok: true,
+        summary: `read ${path}`,
+        data: extracted.text,
       };
     }
 

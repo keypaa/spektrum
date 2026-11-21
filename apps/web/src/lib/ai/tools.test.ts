@@ -11,6 +11,7 @@ import {
 import { revisionHash } from "@spektrum/shared/revision";
 import type { Diagnostic } from "@spektrum/shared/compile";
 import { compileAndWait, executeTool } from "./tools";
+import { extractPdfText } from "./pdf-text";
 
 const state = vi.hoisted(() => ({
   enqueued: { kind: "enqueued", revision: "r" } as
@@ -26,6 +27,14 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/lib/compile-request", () => ({
   enqueueProjectCompile: vi.fn(async () => state.enqueued),
+}));
+
+vi.mock("./pdf-text", () => ({
+  extractPdfText: vi.fn(async () => ({
+    text: "pdf text",
+    pages: 1,
+    truncated: false,
+  })),
 }));
 
 const run = Math.random().toString(36).slice(2, 10);
@@ -92,6 +101,26 @@ afterAll(async () => {
   await db.delete(users).where(eq(users.id, userId));
   await db.delete(users).where(eq(users.id, otherId));
   await pool.end();
+});
+
+describe("read_pdf", () => {
+  it("extracts text and touches the path", async () => {
+    const context = ctx();
+    const result = await executeTool(
+      "read_pdf",
+      { path: "brief.pdf", pages: [1, 2] },
+      context,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.data).toBe("pdf text");
+    expect(context.touchedPaths.has("brief.pdf")).toBe(true);
+    expect(extractPdfText).toHaveBeenCalledWith(
+      userId,
+      projectId,
+      "brief.pdf",
+      [1, 2],
+    );
+  });
 });
 
 describe("executeTool read-only tools", () => {

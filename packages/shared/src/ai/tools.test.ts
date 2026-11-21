@@ -11,12 +11,24 @@ const NAMES = [
   "compile",
   "get_logs",
   "search_project",
+  "read_pdf",
 ];
 
 describe("toolSchemas", () => {
-  it("exposes the nine tools", () => {
+  it("exposes ten tools", () => {
     expect(toolSchemas().map((t) => t.function.name).sort()).toEqual(
       [...NAMES].sort(),
+    );
+  });
+
+  it("describes read_pdf with an optional page range", () => {
+    const pdf = toolSchemas().find((t) => t.function.name === "read_pdf");
+    expect(pdf?.function.description).toContain("PDF");
+    const params = pdf?.function.parameters as {
+      properties?: Record<string, unknown>;
+    };
+    expect(Object.keys(params.properties ?? {})).toEqual(
+      expect.arrayContaining(["path", "pages"]),
     );
   });
 

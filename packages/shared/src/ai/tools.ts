@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const listFiles = z.object({});
+const readPdf = z.object({
+  path: z.string(),
+  pages: z.tuple([z.number().int(), z.number().int()]).optional(),
+});
 const readFile = z.object({
   path: z.string(),
   startLine: z.number().int().optional(),
@@ -61,6 +65,11 @@ export function toolSchemas() {
       "Propose deleting a file (requires user accept).",
       deleteFile,
     ),
+    tool(
+      "read_pdf",
+      "Extract text from a PDF, optionally a page range.",
+      readPdf,
+    ),
     tool("compile", "Compile the project and return diagnostics.", compile),
     tool("get_logs", "Return the last compile diagnostics.", getLogs),
     tool(
@@ -76,6 +85,7 @@ export type ToolSchema = ReturnType<typeof toolSchemas>[number];
 /** The zod schemas behind the JSON tool definitions (for argument parsing). */
 export const toolArgs = {
   list_files: listFiles,
+  read_pdf: readPdf,
   read_file: readFile,
   write_file: writeFile,
   edit_file: editFile,

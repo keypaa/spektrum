@@ -30,6 +30,7 @@ export const THINKING: Record<
 
 export type ToolName =
   | "list_files"
+  | "read_pdf"
   | "read_file"
   | "write_file"
   | "edit_file"
