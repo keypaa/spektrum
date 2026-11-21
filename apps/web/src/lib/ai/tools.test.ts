@@ -104,6 +104,14 @@ afterAll(async () => {
 });
 
 describe("read_pdf", () => {
+  it("returns a non-fatal result when extraction fails", async () => {
+    vi.mocked(extractPdfText).mockRejectedValueOnce(new Error("bad pdf"));
+    const result = await executeTool("read_pdf", { path: "brief.pdf" }, ctx());
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.fatal).toBe(false);
+    expect(result.summary).toContain("could not extract brief.pdf");
+  });
+
   it("extracts text and touches the path", async () => {
     const context = ctx();
     const result = await executeTool(

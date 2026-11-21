@@ -164,18 +164,29 @@ export async function executeTool(
     case "read_pdf": {
       const path = safePath(String(data.path));
       if (!path) return { ok: false, summary: "invalid path", fatal: false };
-      const extracted = await extractPdfText(
-        ctx.userId,
-        ctx.projectId,
-        path,
-        data.pages as [number, number] | undefined,
-      );
-      ctx.touchedPaths.add(path);
-      return {
-        ok: true,
-        summary: `read ${path}`,
-        data: extracted.text,
-      };
+      try {
+        const extracted = await extractPdfText(
+          ctx.userId,
+          ctx.projectId,
+          path,
+          data.pages as [number, number] | undefined,
+        );
+        ctx.touchedPaths.add(path);
+        return {
+          ok: true,
+          summary: `read ${path}`,
+          data: extracted.text,
+        };
+      } catch (error) {
+        // A missing or unreadable PDF must not abort the whole chat turn —
+        // return a tool result the model can explain to the user.
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          ok: false,
+          summary: `could not extract ${path}: ${message}`,
+          fatal: false,
+        };
+      }
     }
 
     case "read_file": {
