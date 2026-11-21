@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
   fastModel: "configured-fast",
   gatewayInput: null as null | Record<string, unknown>,
   titleInput: null as null | Record<string, unknown>,
+  contextInputs: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/auth/session", async (importOriginal) => {
@@ -77,7 +78,10 @@ vi.mock("@/lib/ai/chat-store", () => ({
 }));
 
 vi.mock("@/lib/ai/context", () => ({
-  buildContext: async () => ({ text: "CTX", tokens: 1, dropped: [] }),
+  buildContext: async (input: Record<string, unknown>) => {
+    state.contextInputs.push(input);
+    return { text: "CTX", tokens: 1, dropped: [] };
+  },
 }));
 
 vi.mock("@/lib/ai/gateway", () => ({
@@ -139,12 +143,39 @@ beforeEach(() => {
   state.usage = 0;
   state.gatewayInput = null;
   state.titleInput = null;
+  state.contextInputs = [];
   state.baseUrl = "https://configured.example/v1";
   state.chatModel = "configured-chat";
   state.fastModel = "configured-fast";
 });
 
 describe("POST /chat", () => {
+  it("rejects invalid selection ranges", async () => {
+    for (const selection of [
+      { path: "a.tex", startLine: -1, endLine: 2 },
+      { path: "a.tex", startLine: 1, endLine: 0 },
+      { path: "a.tex", startLine: 5, endLine: 2 },
+    ]) {
+      const res = await POST(req({ message: "hello", selection }), ctx);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it("forwards a valid selection to both context builds", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "reply" };
+      yield { type: "done" };
+    };
+    const selection = { path: "a.tex", startLine: 2, endLine: 3 };
+    const res = await POST(req({ message: "hello", selection }), ctx);
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(state.contextInputs.length).toBeGreaterThanOrEqual(1);
+    for (const input of state.contextInputs) {
+      expect(input.selection).toEqual(selection);
+    }
+  });
+
   it("uses the user's configured endpoint and models", async () => {
     state.gateway = async function* () {
       yield { type: "text", delta: "reply" };

@@ -47,6 +47,12 @@ export function partsFromThreadMessages(
   });
 }
 
+export interface LineSelection {
+  path: string;
+  startLine: number;
+  endLine: number;
+}
+
 export interface ChatController {
   threadId: string | null;
   parts: MessagePart[];
@@ -57,6 +63,7 @@ export interface ChatController {
     thinking: ThinkingLevel,
     pinnedPaths: string[],
     displayText?: string,
+    selection?: LineSelection,
   ): void;
   loadThread(threadId: string): Promise<void>;
   reset(): void;
@@ -88,6 +95,7 @@ export function useChat(input: {
     thinking: ThinkingLevel;
     pinnedPaths: string[];
     displayText?: string | undefined;
+    selection?: LineSelection | undefined;
   } | null>(null);
 
   const loadThread = useCallback(
@@ -114,12 +122,13 @@ export function useChat(input: {
       thinking: ThinkingLevel,
       pinnedPaths: string[],
       displayText?: string,
+      selection?: LineSelection,
     ) => {
       if (cb.current.disabled) return;
       controller.current?.abort();
       const abort = new AbortController();
       controller.current = abort;
-      lastSend.current = { text, thinking, pinnedPaths, displayText };
+      lastSend.current = { text, thinking, pinnedPaths, displayText, selection };
       setStatus("streaming");
       setError(null);
       setParts((current) => [
@@ -139,6 +148,7 @@ export function useChat(input: {
                 message: text,
                 thinking,
                 pinnedPaths,
+                ...(selection ? { selection } : {}),
               }),
               signal: abort.signal,
             },
@@ -291,6 +301,7 @@ export function useChat(input: {
         lastSend.current.thinking,
         lastSend.current.pinnedPaths,
         lastSend.current.displayText,
+        lastSend.current.selection,
       );
     }
   }, [send]);

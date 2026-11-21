@@ -1,6 +1,61 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { appendStreamDelta, partsFromThreadMessages } from "./use-chat";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  appendStreamDelta,
+  partsFromThreadMessages,
+  useChat,
+} from "./use-chat";
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+const SSE =
+  'event: meta\ndata: {"threadId":"t1","userMessageId":"m1","model":"m"}\n\n' +
+  'event: done\ndata: {"usage":{"in":1,"out":1}}\n\n';
+
+function mockFetch(): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(SSE, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("useChat.send", () => {
+  const selection = { path: "a.tex", startLine: 2, endLine: 3 };
+
+  it("sends pinned paths and selection in the POST body", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    act(() => result.current.send("hello", "Medium", ["a.tex"], undefined, selection));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.pinnedPaths).toEqual(["a.tex"]);
+    expect(body.selection).toEqual(selection);
+  });
+
+  it("resends the selection on retry", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    act(() => result.current.send("hello", "Medium", [], undefined, selection));
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    act(() => result.current.retry());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const init = fetchMock.mock.calls[1]![1] as RequestInit;
+    expect(JSON.parse(init.body as string).selection).toEqual(selection);
+  });
+});
 
 describe("partsFromThreadMessages", () => {
   it("keeps reloaded user turns on the right", () => {

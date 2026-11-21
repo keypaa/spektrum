@@ -43,7 +43,14 @@ const bodySchema = z.object({
   thinking: z.enum(THINKING).default("Medium"),
   pinnedPaths: z.array(z.string()).optional(),
   selection: z
-    .object({ path: z.string(), startLine: z.number().int(), endLine: z.number().int() })
+    .object({
+      path: z.string(),
+      startLine: z.number().int().min(1),
+      endLine: z.number().int().min(1),
+    })
+    .refine((value) => value.endLine >= value.startLine, {
+      message: "endLine must not precede startLine",
+    })
     .optional(),
 });
 
