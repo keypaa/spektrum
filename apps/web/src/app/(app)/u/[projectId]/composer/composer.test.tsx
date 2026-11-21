@@ -5,7 +5,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Composer } from "./composer";
 import type { useChat } from "./use-chat";
 
+import type { ComponentProps } from "react";
+import type { DocumentSummary } from "@/lib/documents";
+
 afterEach(cleanup);
+
+const DOCS: DocumentSummary[] = [
+  { id: "d1", path: "main.tex", kind: "tex", updatedAt: "2026-01-01" },
+  { id: "d2", path: "paper.pdf", kind: "img", updatedAt: "2026-01-01" },
+];
+
+const SELECTION = { path: "main.tex", startLine: 55, endLine: 112 };
 
 const baseChat = {
   threadId: null,
@@ -40,6 +50,98 @@ function renderComposer(
   return { onReview, onUploadFiles };
 }
 
+function renderPinned(
+  overrides: Partial<ComponentProps<typeof Composer>> = {},
+) {
+  const onClearSelection = vi.fn();
+  const onNavigateToSelection = vi.fn();
+  const beforeSend = vi.fn(async () => undefined);
+  const chat = { ...baseChat, send: vi.fn() };
+  const props: ComponentProps<typeof Composer> = {
+    chat,
+    aiEnabled: true,
+    onReview: vi.fn(),
+    onUploadFiles: vi.fn(),
+    openTabs: ["main.tex"],
+    onReviewDiff: vi.fn(),
+    documents: DOCS,
+    selection: null,
+    onClearSelection,
+    onNavigateToSelection,
+    beforeSend,
+    ...overrides,
+  };
+  const view = render(<Composer {...props} />);
+  return { ...view, props, chat, onClearSelection, onNavigateToSelection, beforeSend };
+}
+
+describe("Composer context chips", () => {
+  it("opens an @ dropdown filtered to workspace files and pins the choice", async () => {
+    renderPinned();
+    const area = screen.getByLabelText("Ask anything");
+    await userEvent.type(area, "@mai");
+    expect(screen.getByRole("listbox")).toBeTruthy();
+    await userEvent.click(screen.getByRole("option", { name: /main.tex/ }));
+    expect(screen.getByTestId("pinned-file-chip").textContent).toContain("main.tex");
+    expect((area as HTMLTextAreaElement).value).not.toContain("@mai");
+  });
+
+  it("renders a selection chip and replaces it when the selection changes", async () => {
+    const view = renderPinned({ selection: SELECTION });
+    expect(screen.getByTestId("selection-chip").textContent).toContain("55-112");
+    expect(screen.getAllByTestId("selection-chip")).toHaveLength(1);
+
+    view.rerender(
+      <Composer
+        {...view.props}
+        selection={{ path: "main.tex", startLine: 10, endLine: 20 }}
+      />,
+    );
+    expect(screen.getAllByTestId("selection-chip")).toHaveLength(1);
+    expect(screen.getByTestId("selection-chip").textContent).toContain("10-20");
+  });
+
+  it("keeps the chip when selection becomes empty, but removes it when the parent clears it", async () => {
+    const view = renderPinned({ selection: SELECTION });
+    // An empty Monaco selection leaves the parent state untouched.
+    view.rerender(<Composer {...view.props} selection={SELECTION} />);
+    expect(screen.getByTestId("selection-chip")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove selection" }));
+    expect(view.onClearSelection).toHaveBeenCalled();
+    view.rerender(<Composer {...view.props} selection={null} />);
+    expect(screen.queryByTestId("selection-chip")).toBeNull();
+  });
+
+  it("removes the last chip on backspace in an empty textarea", async () => {
+    const view = renderPinned({ selection: SELECTION });
+    await userEvent.type(screen.getByLabelText("Ask anything"), "{Backspace}");
+    expect(view.onClearSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("captures the selection, awaits the flush, then clears chips on send", async () => {
+    let resolveFlush: (() => void) | null = null;
+    const beforeSend = vi.fn(
+      () => new Promise<void>((resolve) => { resolveFlush = resolve; }),
+    );
+    const view = renderPinned({ selection: SELECTION, beforeSend });
+    await userEvent.type(screen.getByLabelText("Ask anything"), "check this{Enter}");
+    expect(view.chat.send).not.toHaveBeenCalled();
+    resolveFlush!();
+    await vi.waitFor(() => expect(view.chat.send).toHaveBeenCalledTimes(1));
+    expect(view.chat.send).toHaveBeenCalledWith(
+      "check this",
+      "Extra high",
+      [],
+      undefined,
+      SELECTION,
+    );
+    expect(view.onClearSelection).toHaveBeenCalled();
+    view.rerender(<Composer {...view.props} selection={null} />);
+    expect(screen.queryByTestId("selection-chip")).toBeNull();
+  });
+});
+
 describe("Composer", () => {
   it("uses the Ask anything placeholder and disables Send when empty", () => {
     renderComposer();
@@ -52,7 +154,13 @@ describe("Composer", () => {
     renderComposer(chat);
     const area = screen.getByLabelText("Ask anything");
     await userEvent.type(area, "hello{Enter}");
-    expect(chat.send).toHaveBeenCalledWith("hello", "Extra high", ["main.tex"]);
+    expect(chat.send).toHaveBeenCalledWith(
+      "hello",
+      "Extra high",
+      [],
+      undefined,
+      undefined,
+    );
   });
 
   it("shows Stop while streaming and calls stop", async () => {
