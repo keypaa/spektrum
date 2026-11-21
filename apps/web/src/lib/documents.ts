@@ -197,7 +197,11 @@ export async function getDocumentByPath(
   path: string,
 ): Promise<DocumentRecord | null> {
   const rows = await db
-    .select({ ...summaryColumns, content: documents.content })
+    .select({
+      ...summaryColumns,
+      content: documents.content,
+      blobKey: documents.blobKey,
+    })
     .from(documents)
     .innerJoin(projects, eq(documents.projectId, projects.id))
     .where(
@@ -208,7 +212,9 @@ export async function getDocumentByPath(
     )
     .limit(1);
   const row = rows[0];
-  return row ? { ...toSummary(row), content: row.content } : null;
+  return row
+    ? { ...toSummary(row), content: row.content, blobKey: row.blobKey }
+    : null;
 }
 
 export async function getDocumentById(

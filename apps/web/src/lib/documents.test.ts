@@ -208,9 +208,9 @@ describe("createDocument / listTree / getDocumentByPath", () => {
     const projectId = await makeProject(ownerId);
     const created = await createDocument(ownerId, projectId, "main.tex");
 
-    expect((await getDocumentByPath(ownerId, projectId, "main.tex"))?.id).toBe(
-      created.id,
-    );
+    const byPath = await getDocumentByPath(ownerId, projectId, "main.tex");
+    expect(byPath?.id).toBe(created.id);
+    expect(byPath).toHaveProperty("blobKey");
     expect((await getDocumentById(ownerId, projectId, created.id))?.path).toBe(
       "main.tex",
     );
