@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
 import {
@@ -9,6 +9,15 @@ import {
 } from "@spektrum/db/schema";
 import type { Diagnostic } from "@spektrum/shared/compile";
 import { buildContext, estimateTokens } from "./context";
+import { extractPdfText } from "./pdf-text";
+
+vi.mock("./pdf-text", () => ({
+  extractPdfText: vi.fn(async () => ({
+    text: "--- page 1 ---\nbrief text",
+    pages: 1,
+    truncated: false,
+  })),
+}));
 
 const run = Math.random().toString(36).slice(2, 10);
 const userId = `ctx-${run}`;
@@ -44,6 +53,19 @@ beforeAll(async () => {
       content: "@article{key1,\n  title={A title}\n}\n@book{key2,\n  title={B}\n}\n",
     },
     { projectId, path: "a.tex", kind: "tex", content: "alpha\nbeta\n" },
+    {
+      projectId,
+      path: "multi.tex",
+      kind: "tex",
+      content: "one\ntwo\nthree\nfour\n",
+    },
+    {
+      projectId,
+      path: "brief.pdf",
+      kind: "img",
+      blobKey: "blob/brief.pdf",
+      content: null,
+    },
     { projectId, path: "b.tex", kind: "tex", content: "b content\n" },
     { projectId, path: "big.tex", kind: "tex", content: "x".repeat(2000) },
     {
@@ -78,6 +100,63 @@ describe("estimateTokens", () => {
 });
 
 describe("buildContext", () => {
+  it("numbers the selected lines", async () => {
+    const result = await buildContext({
+      userId,
+      projectId,
+      mainFile: "main.tex",
+      selection: { path: "multi.tex", startLine: 2, endLine: 3 },
+      history: [],
+    });
+    expect(result.text).toContain('lines="2-3"');
+    expect(result.text).toContain("2| two");
+    expect(result.text).toContain("3| three");
+  });
+
+  it("injects a pinned PDF with page markers and reports its pages", async () => {
+    const result = await buildContext({
+      userId,
+      projectId,
+      mainFile: "main.tex",
+      pinnedPaths: ["brief.pdf"],
+      history: [],
+    });
+    expect(result.text).toContain('<pdf path="brief.pdf" pages="1">');
+    expect(result.text).toContain("--- page 1 ---");
+    expect(result.text).toContain("brief text");
+    expect(result.text).toContain("brief.pdf (pdf, 1 pages)");
+    expect(extractPdfText).toHaveBeenCalledWith(
+      userId,
+      projectId,
+      "brief.pdf",
+    );
+  });
+
+  it("degrades gracefully when PDF extraction fails", async () => {
+    vi.mocked(extractPdfText).mockRejectedValueOnce(new Error("bad pdf"));
+    const result = await buildContext({
+      userId,
+      projectId,
+      mainFile: "main.tex",
+      pinnedPaths: ["brief.pdf"],
+      history: [],
+    });
+    expect(result.text).toContain('<pdf path="brief.pdf"');
+    expect(result.text).toContain("could not extract text");
+  });
+
+  it("drops PDF sections before truncating the main file", async () => {
+    const result = await buildContext({
+      userId,
+      projectId,
+      mainFile: "main.tex",
+      pinnedPaths: ["brief.pdf"],
+      history: [{ role: "user", text: "hello" }],
+      limit: 50,
+    });
+    expect(result.dropped).toContain("pdfs");
+  });
+
   it("orders the sections and extracts only bib keys", async () => {
     const result = await buildContext({
       userId,

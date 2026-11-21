@@ -4,12 +4,15 @@ import { listContextDocuments } from "@spektrum/db/documents";
 import { pdfRenders } from "@spektrum/db/schema";
 import type { Diagnostic } from "@spektrum/shared/compile";
 import { getProject } from "@/lib/projects";
+import { extractPdfText } from "./pdf-text";
+
+const MAX_PINNED_PDF_CHARS = 12_000;
 
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-type DropKey = "history" | "bib" | "touched";
+type DropKey = "history" | "bib" | "touched" | "pdfs";
 
 type Section = {
   key: string;
@@ -53,7 +56,13 @@ export async function buildContext(input: {
   if (!project) return { text: "", tokens: 0, dropped: [] };
 
   const contentPaths = [
-    ...new Set([mainFile, ...pinnedPaths, ...touchedPaths, "refs.bib"]),
+    ...new Set([
+      mainFile,
+      ...pinnedPaths,
+      ...touchedPaths,
+      ...(selection ? [selection.path] : []),
+      "refs.bib",
+    ]),
   ];
   const documents = await listContextDocuments(
     projectId,
@@ -64,8 +73,39 @@ export async function buildContext(input: {
   const bytes = (content: string): number =>
     new TextEncoder().encode(content).length;
 
+  const pdfInfo = new Map<string, { pages: number; note?: string }>();
+  const pdfSections: Section[] = [];
+  for (const path of pinnedPaths) {
+    const doc = byPath.get(path);
+    if (!doc?.blobKey || !path.toLowerCase().endsWith(".pdf")) continue;
+    try {
+      const extracted = await extractPdfText(userId, projectId, path);
+      pdfInfo.set(path, { pages: extracted.pages });
+      pdfSections.push({
+        key: "pdf",
+        attrs: `path="${path}" pages="${extracted.pages}"`,
+        body: extracted.text.slice(0, MAX_PINNED_PDF_CHARS),
+        dropKey: "pdfs",
+      });
+    } catch {
+      pdfInfo.set(path, { pages: 0, note: "could not extract text" });
+      pdfSections.push({
+        key: "pdf",
+        attrs: `path="${path}" pages="0"`,
+        body: "could not extract text",
+        dropKey: "pdfs",
+      });
+    }
+  }
+
   const manifest = documents
     .map((doc) => {
+      const pdf = pdfInfo.get(doc.path);
+      if (pdf) {
+        return `- ${doc.path} (pdf, ${pdf.pages} pages)${
+          pdf.note ? ` — ${pdf.note}` : ""
+        }`;
+      }
       if (doc.content === null) {
         return `- ${doc.path} (${doc.kind}, null)`;
       }
@@ -98,6 +138,7 @@ export async function buildContext(input: {
       ? selectionContent
           .split("\n")
           .slice(selection.startLine - 1, selection.endLine)
+          .map((line, index) => `${selection.startLine + index}| ${line}`)
           .join("\n")
       : "";
 
@@ -134,6 +175,7 @@ export async function buildContext(input: {
     { key: "manifest", body: manifest },
     { key: "main", attrs: `path="${mainFile}"`, body: main },
     ...fileSections,
+    ...pdfSections,
     { key: "bib_keys", body: bibKeys.join(", "), dropKey: "bib" },
     ...(selection
       ? [
@@ -151,7 +193,7 @@ export async function buildContext(input: {
   let text = assemble(sections);
   const dropped: DropKey[] = [];
 
-  for (const key of ["history", "bib", "touched"] as const) {
+  for (const key of ["history", "bib", "touched", "pdfs"] as const) {
     if (estimateTokens(text) <= limit) break;
     const index = sections.findIndex((section) => section.dropKey === key);
     if (index === -1) continue;
