@@ -46,6 +46,7 @@ describe("DEFAULT_PREFERENCES", () => {
         baseUrl: "",
         chatModel: "",
         fastModel: "",
+        imageSupport: "auto",
       },
     });
   });
@@ -74,6 +75,7 @@ describe("mergePreferences", () => {
       baseUrl: "https://openrouter.ai/api/v1",
       chatModel: "openai/gpt-4o",
       fastModel: "google/gemini-2.5-flash",
+      imageSupport: "auto",
     });
     expect(merged.editorFontSize).toBe(DEFAULT_PREFERENCES.editorFontSize);
     // A malformed stored sub-object must not crash the read path.
@@ -89,6 +91,27 @@ describe("mergePreferences", () => {
         llm: { ...DEFAULT_PREFERENCES.llm, surprise: true },
       }).success,
     ).toBe(false);
+  });
+
+  it("defaults imageSupport to auto for rows stored before the field existed", () => {
+    const merged = mergePreferences({
+      llm: {
+        configured: true,
+        providerId: "openrouter",
+        baseUrl: "https://openrouter.ai/api/v1",
+        chatModel: "openai/gpt-4o",
+        fastModel: "google/gemini-2.5-flash",
+      },
+    });
+    expect(merged.llm.imageSupport).toBe("auto");
+    expect(merged.llm.chatModel).toBe("openai/gpt-4o");
+  });
+
+  it("keeps a valid stored imageSupport override", () => {
+    expect(
+      mergePreferences({ llm: { ...DEFAULT_PREFERENCES.llm, imageSupport: "off" } })
+        .llm.imageSupport,
+    ).toBe("off");
   });
 
   it("merges a stored partial key-by-key", () => {
@@ -148,6 +171,15 @@ describe("preferencesSchema", () => {
   it("rejects an unknown theme", () => {
     expect(() =>
       preferencesSchema.parse({ ...DEFAULT_PREFERENCES, interfaceTheme: "neon" }),
+    ).toThrow();
+  });
+
+  it("rejects an unknown imageSupport override", () => {
+    expect(() =>
+      preferencesSchema.parse({
+        ...DEFAULT_PREFERENCES,
+        llm: { ...DEFAULT_PREFERENCES.llm, imageSupport: "maybe" },
+      }),
     ).toThrow();
   });
 

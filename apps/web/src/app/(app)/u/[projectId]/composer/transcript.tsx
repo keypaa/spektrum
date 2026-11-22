@@ -141,28 +141,33 @@ export function Transcript({
             </p>
           );
         }
-        return (
-          <div
-            key={index}
-            data-testid="diff-card"
-            className="rounded-xl border border-[color:var(--border-log)] p-2"
-          >
-            <p className="text-xs">
-              {part.proposal.path} · {part.proposal.kind}
-            </p>
-            {part.status === "pending" ? (
-              <button
-                type="button"
-                onClick={() => onReviewDiff(part)}
-                className="mt-2 h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs"
-              >
-                Review
-              </button>
-            ) : (
-              <p className="mt-1 text-xs text-text-editor-tertiary">{part.status}</p>
-            )}
-          </div>
-        );
+        if (part.type === "diff") {
+          return (
+            <div
+              key={index}
+              data-testid="diff-card"
+              className="rounded-xl border border-[color:var(--border-log)] p-2"
+            >
+              <p className="text-xs">
+                {part.proposal.path} · {part.proposal.kind}
+              </p>
+              {part.status === "pending" ? (
+                <button
+                  type="button"
+                  onClick={() => onReviewDiff(part)}
+                  className="mt-2 h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs"
+                >
+                  Review
+                </button>
+              ) : (
+                <p className="mt-1 text-xs text-text-editor-tertiary">
+                  {part.status}
+                </p>
+              )}
+            </div>
+          );
+        }
+        return null;
       })}
       {streaming ? (
         <div className="flex items-center gap-2 text-xs text-[color:var(--border-brand)]">

@@ -4,6 +4,7 @@
 // mirrored to `crixet_light_mode_preference_v1` for the pre-paint script.
 
 import { z } from "zod";
+import { imageSupportSchema } from "./ai/images";
 
 /** The §9.6 "Hide files from file tree" list, verbatim and in order. */
 export const DEFAULT_HIDDEN_FILES: readonly string[] = [
@@ -33,6 +34,8 @@ export const llmConfigSchema = z
     baseUrl: z.string().max(500),
     chatModel: z.string().max(200),
     fastModel: z.string().max(200),
+    // Defaulted so rows written before this field existed still parse.
+    imageSupport: imageSupportSchema.default("auto"),
   })
   .strict();
 
@@ -93,6 +96,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     baseUrl: "",
     chatModel: "",
     fastModel: "",
+    imageSupport: "auto",
   },
 };
 

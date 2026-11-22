@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { diffProposalSchema } from "./ai/diff";
 
+export * from "./ai/images";
 export * from "./ai/prompts";
 export * from "./ai/providers";
 export * from "./ai/tools";
@@ -45,6 +46,7 @@ export type MessagePart =
   | { type: "thinking"; text: string }
   | { type: "tool_call"; id: string; name: ToolName; args: unknown }
   | { type: "tool_result"; id: string; ok: boolean; summary: string }
+  | { type: "image"; id: string; blobKey: string; name: string; mimeType: string }
   | {
       type: "diff";
       id: string;

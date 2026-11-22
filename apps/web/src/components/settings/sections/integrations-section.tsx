@@ -54,6 +54,7 @@ export function IntegrationsSection() {
       baseUrl: chosen?.baseUrl ?? "",
       chatModel: chosen?.defaultModel ?? "",
       fastModel: chosen?.defaultFastModel ?? "",
+      imageSupport: llm.imageSupport,
     });
   };
 

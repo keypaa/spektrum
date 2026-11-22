@@ -56,6 +56,7 @@ describe("resolveLlmConfigForRequest", () => {
       baseUrl: "https://openrouter.ai/api/v1",
       chatModel: "openai/gpt-4o",
       fastModel: "google/gemini-2.5-flash",
+      imageSupport: "auto" as const,
     };
     await putPreferences(userId, { ...DEFAULT_PREFERENCES, llm });
     expect(await resolveLlmConfigForRequest(userId, "member")).toEqual({
@@ -77,6 +78,7 @@ describe("resolveLlmConfigForRequest", () => {
         baseUrl: "",
         chatModel: "baidu/ernie-5.5-flash-preview:free",
         fastModel: "baidu/ernie-5.5-flash-preview:free",
+        imageSupport: "auto",
       },
     });
     const config = await resolveLlmConfigForRequest(userId, "member");
@@ -94,6 +96,7 @@ describe("resolveLlmConfigForRequest", () => {
         baseUrl: "ftp://bad.example/v1",
         chatModel: "m",
         fastModel: "f",
+        imageSupport: "auto",
       },
     });
     const env = loadWebEnv();
@@ -112,6 +115,7 @@ describe("resolveLlmConfigForRequest", () => {
         baseUrl: "https://custom.example/v1",
         chatModel: "chat",
         fastModel: "fast",
+        imageSupport: "auto",
       },
     });
     const env = loadWebEnv();
