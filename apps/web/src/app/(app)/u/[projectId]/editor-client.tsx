@@ -992,31 +992,29 @@ export function EditorClient({
   const chatPanel = (popped: boolean) => (
     <div
       data-testid={popped ? "chat-panel-popped" : "chat-panel"}
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border-log)] bg-bg-sidepanel/85 backdrop-blur-xl backdrop-brightness-50"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border-log)] bg-bg-sidepanel/85 backdrop-blur-xl backdrop-brightness-50"
     >
       {!popped ? (
-        <div className="flex h-1 w-full flex-none items-center justify-center">
-          <div
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="Resize chat"
-            onPointerDown={(event) => {
-              const measured =
-                chatSlotRef.current?.getBoundingClientRect().height ?? 0;
-              chatDrag.current = {
-                startY: event.clientY,
-                startHeight:
-                  measured > 0
-                    ? measured
-                    : chatHeight ?? (chat.parts.length > 0 ? 420 : 260),
-              };
-              document.body.style.userSelect = "none";
-            }}
-            className="h-1 w-10 cursor-row-resize rounded-full bg-[color:var(--border-outline)] transition-colors hover:bg-[color:var(--border-modal)]"
-          />
-        </div>
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize chat"
+          onPointerDown={(event) => {
+            const measured =
+              chatSlotRef.current?.getBoundingClientRect().height ?? 0;
+            chatDrag.current = {
+              startY: event.clientY,
+              startHeight:
+                measured > 0
+                  ? measured
+                  : chatHeight ?? (chat.parts.length > 0 ? 420 : 260),
+            };
+            document.body.style.userSelect = "none";
+          }}
+          className="absolute left-1/2 top-1 z-10 h-1 w-10 -translate-x-1/2 cursor-row-resize rounded-full bg-[color:var(--border-outline)] transition-colors hover:bg-[color:var(--border-modal)]"
+        />
       ) : null}
-      <div className="flex h-8 flex-none items-center justify-between border-b border-[color:var(--border-log)] px-3">
+      <div className="mt-1 flex h-8 flex-none items-center justify-between border-b border-[color:var(--border-log)] px-3">
         {!popped ? (
           <button
             type="button"
@@ -1381,6 +1379,7 @@ export function EditorClient({
                   render: render.status,
                   isCurrent: initialRender?.isCurrent ?? false,
                   dirty,
+                  currentRevision: initialRender?.revision ?? null,
                 })}
                 page={page}
                 numPages={numPages}

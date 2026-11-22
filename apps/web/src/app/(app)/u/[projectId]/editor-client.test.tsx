@@ -188,12 +188,15 @@ describe("EditorClient", () => {
     expect(screen.getByTestId("chat-panel").className).toContain("bg-bg-sidepanel/85");
     expect(screen.getByTestId("chat-panel").className).toContain("backdrop-blur-xl");
     expect(screen.getByTestId("chat-panel").className).toContain("backdrop-brightness-50");
+    expect(
+      screen.getByRole("button", { name: "New chat" }).parentElement?.className,
+    ).toContain("mt-1");
     const slot = screen.getByTestId("composer-slot-placeholder");
     expect(slot.className).toContain("absolute");
     expect(slot.parentElement?.className).toContain("relative");
-    expect(
-      screen.getByRole("separator", { name: "Resize chat" }).parentElement?.className,
-    ).toContain("h-1 ");
+    const handle = screen.getByRole("separator", { name: "Resize chat" });
+    expect(handle.className).toContain("absolute");
+    expect(handle.className).toContain("top-1");
   });
 
   it("closes the chat and reopens it from the tab strip", async () => {

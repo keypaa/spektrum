@@ -35,13 +35,25 @@ export function pillState(args: {
   render: RenderEvent | null;
   isCurrent: boolean;
   dirty: boolean;
+  currentRevision?: string | null;
 }): PillState {
   if (args.dirty) return "dirty";
   if (!args.render) return "initializing";
   if (args.render.event === "status") {
     if (args.render.state === "queued" || args.render.state === "running")
       return "compiling";
-    if (args.render.state === "error") return "failed";
+    if (args.render.state === "error") {
+      // A failed job for an older revision can still arrive over the SSE
+      // stream. It must not override a successful render of the documents
+      // that are on screen now.
+      if (
+        args.currentRevision &&
+        args.render.revision !== args.currentRevision
+      ) {
+        return "compiled";
+      }
+      return "failed";
+    }
     if (args.render.state === "superseded") return "compiling";
   }
   if (args.render.event === "result") return "compiled";

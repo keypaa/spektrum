@@ -273,7 +273,7 @@ export function Composer({
           <div
             role="listbox"
             aria-label="Workspace files"
-            className="absolute bottom-16 left-6 z-20 max-h-52 w-72 overflow-y-auto rounded-xl border border-[color:var(--border-outline)] bg-bg-app p-1 shadow-menu"
+            className="absolute bottom-16 left-6 z-20 max-h-40 w-72 overflow-y-auto rounded-xl border border-[color:var(--border-outline)] bg-bg-app p-1 shadow-menu"
           >
             {mentionMatches.length === 0 ? (
               <p className="px-2 py-2 text-xs text-text-editor-tertiary">

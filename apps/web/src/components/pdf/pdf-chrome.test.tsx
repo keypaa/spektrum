@@ -71,6 +71,17 @@ describe("pillState", () => {
       "dirty",
     );
   });
+
+  it("ignores an error event from a stale revision", () => {
+    expect(
+      pillState({
+        render: { event: "status", state: "error", revision: "old" },
+        isCurrent: false,
+        dirty: false,
+        currentRevision: "current",
+      }),
+    ).toBe("compiled");
+  });
 });
 
 describe("PdfChrome", () => {

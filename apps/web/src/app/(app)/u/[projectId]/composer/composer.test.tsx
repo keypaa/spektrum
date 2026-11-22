@@ -79,6 +79,7 @@ describe("Composer context chips", () => {
     const area = screen.getByLabelText("Ask anything");
     await userEvent.type(area, "@mai");
     expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(screen.getByRole("listbox").className).toContain("max-h-40");
     await userEvent.click(screen.getByRole("option", { name: /main.tex/ }));
     expect(screen.getByTestId("pinned-file-chip").textContent).toContain("main.tex");
     expect((area as HTMLTextAreaElement).value).not.toContain("@mai");
