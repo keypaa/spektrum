@@ -3,8 +3,15 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   // The visual suite has its own config (playwright.visual.config.ts) and its
-  // own two-server setup; the behavioural suite must never pick it up.
-  testIgnore: ["**/visual/**", "**/compile.spec.ts", "**/ai.spec.ts"],
+  // own two-server setup; the behavioural suite must never pick it up. The AI
+  // and image specs likewise need the mock gateway + AI global setup and run
+  // through playwright.ai.config.ts only.
+  testIgnore: [
+    "**/visual/**",
+    "**/compile.spec.ts",
+    "**/ai.spec.ts",
+    "**/images.spec.ts",
+  ],
   // `next dev` compiles each route on demand. A route the suite has not hit
   // yet (or whose cache was evicted) can take longer than 30 s to compile on a
   // loaded machine, which surfaced as a click timeout rather than a real

@@ -6,14 +6,20 @@ import { CopyButton } from "@/components/chat/copy-button";
 import { MarkdownContent } from "@/components/chat/markdown-content";
 import { isUserTextPart } from "./chat-parts";
 
+type ImagePart = Extract<MessagePart, { type: "image" }>;
+
 export function Transcript({
   parts,
   onReviewDiff,
   streaming = false,
+  projectId,
+  threadId,
 }: {
   parts: MessagePart[];
   onReviewDiff(part: Extract<MessagePart, { type: "diff" }>): void;
   streaming?: boolean;
+  projectId?: string;
+  threadId?: string | null;
 }): React.ReactElement {
   // Older stored replies contain one "Thinking" part per token chunk, and a
   // threaded reload can append the just-streamed reply again. Collapse both
@@ -64,6 +70,34 @@ export function Transcript({
   const rendered = visible.filter(
     (part) => part.type !== "thinking" || part.text.trim().length > 0,
   );
+
+  // Optimistic parts carry a local object URL (or data URL) as their blobKey.
+  // Persisted parts carry a storage key and must be served through the
+  // owner-only thumbnail route. The two kinds of part ids never need to match.
+  const thumbnailSrc = (image: ImagePart): string => {
+    if (
+      image.blobKey.startsWith("blob:") ||
+      image.blobKey.startsWith("data:")
+    ) {
+      return image.blobKey;
+    }
+    return `/api/projects/${projectId}/chat/attachments/${image.id}?threadId=${threadId ?? ""}`;
+  };
+  const thumbnails = (images: ImagePart[]): React.ReactNode =>
+    images.length ? (
+      <div className="mt-2 flex flex-wrap justify-end gap-1">
+        {images.map((image) => (
+          <img
+            key={image.id}
+            data-testid="user-image"
+            src={thumbnailSrc(image)}
+            alt={image.name}
+            className="h-20 w-20 rounded-lg border border-[color:var(--border-log)] object-cover"
+          />
+        ))}
+      </div>
+    ) : null;
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const last = rendered.at(-1);
   const lastText = last?.type === "text" ? last.text : "";
@@ -77,93 +111,125 @@ export function Transcript({
       ref={scrollRef}
       className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto px-1 py-2"
     >
-      {rendered.map((part, index) => {
-        if (part.type === "text") {
-          const isUser = part.text.startsWith("User: ");
-          const text = isUser ? part.text.slice("User: ".length) : part.text;
-          const mentions = text.match(/@[^\s@]+/g) ?? [];
-          const body = mentions.length
-            ? text.replace(/@[^\s@]+/g, "").replace(/\s+/g, " ").trim()
-            : text;
-          return isUser ? (
-            <div key={index} className="flex flex-col items-end gap-1">
-              <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-bg-tertiary px-3 py-2 text-xs leading-4 text-text-editor-primary">
-                {mentions.length ? (
-                  <div className="mb-1 flex flex-wrap justify-end gap-1">
-                    {mentions.map((mention, mentionIndex) => (
-                      <span
-                        key={mentionIndex}
-                        data-testid="user-mention"
-                        className="rounded-full bg-bg-app px-2 py-0.5 text-[11px] text-text-editor-secondary"
-                      >
-                        {mention}
-                      </span>
-                    ))}
+      {(() => {
+        const nodes: React.ReactNode[] = [];
+        for (let index = 0; index < rendered.length; index += 1) {
+          const part = rendered[index]!;
+          if (part.type === "text") {
+            const isUser = part.text.startsWith("User: ");
+            const text = isUser ? part.text.slice("User: ".length) : part.text;
+            const mentions = text.match(/@[^\s@]+/g) ?? [];
+            const body = mentions.length
+              ? text.replace(/@[^\s@]+/g, "").replace(/\s+/g, " ").trim()
+              : text;
+            if (isUser) {
+              // Image parts immediately after a user turn belong to that
+              // bubble. Their ids may be local or server-generated; the src
+              // helper handles both without matching ids across the boundary.
+              const images: ImagePart[] = [];
+              while (
+                index + 1 < rendered.length &&
+                rendered[index + 1]!.type === "image"
+              ) {
+                index += 1;
+                images.push(rendered[index] as ImagePart);
+              }
+              nodes.push(
+                <div key={index} className="flex flex-col items-end gap-1">
+                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-bg-tertiary px-3 py-2 text-xs leading-4 text-text-editor-primary">
+                    {mentions.length ? (
+                      <div className="mb-1 flex flex-wrap justify-end gap-1">
+                        {mentions.map((mention, mentionIndex) => (
+                          <span
+                            key={mentionIndex}
+                            data-testid="user-mention"
+                            className="rounded-full bg-bg-app px-2 py-0.5 text-[11px] text-text-editor-secondary"
+                          >
+                            {mention}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {body}
                   </div>
-                ) : null}
-                {body}
-              </div>
-              <CopyButton text={text} label="Copy message" />
-            </div>
-          ) : (
-            <div key={index} className="flex flex-col items-start gap-1">
-              <MarkdownContent content={text} />
-              <CopyButton text={text} label="Copy reply" />
-            </div>
-          );
-        }
-        if (part.type === "thinking") {
-          return (
-            <details
-              key={index}
-              className="rounded-xl border border-[color:var(--border-log)] p-2 text-xs"
-            >
-              <summary className="flex cursor-pointer list-none items-center text-text-editor-secondary">
-                Thinking
-              </summary>
-              <div className="mt-2 whitespace-pre-wrap text-text-editor-tertiary">
-                {part.text}
-              </div>
-            </details>
-          );
-        }
-        if (part.type === "tool_call") {
-          return (
-            <p key={index} className="text-xs text-text-editor-tertiary">
-              {part.name}
-            </p>
-          );
-        }
-        if (part.type === "tool_result") {
-          return (
-            <p key={index} className="text-xs text-text-editor-tertiary">
-              {part.summary}
-            </p>
-          );
-        }
-        return (
-          <div
-            key={index}
-            data-testid="diff-card"
-            className="rounded-xl border border-[color:var(--border-log)] p-2"
-          >
-            <p className="text-xs">
-              {part.proposal.path} · {part.proposal.kind}
-            </p>
-            {part.status === "pending" ? (
-              <button
-                type="button"
-                onClick={() => onReviewDiff(part)}
-                className="mt-2 h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs"
+                  {thumbnails(images)}
+                  <CopyButton text={text} label="Copy message" />
+                </div>,
+              );
+            } else {
+              nodes.push(
+                <div key={index} className="flex flex-col items-start gap-1">
+                  <MarkdownContent content={text} />
+                  <CopyButton text={text} label="Copy reply" />
+                </div>,
+              );
+            }
+            continue;
+          }
+          if (part.type === "image") {
+            // An image-only user turn has no text to attach to; still show it.
+            nodes.push(
+              <div key={index} className="flex justify-end">
+                {thumbnails([part])}
+              </div>,
+            );
+            continue;
+          }
+          if (part.type === "thinking") {
+            nodes.push(
+              <details
+                key={index}
+                className="rounded-xl border border-[color:var(--border-log)] p-2 text-xs"
               >
-                Review
-              </button>
-            ) : (
-              <p className="mt-1 text-xs text-text-editor-tertiary">{part.status}</p>
-            )}
-          </div>
-        );
-      })}
+                <summary className="flex cursor-pointer list-none items-center text-text-editor-secondary">
+                  Thinking
+                </summary>
+                <div className="mt-2 whitespace-pre-wrap text-text-editor-tertiary">
+                  {part.text}
+                </div>
+              </details>,
+            );
+          } else if (part.type === "tool_call") {
+            nodes.push(
+              <p key={index} className="text-xs text-text-editor-tertiary">
+                {part.name}
+              </p>,
+            );
+          } else if (part.type === "tool_result") {
+            nodes.push(
+              <p key={index} className="text-xs text-text-editor-tertiary">
+                {part.summary}
+              </p>,
+            );
+          } else if (part.type === "diff") {
+            nodes.push(
+              <div
+                key={index}
+                data-testid="diff-card"
+                className="rounded-xl border border-[color:var(--border-log)] p-2"
+              >
+                <p className="text-xs">
+                  {part.proposal.path} · {part.proposal.kind}
+                </p>
+                {part.status === "pending" ? (
+                  <button
+                    type="button"
+                    onClick={() => onReviewDiff(part)}
+                    className="mt-2 h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs"
+                  >
+                    Review
+                  </button>
+                ) : (
+                  <p className="mt-1 text-xs text-text-editor-tertiary">
+                    {part.status}
+                  </p>
+                )}
+              </div>,
+            );
+          }
+        }
+        return nodes;
+      })()}
       {streaming ? (
         <div className="flex items-center gap-2 text-xs text-[color:var(--border-brand)]">
           <span className="h-2 w-2 animate-pulse rounded-full bg-current" />

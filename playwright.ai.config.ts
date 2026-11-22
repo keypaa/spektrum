@@ -19,7 +19,8 @@ const BASE_ENV = {
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /ai\.spec\.ts/,
+  // The AI suite proper plus the image-input flow that drives the same gateway.
+  testMatch: /(ai|images)\.spec\.ts/,
   testIgnore: ["**/visual/**"],
   workers: 1,
   timeout: 120_000,

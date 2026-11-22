@@ -12,8 +12,10 @@ import {
   CUSTOM_PROVIDER_ID,
   findProvider,
   validateBaseUrl,
+  type ImageSupportPreference,
 } from "@spektrum/shared/ai";
 import { usePreferences } from "@/components/preferences-provider";
+import type { ImageSupport } from "@/lib/ai/model-capabilities";
 import { SelectRow } from "../select-row";
 import { ModelPicker, type ModelOption } from "../model-picker";
 
@@ -54,6 +56,7 @@ export function IntegrationsSection() {
       baseUrl: chosen?.baseUrl ?? "",
       chatModel: chosen?.defaultModel ?? "",
       fastModel: chosen?.defaultFastModel ?? "",
+      imageSupport: llm.imageSupport,
     });
   };
 
@@ -75,9 +78,18 @@ export function IntegrationsSection() {
       .then((body) => {
         if (!cancelled && body?.models) {
           setModels(
-            (body.models as Array<{ id: string; label?: string }>).map((model) => ({
+            (
+              body.models as Array<{
+                id: string;
+                label?: string;
+                imageSupport?: ImageSupport;
+              }>
+            ).map((model) => ({
               id: model.id,
               label: model.label ?? model.id,
+              // Keep the detected signal: the composer's capability resolver
+              // consumes the same /models payload.
+              imageSupport: model.imageSupport,
             })),
           );
         }
@@ -321,6 +333,19 @@ export function IntegrationsSection() {
               onChange={(value) => patchLlm({ fastModel: value })}
             />
           </div>
+          <SelectRow
+            label="Image input"
+            description="Auto detects images from the model metadata. Force on or off overrides detection."
+            value={llm.imageSupport}
+            options={[
+              { value: "auto", label: "Auto" },
+              { value: "on", label: "Force on" },
+              { value: "off", label: "Force off" },
+            ]}
+            onChange={(value) =>
+              patchLlm({ imageSupport: value as ImageSupportPreference })
+            }
+          />
         </div>
       </div>
 

@@ -1,7 +1,17 @@
 import { loadWebEnv } from "@spektrum/shared/env";
 import { resolveLlmConfigForRequest } from "./keys";
+import { detectImageSupport, type ImageSupport } from "./model-capabilities";
 
-export type ModelInfo = { id: string; label: string };
+export type ModelInfo = {
+  id: string;
+  label: string;
+  imageSupport: ImageSupport;
+};
+
+/** Fallback entries carry no catalog metadata, so only the id can speak. */
+function fromConfiguredId(id: string): ModelInfo {
+  return { id, label: id, imageSupport: detectImageSupport({}, id) };
+}
 
 const CACHE_MS = 60_000;
 const cache = new Map<string, { models: ModelInfo[]; expires: number }>();
@@ -21,14 +31,8 @@ export async function listModels(
   const resolved = await resolveLlmConfigForRequest(userId, role);
   const baseUrl = resolved?.baseUrl ?? env.llmBaseUrl;
   const models: ModelInfo[] = resolved
-    ? [
-        { id: resolved.chatModel, label: resolved.chatModel },
-        { id: resolved.fastModel, label: resolved.fastModel },
-      ]
-    : [
-        { id: env.llmModelChat, label: env.llmModelChat },
-        { id: env.llmModelFast, label: env.llmModelFast },
-      ];
+    ? [fromConfiguredId(resolved.chatModel), fromConfiguredId(resolved.fastModel)]
+    : [fromConfiguredId(env.llmModelChat), fromConfiguredId(env.llmModelFast)];
   const fallback = models.filter((model, index) =>
     models.findIndex((m) => m.id === model.id) === index,
   );
@@ -56,10 +60,20 @@ export async function listModels(
       signal: AbortSignal.timeout(3000),
     });
     if (!response.ok) throw new Error(`models responded ${response.status}`);
-    const body = (await response.json()) as { data?: Array<{ id?: string }> };
-    const remote = (body.data ?? [])
-      .map((model) => ({ id: model.id ?? "", label: model.id ?? "" }))
-      .filter((model) => model.id.length > 0);
+    const body = (await response.json()) as { data?: unknown };
+    const remote = (Array.isArray(body.data) ? body.data : [])
+      .map((model) =>
+        typeof model === "object" && model !== null
+          ? (model as Record<string, unknown>)
+          : undefined,
+      )
+      .flatMap((raw) => {
+        const id = typeof raw?.id === "string" ? raw.id : "";
+        if (id.length === 0) return [];
+        return [
+          { id, label: id, imageSupport: detectImageSupport(raw ?? {}, id) },
+        ];
+      });
     const result = remote.length > 0 ? remote : fallback;
     store(result);
     return result;

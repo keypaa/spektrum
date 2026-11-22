@@ -100,6 +100,33 @@ describe("estimateTokens", () => {
 });
 
 describe("buildContext", () => {
+  it("formats history as text only, ignoring image parts", async () => {
+    const result = await buildContext({
+      userId,
+      projectId,
+      mainFile: "main.tex",
+      history: [
+        {
+          role: "user",
+          text: "look here",
+          images: [
+            {
+              type: "image",
+              id: "img-1",
+              blobKey: "chat/p/img-1.png",
+              name: "img-1.png",
+              mimeType: "image/png",
+            },
+          ],
+        },
+        { role: "assistant", text: "I see", images: [] },
+      ],
+    });
+    expect(result.text).toContain("User: look here");
+    expect(result.text).toContain("Assistant: I see");
+    expect(result.text).not.toContain("chat/p/img-1.png");
+  });
+
   it("numbers the selected lines", async () => {
     const result = await buildContext({
       userId,

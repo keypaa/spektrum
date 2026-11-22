@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@spektrum/db";
 import { documents, folders, projects } from "@spektrum/db/schema";
 import { BLANK_MAIN_TEX, EXAMPLE_MAIN_TEX } from "./templates";
+import { deleteProjectChatImages } from "./ai/chat-store";
 
 export interface ProjectRow {
   id: string;
@@ -150,10 +151,14 @@ export async function duplicateProject(
 }
 
 export async function softDeleteProject(ownerId: string, id: string): Promise<void> {
-  await db
+  const [row] = await db
     .update(projects)
     .set({ deletedAt: new Date() })
-    .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)));
+    .where(and(eq(projects.id, id), eq(projects.ownerId, ownerId)))
+    .returning({ id: projects.id });
+  // Only the owner's project loses its chat attachment blobs; a cross-tenant
+  // no-op must not touch another owner's storage.
+  if (row) await deleteProjectChatImages(id);
 }
 
 export async function createFolder(ownerId: string, name: string): Promise<string> {

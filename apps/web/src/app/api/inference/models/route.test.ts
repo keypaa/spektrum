@@ -60,8 +60,8 @@ describe("GET /api/inference/models", () => {
     expect(first.status).toBe(200);
     expect(await first.json()).toEqual({
       models: [
-        { id: "m1", label: "m1" },
-        { id: "m2", label: "m2" },
+        { id: "m1", label: "m1", imageSupport: "unknown" },
+        { id: "m2", label: "m2", imageSupport: "unknown" },
       ],
     });
     expect(second.status).toBe(200);
@@ -80,8 +80,12 @@ describe("GET /api/inference/models", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       models: [
-        { id: "openai/gpt-4o", label: "openai/gpt-4o" },
-        { id: "openai/gpt-4o-mini", label: "openai/gpt-4o-mini" },
+        { id: "openai/gpt-4o", label: "openai/gpt-4o", imageSupport: "yes" },
+        {
+          id: "openai/gpt-4o-mini",
+          label: "openai/gpt-4o-mini",
+          imageSupport: "yes",
+        },
       ],
     });
   });

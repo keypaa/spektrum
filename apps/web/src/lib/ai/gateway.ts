@@ -8,9 +8,13 @@ export type GatewayEvent =
   | { type: "usage"; inputTokens: number; outputTokens: number }
   | { type: "done" };
 
+export type GatewayContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export type GatewayMessage = {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  content: string | GatewayContentPart[];
   tool_calls?: unknown[];
   tool_call_id?: string;
 };

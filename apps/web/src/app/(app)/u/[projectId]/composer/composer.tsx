@@ -17,11 +17,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@spektrum/ui";
-import { THINKING, type ThinkingLevel } from "@spektrum/shared/ai"; // corrected below
+import {
+  IMAGE_LIMITS,
+  THINKING,
+  imageMimeTypeSchema,
+  type ChatImageAttachment,
+  type ImageSupportPreference,
+  type MessagePart,
+  type ThinkingLevel,
+} from "@spektrum/shared/ai";
+import { useOptionalPreferences } from "@/components/preferences-provider";
+import { resolveImageCapability } from "@/lib/ai/image-capability";
+import type { ImageSupport } from "@/lib/ai/model-capabilities";
 import type { DocumentSummary } from "@/lib/documents";
+import { readPastedImages } from "./image-paste";
 import type { useChat } from "./use-chat";
 import { Transcript } from "./transcript";
-import type { MessagePart } from "@spektrum/shared/ai"; // corrected below
 
 const LINE_HEIGHT = 16;
 const MAX_LINES = 5;
@@ -37,6 +48,8 @@ export function Composer({
   onClearSelection = () => undefined,
   onNavigateToSelection = () => undefined,
   beforeSend,
+  imageSupport,
+  imageSupportOverride,
 }: {
   chat: ReturnType<typeof useChat>;
   aiEnabled: boolean;
@@ -52,12 +65,64 @@ export function Composer({
     endLine: number;
   }): void;
   beforeSend?(): Promise<void>;
+  /** Detected capability of the active chat model; fetched when omitted. */
+  imageSupport?: ImageSupport | undefined;
+  /** Settings override; read from preferences when omitted. */
+  imageSupportOverride?: ImageSupportPreference | undefined;
 }): React.ReactElement {
   const [value, setValue] = useState("");
   const [pinnedPaths, setPinnedPaths] = useState<string[]>([]);
+  const [images, setImages] = useState<ChatImageAttachment[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [level, setLevel] = useState<ThinkingLevel>("Extra high");
+  const preferences = useOptionalPreferences();
+  const override =
+    imageSupportOverride ?? preferences?.preferences.llm.imageSupport ?? "auto";
+  const activeModel =
+    imageSupport !== undefined || !preferences?.preferences.llm.configured
+      ? null
+      : preferences.preferences.llm.chatModel;
+  const [fetchedSupport, setFetchedSupport] = useState<ImageSupport | undefined>(
+    undefined,
+  );
+  const capability = resolveImageCapability(imageSupport ?? fetchedSupport, override);
+
+  // The same /models payload Settings uses; look up the active chat model and
+  // fall back to the first entry (the chat model in the fallback list).
+  useEffect(() => {
+    if (imageSupport !== undefined || typeof fetch !== "function") return;
+    let cancelled = false;
+    void fetch("/api/inference/models")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (cancelled || !body || !Array.isArray(body.models)) return;
+        const models = body.models as Array<{
+          id: string;
+          imageSupport?: ImageSupport;
+        }>;
+        const match = activeModel
+          ? models.find((model) => model.id === activeModel)
+          : undefined;
+        // If the active model is missing from the catalog, show uncertainty
+        // instead of borrowing the first model's capability.
+        setFetchedSupport(
+          activeModel ? match?.imageSupport : models[0]?.imageSupport,
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [imageSupport, activeModel]);
+
+  // New chat / loading a thread starts with an empty composer: drop the
+  // previous thread's pending attachments (useChat bumps the epoch on both).
+  const sessionEpoch = chat.sessionEpoch ?? 0;
+  useEffect(() => {
+    setImages([]);
+  }, [sessionEpoch]);
+
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const plusMenuId = useId();
@@ -109,9 +174,17 @@ export function Composer({
     // Capture before clearing: parent state updates are asynchronous.
     const captured = selection;
     await beforeSend?.();
-    chat.send(text, level, pinnedPaths, undefined, captured ?? undefined);
+    chat.send(
+      text,
+      level,
+      pinnedPaths,
+      undefined,
+      captured ?? undefined,
+      capability.canAttach ? images : [],
+    );
     setValue("");
     setPinnedPaths([]);
+    setImages([]);
     setMentionOpen(false);
     onClearSelection();
   };
@@ -136,6 +209,8 @@ export function Composer({
             parts={chat.parts}
             onReviewDiff={onReviewDiff}
             streaming={streaming}
+            projectId={chat.projectId}
+            threadId={chat.threadId}
           />
         </div>
       ) : (
@@ -165,14 +240,61 @@ export function Composer({
           role="alert"
           className="mb-2 flex-none rounded-xl border border-[color:var(--border-log)] bg-bg-app px-3 py-2 text-xs text-fg-error"
         >
-          {chat.error}
+          <div className="flex items-start justify-between gap-2">
+            <span>{chat.error}</span>
+            {chat.imageRejected ? (
+              <button
+                type="button"
+                data-testid="retry-without-images"
+                onClick={chat.retry}
+                className="flex-none rounded-full border border-[color:var(--border-log)] px-2 py-0.5 text-xs text-fg-error hover:bg-bg-tertiary"
+              >
+                Retry without images
+              </button>
+            ) : null}
+          </div>
         </div>
+      ) : null}
+
+      {capability.notice ? (
+        <p
+          role="status"
+          className="mb-2 flex-none px-1 text-xs text-text-editor-secondary"
+        >
+          {capability.notice}
+        </p>
       ) : null}
 
       <div
         data-testid="composer"
         className="relative flex min-h-[64px] w-full flex-none flex-col rounded-3xl border border-[color:var(--ai-border)] bg-ai-bg px-4 py-3"
       >
+        {images.length > 0 ? (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {images.map((image, index) => (
+              <div key={image.id} data-testid="pasted-image" className="relative">
+                <img
+                  src={`data:${image.mimeType};base64,${image.data}`}
+                  alt={`Attached image ${index + 1}`}
+                  className="h-16 w-16 rounded-lg object-cover"
+                />
+                <button
+                  type="button"
+                  aria-label="Remove image"
+                  onClick={() =>
+                    setImages((current) =>
+                      current.filter((_entry, i) => i !== index),
+                    )
+                  }
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-bg-tertiary text-text-editor-secondary hover:text-text-editor-primary"
+                >
+                  <IconClose size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {pinnedPaths.length > 0 || selection ? (
           <div className="mb-2 flex flex-wrap gap-1">
             {pinnedPaths.map((path) => (
@@ -229,6 +351,27 @@ export function Composer({
             setValue(event.target.value);
             setMentionOpen(/(?:^|\s)@([^\s@]*)$/.test(event.target.value));
             setMentionIndex(0);
+          }}
+          onPaste={(event) => {
+            const items = Array.from(event.clipboardData.items);
+            const hasAllowedImage = items.some(
+              (entry) =>
+                entry.kind === "file" &&
+                imageMimeTypeSchema.safeParse(entry.type).success,
+            );
+            if (!hasAllowedImage) return; // ordinary text paste / unsupported type
+            // Only swallow the event when we actually handle the image. With
+            // image input off (or an unsupported type), mixed image+text pastes
+            // must still insert their text.
+            if (!capability.canAttach) return;
+            event.preventDefault();
+            void readPastedImages(items).then((added) => {
+              if (added.length === 0) return;
+              setImages((current) => {
+                const room = IMAGE_LIMITS.maxCount - current.length;
+                return room > 0 ? [...current, ...added.slice(0, room)] : current;
+              });
+            });
           }}
           onKeyDown={(event) => {
             if (mentionOpen && mentionMatches.length > 0) {

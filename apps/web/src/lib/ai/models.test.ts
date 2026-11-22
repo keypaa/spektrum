@@ -40,7 +40,9 @@ beforeEach(() => {
 describe("listModels", () => {
   it("uses the configured endpoint instead of the env default", async () => {
     const models = await listModels("user-1", "member");
-    expect(models).toEqual([{ id: "remote-model", label: "remote-model" }]);
+    expect(models).toEqual([
+      { id: "remote-model", label: "remote-model", imageSupport: "unknown" },
+    ]);
     expect(state.urls).toEqual(["https://one.example/v1/models"]);
   });
 

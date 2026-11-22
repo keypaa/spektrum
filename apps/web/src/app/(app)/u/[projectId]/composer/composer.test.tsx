@@ -1,12 +1,28 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatImageAttachment, ImageSupportPreference } from "@spektrum/shared/ai";
+import type { ImageSupport } from "@/lib/ai/model-capabilities";
 import { Composer } from "./composer";
 import type { useChat } from "./use-chat";
 
 import type { ComponentProps } from "react";
 import type { DocumentSummary } from "@/lib/documents";
+
+const pasteState = vi.hoisted(() => ({
+  files: [] as ChatImageAttachment[],
+}));
+
+// The paste decoder is covered in image-paste.test.ts; here we only need its
+// output so the component test stays about thumbnails, removal and sending.
+vi.mock("./image-paste", () => ({
+  readPastedImages: vi.fn(async () => pasteState.files),
+}));
+
+beforeEach(() => {
+  pasteState.files = [];
+});
 
 afterEach(cleanup);
 
@@ -18,10 +34,12 @@ const DOCS: DocumentSummary[] = [
 const SELECTION = { path: "main.tex", startLine: 55, endLine: 112 };
 
 const baseChat = {
+  projectId: "p1",
   threadId: null,
   parts: [],
   status: "idle" as const,
   error: null,
+  imageRejected: false,
   send: vi.fn(),
   loadThread: vi.fn(),
   reset: vi.fn(),
@@ -34,19 +52,24 @@ const baseChat = {
 function renderComposer(
   overrides: Partial<ReturnType<typeof useChat>> = {},
   aiEnabled = true,
+  imageSupport?: ImageSupport,
+  imageSupportOverride?: ImageSupportPreference,
 ) {
   const onReview = vi.fn();
   const onUploadFiles = vi.fn();
+  const chat = { ...baseChat, ...overrides };
   render(
     <Composer
-      chat={{ ...baseChat, ...overrides }}
+      chat={chat}
       aiEnabled={aiEnabled}
       onReview={onReview}
       onUploadFiles={onUploadFiles}
       onReviewDiff={vi.fn()}
+      imageSupport={imageSupport}
+      imageSupportOverride={imageSupportOverride}
     />,
   );
-  return { onReview, onUploadFiles };
+  return { onReview, onUploadFiles, chat };
 }
 
 function renderPinned(
@@ -141,6 +164,7 @@ describe("Composer context chips", () => {
       [],
       undefined,
       SELECTION,
+      [],
     );
     expect(view.onClearSelection).toHaveBeenCalled();
     view.rerender(<Composer {...view.props} selection={null} />);
@@ -166,6 +190,7 @@ describe("Composer", () => {
       [],
       undefined,
       undefined,
+      [],
     );
   });
 
@@ -236,5 +261,140 @@ describe("Composer", () => {
   it("surfaces a failed request instead of showing nothing", () => {
     renderComposer({ error: "gateway responded 429 (rate limited)" });
     expect(screen.getByRole("alert").textContent).toContain("429");
+  });
+
+  it("offers Retry without images only after an image rejection", async () => {
+    const chat = {
+      ...baseChat,
+      error: "image input not supported",
+      imageRejected: true,
+    };
+    renderComposer(chat);
+    const button = screen.getByTestId("retry-without-images");
+    expect(button.textContent).toContain("Retry without images");
+    await userEvent.click(button);
+    expect(chat.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer Retry without images for an ordinary error", () => {
+    renderComposer({ error: "rate limited", imageRejected: false });
+    expect(screen.queryByTestId("retry-without-images")).toBeNull();
+  });
+});
+
+describe("Composer image attachments", () => {
+  const attachment = (id: string): ChatImageAttachment => ({
+    id,
+    mimeType: "image/webp",
+    data: "AQIDBA==",
+  });
+
+  function paste(area: HTMLElement): void {
+    fireEvent.paste(area, {
+      clipboardData: {
+        items: [item(new File(["x"], "shot.png", { type: "image/png" }), "image/png")],
+      },
+    });
+  }
+
+  function item(file: File, type: string): DataTransferItem {
+    return { kind: "file", type, getAsFile: () => file } as unknown as DataTransferItem;
+  }
+
+  it("shows pasted thumbnails and removes one on click", async () => {
+    pasteState.files = [attachment("a1"), attachment("a2")];
+    const { chat } = renderComposer();
+
+    paste(screen.getByLabelText("Ask anything"));
+
+    expect(await screen.findAllByTestId("pasted-image")).toHaveLength(2);
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove image" })[0]!);
+    expect(screen.getAllByTestId("pasted-image")).toHaveLength(1);
+    expect(chat.send).not.toHaveBeenCalled();
+  });
+
+  it("sends attachments with the message and clears the thumbnails", async () => {
+    pasteState.files = [attachment("a1")];
+    const { chat } = renderComposer();
+    const area = screen.getByLabelText("Ask anything");
+    paste(area);
+    await screen.findByTestId("pasted-image");
+
+    await userEvent.type(area, "look{Enter}");
+
+    expect(chat.send).toHaveBeenCalledWith(
+      "look",
+      "Extra high",
+      [],
+      undefined,
+      undefined,
+      [attachment("a1")],
+    );
+    expect(screen.queryByTestId("pasted-image")).toBeNull();
+  });
+
+  it("does not attach pasted images when the override is off", async () => {
+    pasteState.files = [attachment("a1")];
+    renderComposer({}, true, "yes", "off");
+
+    paste(screen.getByLabelText("Ask anything"));
+
+    expect(screen.queryByTestId("pasted-image")).toBeNull();
+  });
+
+  it("shows a non-blocking warning when detection says no", () => {
+    renderComposer({}, true, "no");
+    expect(screen.getByRole("status").textContent).toContain("may not accept images");
+    expect(screen.getByLabelText("Ask anything")).toBeTruthy();
+  });
+
+  it("shows a warning when the override is off", () => {
+    renderComposer({}, true, "yes", "off");
+    expect(screen.getByRole("status").textContent).toContain("turned off");
+  });
+
+  it("shows no warning when detection says yes", () => {
+    renderComposer({}, true, "yes");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("clears pending attachments when the session epoch changes", async () => {
+    pasteState.files = [attachment("a1")];
+    const view = renderPinned({ chat: { ...baseChat, sessionEpoch: 0 } });
+    paste(screen.getByLabelText("Ask anything"));
+    await screen.findByTestId("pasted-image");
+
+    view.rerender(
+      <Composer
+        {...view.props}
+        chat={{ ...baseChat, sessionEpoch: 1 }}
+      />,
+    );
+
+    expect(screen.queryByTestId("pasted-image")).toBeNull();
+  });
+
+  it("does not swallow a paste of an unsupported image type", () => {
+    renderComposer();
+    const area = screen.getByLabelText("Ask anything");
+    const pasteEvent = createEvent.paste(area, {
+      clipboardData: {
+        items: [item(new File(["x"], "a.bmp", { type: "image/bmp" }), "image/bmp")],
+      },
+    });
+    fireEvent(area, pasteEvent);
+    expect(pasteEvent.defaultPrevented).toBe(false);
+  });
+
+  it("does not swallow a mixed paste when image input is off", () => {
+    renderComposer({}, true, "yes", "off");
+    const area = screen.getByLabelText("Ask anything");
+    const pasteEvent = createEvent.paste(area, {
+      clipboardData: {
+        items: [item(new File(["x"], "a.png", { type: "image/png" }), "image/png")],
+      },
+    });
+    fireEvent(area, pasteEvent);
+    expect(pasteEvent.defaultPrevented).toBe(false);
   });
 });

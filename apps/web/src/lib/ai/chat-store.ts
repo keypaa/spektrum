@@ -1,7 +1,9 @@
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { deleteObject } from "@spektrum/storage";
 import { db } from "@spektrum/db";
 import { chatMessages, chatThreads, projects } from "@spektrum/db/schema";
 import type { MessagePart } from "@spektrum/shared/ai";
+import type { HistoryTurn } from "./multimodal";
 
 export interface ThreadRow {
   id: string;
@@ -122,12 +124,44 @@ export async function renameThread(input: {
   return { ...thread, title: input.title, titleSource: "manual" };
 }
 
+/** Remove every attachment blob referenced by a thread's persisted parts.
+  * Must run before the thread row is deleted: messages cascade away with it. */
+export async function deleteChatImages(threadId: string): Promise<void> {
+  const rows = await db
+    .select({ content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId));
+  const keys = new Set<string>();
+  for (const row of rows) {
+    const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
+    for (const part of parts) {
+      if (part.type === "image" && part.blobKey) keys.add(part.blobKey);
+    }
+  }
+  await Promise.all(
+    [...keys].map((key) =>
+      deleteObject("uploads", key).catch(() => undefined),
+    ),
+  );
+}
+
+/** Attachment blobs are not cascaded by the database, so a project deletion
+  * has to clean up each of its threads explicitly. */
+export async function deleteProjectChatImages(projectId: string): Promise<void> {
+  const rows = await db
+    .select({ id: chatThreads.id })
+    .from(chatThreads)
+    .where(eq(chatThreads.projectId, projectId));
+  await Promise.all(rows.map((row) => deleteChatImages(row.id)));
+}
+
 export async function deleteThread(input: {
   threadId: string;
   userId: string;
 }): Promise<boolean> {
   const thread = await getThread(input);
   if (!thread) return false;
+  await deleteChatImages(input.threadId);
   await db.delete(chatThreads).where(eq(chatThreads.id, input.threadId));
   return true;
 }
@@ -280,26 +314,50 @@ export async function firstExchange(threadId: string): Promise<{
   return { user, assistant };
 }
 
-export async function recentTurns(threadId: string): Promise<
-  Array<{ role: "user" | "assistant"; text: string }>
-> {
+export async function recentTurns(threadId: string): Promise<HistoryTurn[]> {
   const rows = await db
     .select({ role: chatMessages.role, content: chatMessages.content })
     .from(chatMessages)
     .where(eq(chatMessages.threadId, threadId))
     .orderBy(desc(chatMessages.createdAt))
     .limit(40);
-  return rows
-    .reverse()
-    .flatMap((row) => {
-      if (row.role !== "user" && row.role !== "assistant") return [];
-      const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
-      const text = parts
-        .filter((part) => part.type === "text")
-        .map((part) => (part.type === "text" ? part.text : ""))
-        .join("");
-      return text ? [{ role: row.role, text }] : [];
-    });
+  return rows.reverse().flatMap((row) => {
+    if (row.role !== "user" && row.role !== "assistant") return [];
+    const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
+    const text = parts
+      .filter((part) => part.type === "text")
+      .map((part) => (part.type === "text" ? part.text : ""))
+      .join("");
+    const images = parts.filter(
+      (part): part is Extract<MessagePart, { type: "image" }> =>
+        part.type === "image",
+    );
+    // Keep image-only turns (their images belong in later requests), but drop
+    // textless tool/thinking turns so text-only history stays unchanged.
+    return text || images.length ? [{ role: row.role, text, images }] : [];
+  });
+}
+
+/** Find the image part for an attachment within a thread, or null.
+ *
+ * Ownership is deliberately not checked here: callers scope the lookup with
+ * `getThread({ threadId, userId })` first (project owner only).
+ */
+export async function findImagePart(
+  threadId: string,
+  attachmentId: string,
+): Promise<Extract<MessagePart, { type: "image" }> | null> {
+  const rows = await db
+    .select({ content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId));
+  for (const row of rows) {
+    const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
+    for (const part of parts) {
+      if (part.type === "image" && part.id === attachmentId) return part;
+    }
+  }
+  return null;
 }
 
 export async function touchedPaths(threadId: string): Promise<string[]> {

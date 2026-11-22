@@ -7,9 +7,11 @@
 // GET  /requests            -> recorded requests (x-ai-mock-token: test-token)
 // POST /v1/chat/completions -> text/event-stream
 //
-// Branch order: title -> fix -> review -> create -> delete -> tool follow-up
-// -> default. Every tool branch returns a short text once the request carries a
-// role:"tool" message, so the second model call ends the turn.
+// Branch order: title -> image -> fix -> review -> create -> delete -> tool
+// follow-up -> default. Every tool branch returns a short text once the request
+// carries a role:"tool" message, so the second model call ends the turn. User
+// messages may be multimodal arrays (pasted images); only their text parts are
+// read to pick a branch — the image data itself is never interpreted here.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { appendFileSync, writeFileSync } from "node:fs";
@@ -87,11 +89,26 @@ const toolCall = (name: string, args: unknown): unknown[] => [
   { choices: [], usage: { prompt_tokens: 20, completion_tokens: 8 } },
 ];
 
+type TextPart = { type: string; text: string };
+
 function lastUserText(messages: Array<{ role?: string; content?: unknown }>): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i]!;
     if (message.role === "user") {
-      return typeof message.content === "string" ? message.content : "";
+      if (typeof message.content === "string") return message.content;
+      if (Array.isArray(message.content)) {
+        return message.content
+          .filter(
+            (part): part is TextPart =>
+              typeof part === "object" &&
+              part !== null &&
+              (part as TextPart).type === "text" &&
+              typeof (part as TextPart).text === "string",
+          )
+          .map((part) => part.text)
+          .join("\n");
+      }
+      return "";
     }
   }
   return "";
@@ -110,6 +127,9 @@ function respond(body: {
 
   if (isTitle) {
     return text('{"title":"Fix the broken document"}');
+  }
+  if (userText.includes("describe this image")) {
+    return text("I see the image.");
   }
   if (userText.includes("fails to compile")) {
     return hasTool

@@ -1,5 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import { deleteObject } from "@spektrum/storage";
+import { softDeleteProject } from "@/lib/projects";
 import { db, pool } from "@spektrum/db";
 import {
   chatMessages,
@@ -11,6 +13,7 @@ import {
   appendMessage,
   createThread,
   deleteThread,
+  findImagePart,
   firstExchange,
   getMessage,
   getThread,
@@ -20,6 +23,10 @@ import {
   touchedPaths,
   updateDiffDecision,
 } from "./chat-store";
+
+vi.mock("@spektrum/storage", () => ({
+  deleteObject: vi.fn(async () => undefined),
+}));
 
 const run = Math.random().toString(36).slice(2, 10);
 const userId = `chat-${run}`;
@@ -130,6 +137,58 @@ describe("chat-store messages", () => {
     expect(turns[0]?.text).toMatch(/^Q/);
   });
 
+  it("returns image parts alongside text in recent turns", async () => {
+    const id = crypto.randomUUID();
+    const image: MessagePart = {
+      type: "image",
+      id,
+      blobKey: `chat/${projectId}/${id}.png`,
+      name: `${id}.png`,
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId,
+      role: "user",
+      // An image-only message must survive as a turn even with empty text.
+      content: { parts: [image] },
+    });
+
+    const turns = await recentTurns(threadId);
+    expect(turns[turns.length - 1]).toEqual({
+      role: "user",
+      text: "",
+      images: [image],
+    });
+  });
+
+  it("drops textless tool/thinking turns from recent turns", async () => {
+    await appendMessage({
+      threadId,
+      role: "assistant",
+      content: {
+        parts: [
+          { type: "thinking", text: "working" },
+          {
+            type: "tool_call",
+            id: crypto.randomUUID(),
+            name: "read_file",
+            args: { path: "a.tex" },
+          },
+        ],
+      },
+    });
+
+    const turns = await recentTurns(threadId);
+    expect(
+      turns.some(
+        (turn) =>
+          turn.role === "assistant" &&
+          turn.text === "" &&
+          turn.images.length === 0,
+      ),
+    ).toBe(false);
+  });
+
   it("collects touched paths from tool calls", async () => {
     const tool = (name: string, path: string): MessagePart => ({
       type: "tool_call",
@@ -144,6 +203,44 @@ describe("chat-store messages", () => {
     });
     const paths = await touchedPaths(threadId);
     expect(paths).toEqual(["a.tex", "b.tex"]);
+  });
+
+  it("finds an image part only within its thread", async () => {
+    const id = crypto.randomUUID();
+    const part: MessagePart = {
+      type: "image",
+      id,
+      blobKey: `chat/${projectId}/${id}.png`,
+      name: `${id}.png`,
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId,
+      role: "user",
+      content: { parts: [text("look"), part] },
+    });
+    expect(await findImagePart(threadId, id)).toEqual(part);
+    expect(await findImagePart(threadId, crypto.randomUUID())).toBeNull();
+
+    const otherThread = await createThread({
+      projectId: otherProjectId,
+      userId: otherId,
+      title: "Other image",
+    });
+    const otherPart: MessagePart = {
+      type: "image",
+      id: crypto.randomUUID(),
+      blobKey: `chat/${otherProjectId}/${id}.png`,
+      name: `${id}.png`,
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId: otherThread.id,
+      role: "user",
+      content: { parts: [otherPart] },
+    });
+    expect(await findImagePart(otherThread.id, otherPart.id)).toEqual(otherPart);
+    expect(await findImagePart(threadId, otherPart.id)).toBeNull();
   });
 
   it("flips only the matching diff part", async () => {
@@ -176,5 +273,51 @@ describe("chat-store messages", () => {
     expect(diff && diff.type === "diff" ? diff.status : null).toBe("accepted");
 
     expect(await updateDiffDecision({ threadId, userId, messageId, diffId: "missing", decision: "rejected" })).toBe(false);
+  });
+});
+
+describe("chat attachment cleanup", () => {
+  it("deleting a thread deletes its attachment blobs", async () => {
+    vi.mocked(deleteObject).mockClear();
+    const victim = await createThread({ projectId, userId, title: "Blobs" });
+    const image: MessagePart = {
+      type: "image",
+      id: crypto.randomUUID(),
+      blobKey: `chat/${projectId}/cleanup.png`,
+      name: "cleanup.png",
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId: victim.id,
+      role: "user",
+      content: { parts: [image] },
+    });
+
+    expect(await deleteThread({ threadId: victim.id, userId })).toBe(true);
+
+    expect(deleteObject).toHaveBeenCalledWith("uploads", image.blobKey);
+  });
+
+  it("deleting a project deletes its threads' attachment blobs", async () => {
+    vi.mocked(deleteObject).mockClear();
+    const pid = crypto.randomUUID();
+    await db.insert(projects).values({ id: pid, ownerId: userId, name: "Blobs" });
+    const victim = await createThread({ projectId: pid, userId, title: "Blobs" });
+    const image: MessagePart = {
+      type: "image",
+      id: crypto.randomUUID(),
+      blobKey: `chat/${pid}/project-cleanup.png`,
+      name: "project-cleanup.png",
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId: victim.id,
+      role: "user",
+      content: { parts: [image] },
+    });
+
+    await softDeleteProject(userId, pid);
+
+    expect(deleteObject).toHaveBeenCalledWith("uploads", image.blobKey);
   });
 });
