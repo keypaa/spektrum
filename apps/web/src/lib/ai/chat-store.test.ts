@@ -155,6 +155,34 @@ describe("chat-store messages", () => {
     });
   });
 
+  it("drops textless tool/thinking turns from recent turns", async () => {
+    await appendMessage({
+      threadId,
+      role: "assistant",
+      content: {
+        parts: [
+          { type: "thinking", text: "working" },
+          {
+            type: "tool_call",
+            id: crypto.randomUUID(),
+            name: "read_file",
+            args: { path: "a.tex" },
+          },
+        ],
+      },
+    });
+
+    const turns = await recentTurns(threadId);
+    expect(
+      turns.some(
+        (turn) =>
+          turn.role === "assistant" &&
+          turn.text === "" &&
+          turn.images.length === 0,
+      ),
+    ).toBe(false);
+  });
+
   it("collects touched paths from tool calls", async () => {
     const tool = (name: string, path: string): MessagePart => ({
       type: "tool_call",

@@ -299,8 +299,9 @@ export async function recentTurns(threadId: string): Promise<HistoryTurn[]> {
       (part): part is Extract<MessagePart, { type: "image" }> =>
         part.type === "image",
     );
-    // Keep image-only turns too: their images still belong in later requests.
-    return [{ role: row.role, text, images }];
+    // Keep image-only turns (their images belong in later requests), but drop
+    // textless tool/thinking turns so text-only history stays unchanged.
+    return text || images.length ? [{ role: row.role, text, images }] : [];
   });
 }
 
