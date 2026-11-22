@@ -229,6 +229,24 @@ describe("EditorClient", () => {
     expect(screen.queryByTestId("chat-panel-popped")).toBeNull();
   });
 
+  it("keeps the PDF sheet square under a compile error banner", () => {
+    renderShell({
+      initialRender: {
+        isCurrent: false,
+        status: "error",
+        revision: "a".repeat(64),
+        pdfUrl: "/render.pdf",
+        lastOkRevision: null,
+        mainFile: "main.tex",
+        durationMs: 0,
+        diagnostics: [{ severity: "error", message: "boom", raw: "boom" }],
+        stats: null,
+      },
+    });
+    expect(screen.getByTestId("compile-error")).toBeTruthy();
+    expect(screen.getByTestId("pdf-preview-sheet").className).toContain("rounded-t-none");
+  });
+
   it("renders without crashing and with no tab when there are no documents", () => {
     renderShell({ documents: [], initialDocument: null });
     expect(screen.getByTestId("editor-root")).toBeTruthy();

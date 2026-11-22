@@ -602,12 +602,14 @@ export function EditorClient({
   // A failed compile must be visible where you are looking. The pill alone
   // changes "Compiled" → "Failed" while the previous PDF stays on screen, and
   // the log text lives behind Tools → Logs, so the failure read as a stale PDF.
-  const failed =
-    render.status?.event === "status"
-      ? render.status.state === "error"
-      : render.status?.event === "result"
-        ? false
-        : initialRender?.status === "error";
+  const failed = render.status
+    ? pillState({
+        render: render.status,
+        isCurrent: initialRender?.isCurrent ?? false,
+        dirty: false,
+        currentRevision: initialRender?.revision ?? null,
+      }) === "failed"
+    : initialRender?.status === "error";
   const errorDiagnostic = failed
     ? (diagnostics.find((d) => d.severity === "error") ?? diagnostics[0] ?? null)
     : null;
@@ -1367,7 +1369,12 @@ export function EditorClient({
               its icons and labels disappeared. The preview ink token is dark in
               both themes; opting in here covers the chrome, the search pill's
               border and any other inherited text on the sheet. */}
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-lg bg-bg-preview text-[color:var(--text-preview-primary)]">
+          <div
+            data-testid="pdf-preview-sheet"
+            className={`relative flex min-h-0 flex-1 flex-col overflow-hidden bg-bg-preview text-[color:var(--text-preview-primary)] ${
+              errorDiagnostic ? "rounded-t-none" : "rounded-t-lg"
+            }`}
+          >
             {/* No `relative` here on purpose: PdfChrome's floating bar is
                 absolutely positioned and must resolve against the sheet, not
                 against this 52 px toolbar row — otherwise `bottom-3` pinned it
