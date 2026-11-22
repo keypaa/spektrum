@@ -486,4 +486,63 @@ describe("POST /chat", () => {
     // The original image stays persisted and truthful in the transcript.
     expect(state.objects.has(historyPart.blobKey)).toBe(true);
   });
+
+  it("413s a declared body over 8 MiB before parsing or rate limiting", async () => {
+    state.allowed = false; // would be a 429 if we got as far as the limiter
+    const oversized = new Request(
+      `http://localhost:3000/api/projects/${PROJECT_ID}/chat`,
+      {
+        method: "POST",
+        headers: {
+          origin: "http://localhost:3000",
+          "content-type": "application/json",
+          "content-length": String(9 * 1024 * 1024),
+        },
+        body: JSON.stringify({ message: "hello" }),
+      },
+    ) as never;
+    const res = await POST(oversized, ctx);
+    expect(res.status).toBe(413);
+    expect(state.gatewayInput).toBeNull();
+  });
+
+  it("a plain follow-up after a rejected image sends plain string content", async () => {
+    await seedHistoryImage();
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({
+        message: "just text now",
+        threadId: crypto.randomUUID(),
+        omitHistoryImages: true,
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    await res.text();
+    // No array, no image parts, no omission marker — byte-for-byte plain.
+    expect(gatewayContent()).toBe("just text now");
+  });
+
+  it("a retry reuses the failed user row and keeps meta.userMessageId", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({
+        message: "look",
+        threadId: crypto.randomUUID(),
+        retryWithoutImages: true,
+        omitHistoryImages: true,
+        retryOfMessageId: "failed-user-id",
+      }),
+      ctx,
+    );
+    const body = await res.text();
+    expect(body).toContain('"userMessageId":"failed-user-id"');
+    // Only the assistant reply is appended; the user row is reused.
+    expect(state.appends.some((append) => append.role === "user")).toBe(false);
+    expect(state.appends.filter((append) => append.role === "assistant")).toHaveLength(1);
+  });
 });

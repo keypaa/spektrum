@@ -38,7 +38,15 @@ export async function buildUserContent(
   let omitted = candidates.length > capped.length;
 
   for (const part of capped) {
-    const bytes = await readChatImage(part.blobKey);
+    let bytes: Awaited<ReturnType<typeof readChatImage>>;
+    try {
+      bytes = await readChatImage(part.blobKey);
+    } catch {
+      // A missing/inaccessible blob must not abort the whole turn: treat it
+      // like any other omitted image and keep the rest of the context.
+      omitted = true;
+      continue;
+    }
     if (totalBytes + bytes.byteLength > IMAGE_LIMITS.maxHistoryBytes) {
       omitted = true;
       continue;

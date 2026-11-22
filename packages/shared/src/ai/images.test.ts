@@ -71,6 +71,27 @@ describe("chatImageAttachmentsSchema", () => {
       ).toBe(true);
     }
   });
+
+  it("rejects non-base64 input and junk Buffer silently ignores", () => {
+    for (const data of [
+      "data:image/png;base64,iVBORw0KGgo=",
+      "iVBORw0KGgo=!!",
+      "iVBOR w0KGgo=",
+      "not base64 at all",
+      "abc", // not a multiple of four
+    ]) {
+      expect(
+        chatImageAttachmentSchema.safeParse(attachment({ data })).success,
+      ).toBe(false);
+    }
+  });
+
+  it("rejects a raw string too long to be a valid 1 MiB payload", () => {
+    const data = "A".repeat(2_000_000);
+    expect(
+      chatImageAttachmentSchema.safeParse(attachment({ data })).success,
+    ).toBe(false);
+  });
 });
 
 describe("imageSupportSchema", () => {

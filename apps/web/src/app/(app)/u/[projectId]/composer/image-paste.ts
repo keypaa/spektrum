@@ -17,6 +17,10 @@ const ALLOWED_MIMES = new Set<string>([
   "image/gif",
 ]);
 
+// Refuse to decode absurd source files before createImageBitmap allocates a
+// bitmap. Well-behaved pastes are far smaller; this is a backstop.
+const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+
 // WebP first; progressively cheaper fallbacks still fit the allowlist. A frame
 // that cannot fit the decoded-byte cap after every attempt is dropped.
 const ENCODE_ATTEMPTS: ReadonlyArray<{ mimeType: ImageMimeType; quality: number }> = [
@@ -61,6 +65,7 @@ function canvasToBlob(
 }
 
 async function toAttachment(file: File): Promise<ChatImageAttachment | null> {
+  if (file.size > MAX_SOURCE_BYTES) return null;
   let bitmap: ImageBitmap | undefined;
   try {
     bitmap = await createImageBitmap(file);
@@ -79,8 +84,14 @@ async function toAttachment(file: File): Promise<ChatImageAttachment | null> {
     for (const attempt of ENCODE_ATTEMPTS) {
       const blob = await canvasToBlob(canvas, attempt.mimeType, attempt.quality);
       if (blob.size > IMAGE_LIMITS.maxBytesPerImage) continue;
+      // Engines without WebP encoding silently fall back to PNG bytes. Label
+      // the attachment with what the canvas actually produced when it is an
+      // allowed type; otherwise keep the type we asked for.
+      const mimeType = ALLOWED_MIMES.has(blob.type)
+        ? (blob.type as ImageMimeType)
+        : attempt.mimeType;
       const data = toBase64(new Uint8Array(await blob.arrayBuffer()));
-      return { id: newId(), mimeType: attempt.mimeType, data };
+      return { id: newId(), mimeType, data };
     }
     return null;
   } catch {

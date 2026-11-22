@@ -20,6 +20,7 @@ import {
 import {
   IMAGE_LIMITS,
   THINKING,
+  imageMimeTypeSchema,
   type ChatImageAttachment,
   type ImageSupportPreference,
   type MessagePart,
@@ -103,13 +104,24 @@ export function Composer({
         const match = activeModel
           ? models.find((model) => model.id === activeModel)
           : undefined;
-        setFetchedSupport((match ?? models[0])?.imageSupport);
+        // If the active model is missing from the catalog, show uncertainty
+        // instead of borrowing the first model's capability.
+        setFetchedSupport(
+          activeModel ? match?.imageSupport : models[0]?.imageSupport,
+        );
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [imageSupport, activeModel]);
+
+  // New chat / loading a thread starts with an empty composer: drop the
+  // previous thread's pending attachments (useChat bumps the epoch on both).
+  const sessionEpoch = chat.sessionEpoch ?? 0;
+  useEffect(() => {
+    setImages([]);
+  }, [sessionEpoch]);
 
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -228,7 +240,19 @@ export function Composer({
           role="alert"
           className="mb-2 flex-none rounded-xl border border-[color:var(--border-log)] bg-bg-app px-3 py-2 text-xs text-fg-error"
         >
-          {chat.error}
+          <div className="flex items-start justify-between gap-2">
+            <span>{chat.error}</span>
+            {chat.imageRejected ? (
+              <button
+                type="button"
+                data-testid="retry-without-images"
+                onClick={chat.retry}
+                className="flex-none rounded-full border border-[color:var(--border-log)] px-2 py-0.5 text-xs text-fg-error hover:bg-bg-tertiary"
+              >
+                Retry without images
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -330,15 +354,17 @@ export function Composer({
           }}
           onPaste={(event) => {
             const items = Array.from(event.clipboardData.items);
-            if (
-              !items.some(
-                (entry) => entry.kind === "file" && entry.type.startsWith("image/"),
-              )
-            ) {
-              return; // ordinary text paste
-            }
-            event.preventDefault();
+            const hasAllowedImage = items.some(
+              (entry) =>
+                entry.kind === "file" &&
+                imageMimeTypeSchema.safeParse(entry.type).success,
+            );
+            if (!hasAllowedImage) return; // ordinary text paste / unsupported type
+            // Only swallow the event when we actually handle the image. With
+            // image input off (or an unsupported type), mixed image+text pastes
+            // must still insert their text.
             if (!capability.canAttach) return;
+            event.preventDefault();
             void readPastedImages(items).then((added) => {
               if (added.length === 0) return;
               setImages((current) => {

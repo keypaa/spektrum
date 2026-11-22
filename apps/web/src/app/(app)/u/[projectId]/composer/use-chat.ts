@@ -92,6 +92,10 @@ export interface ChatController {
   parts: MessagePart[];
   status: "idle" | "streaming" | "error";
   error: string | null;
+  /** True after the gateway rejected an image: show "Retry without images". */
+  imageRejected: boolean;
+  /** Bumped on reset/loadThread so the composer clears its attachments. */
+  sessionEpoch?: number;
   send(
     text: string,
     thinking: ThinkingLevel,
@@ -99,7 +103,7 @@ export interface ChatController {
     displayText?: string,
     selection?: LineSelection,
     images?: ChatImageAttachment[],
-    options?: { retryWithoutImages?: boolean },
+    options?: { retryWithoutImages?: boolean; retryOfMessageId?: string },
   ): void;
   loadThread(threadId: string): Promise<void>;
   reset(): void;
@@ -131,9 +135,17 @@ export function useChat(input: {
     for (const url of objectUrls.current) URL.revokeObjectURL(url);
     objectUrls.current.clear();
   }, []);
-  // The server appends "Retry without images." to image-rejection errors; that
-  // is the signal that a plain retry must drop the images and reuse the turn.
-  const imageRejection = useRef(false);
+  // Once the gateway rejects an image in a thread, every later turn must omit
+  // history images — otherwise the rejected image is re-sent forever. Unlike
+  // the UI flag below this is deliberately NOT cleared at the start of a send.
+  const omitHistoryImages = useRef(false);
+  // Drives the visible "Retry without images" affordance in the composer.
+  const [imageRejected, setImageRejected] = useState(false);
+  // Bumped on reset/loadThread so the composer drops its local attachments.
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  // Id of the last persisted user turn (from `meta`), reused on retry so the
+  // route does not append a duplicate user row.
+  const lastUserMessageId = useRef<string | null>(null);
   // An unmounted chat must not keep applying SSE events to a dead page.
   useEffect(
     () => () => {
@@ -165,6 +177,10 @@ export function useChat(input: {
       // The loaded parts use persisted blob keys; the optimistic object URLs
       // from this session are no longer referenced by the transcript.
       revokeObjectUrls();
+      omitHistoryImages.current = false;
+      setImageRejected(false);
+      setSessionEpoch((value) => value + 1);
+      lastUserMessageId.current = null;
       setParts(loaded);
       setThreadId(id);
       cb.current.onThreadChange?.(id);
@@ -180,19 +196,22 @@ export function useChat(input: {
       displayText?: string,
       selection?: LineSelection,
       images?: ChatImageAttachment[],
-      options?: { retryWithoutImages?: boolean },
+      options?: { retryWithoutImages?: boolean; retryOfMessageId?: string },
     ) => {
       if (cb.current.disabled) return;
       controller.current?.abort();
       const abort = new AbortController();
       controller.current = abort;
       const retryWithoutImages = options?.retryWithoutImages === true;
+      const retryOfMessageId = options?.retryOfMessageId;
       // A retry keeps the original send record: images are already persisted
       // and the route trims them from history when retryWithoutImages is set.
       if (!retryWithoutImages) {
         lastSend.current = { text, thinking, pinnedPaths, displayText, selection, images };
       }
-      imageRejection.current = false;
+      // The button is tied to the last failed turn; a new send hides it. The
+      // persistent omit flag stays set for every later turn in this thread.
+      setImageRejected(false);
       setStatus("streaming");
       setError(null);
       const shown = displayText ?? text;
@@ -237,7 +256,9 @@ export function useChat(input: {
                 pinnedPaths,
                 ...(selection ? { selection } : {}),
                 ...(images && images.length > 0 ? { images } : {}),
+                ...(omitHistoryImages.current ? { omitHistoryImages: true } : {}),
                 ...(retryWithoutImages ? { retryWithoutImages: true } : {}),
+                ...(retryOfMessageId ? { retryOfMessageId } : {}),
               }),
               signal: abort.signal,
             },
@@ -258,6 +279,8 @@ export function useChat(input: {
 
           const apply = (event: ChatEvent): void => {
             if (event.event === "meta") {
+              // Remember the persisted turn so a retry can reuse its row.
+              lastUserMessageId.current = event.data.userMessageId;
               // Navigate only once the stream is finished. Doing it here made
               // the URL change reload the thread mid-stream, which could
               // re-append the reply and show it twice.
@@ -308,11 +331,16 @@ export function useChat(input: {
               if (newThreadId) cb.current.onThreadChange?.(newThreadId);
               newThreadId = null;
             } else if (event.event === "error") {
-              // The server tags image rejections with this suffix. A plain
-              // retry then reuses the persisted turn without its images.
-              imageRejection.current = event.data.message.includes(
-                "Retry without images",
-              );
+              // The structured flag is authoritative; the suffix keeps older
+              // gateways/clients working. Once set, this thread omits history
+              // images on every later turn, not just the immediate retry.
+              const rejected =
+                event.data.retryWithoutImages === true ||
+                event.data.message.includes("Retry without images");
+              if (rejected) {
+                omitHistoryImages.current = true;
+                setImageRejected(true);
+              }
               setError(event.data.message);
               setStatus("error");
             }
@@ -370,7 +398,10 @@ export function useChat(input: {
     controller.current?.abort();
     controller.current = null;
     lastSend.current = null;
-    imageRejection.current = false;
+    omitHistoryImages.current = false;
+    setImageRejected(false);
+    setSessionEpoch((value) => value + 1);
+    lastUserMessageId.current = null;
     revokeObjectUrls();
     setThreadId(null);
     setParts([]);
@@ -393,9 +424,9 @@ export function useChat(input: {
   const retry = useCallback(() => {
     if (lastSend.current) {
       // After an image rejection the failed user turn is already persisted.
-      // Reuse it: drop the optimistic parts and let the route trim the stored
-      // images. A normal retry keeps the images as before.
-      const withoutImages = imageRejection.current;
+      // Reuse its row (no duplicate bubble) and drop the images. A normal retry
+      // after a transient error keeps the images as before.
+      const withoutImages = omitHistoryImages.current;
       send(
         lastSend.current.text,
         lastSend.current.thinking,
@@ -403,7 +434,12 @@ export function useChat(input: {
         lastSend.current.displayText,
         lastSend.current.selection,
         withoutImages ? [] : lastSend.current.images,
-        { retryWithoutImages: withoutImages },
+        {
+          ...(withoutImages ? { retryWithoutImages: true } : {}),
+          ...(lastUserMessageId.current
+            ? { retryOfMessageId: lastUserMessageId.current }
+            : {}),
+        },
       );
     }
   }, [send]);
@@ -435,6 +471,8 @@ export function useChat(input: {
     parts,
     status,
     error,
+    imageRejected,
+    sessionEpoch,
     send,
     loadThread,
     reset,

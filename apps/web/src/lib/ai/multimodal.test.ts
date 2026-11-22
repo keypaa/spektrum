@@ -144,4 +144,19 @@ describe("buildUserContent", () => {
       { type: "text", text: IMAGE_OMITTED_MARKER },
     ]);
   });
+
+  it("skips an unreadable blob instead of aborting the whole request", async () => {
+    const good = image("good");
+    const missing = image("missing");
+    const goodBytes = store(good, 12);
+    // `missing` has no stored object, so readChatImage throws for it.
+
+    const content = await buildUserContent("q", [good, missing], []);
+
+    expect(content).toEqual([
+      { type: "text", text: "q" },
+      imageUrl(goodBytes),
+      { type: "text", text: IMAGE_OMITTED_MARKER },
+    ]);
+  });
 });

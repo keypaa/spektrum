@@ -121,4 +121,29 @@ describe("readPastedImages", () => {
 
     expect(await readPastedImages([item(png(), "image/png")])).toEqual([]);
   });
+
+  it("labels the attachment with the actual MIME when WebP falls back to PNG", async () => {
+    stubBitmap({ width: 10, height: 10, close: () => undefined });
+    Object.defineProperty(HTMLCanvasElement.prototype, "toBlob", {
+      configurable: true,
+      value: (callback: BlobCallback) => {
+        callback(new Blob([encodedBytes], { type: "image/png" }));
+      },
+    });
+
+    const result = await readPastedImages([item(png(), "image/png")]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.mimeType).toBe("image/png");
+  });
+
+  it("skips an oversized source file before createImageBitmap", async () => {
+    const createBitmap = vi.fn();
+    vi.stubGlobal("createImageBitmap", createBitmap);
+    const big = png();
+    Object.defineProperty(big, "size", { value: 20 * 1024 * 1024 + 1 });
+
+    expect(await readPastedImages([item(big, "image/png")])).toEqual([]);
+    expect(createBitmap).not.toHaveBeenCalled();
+  });
 });

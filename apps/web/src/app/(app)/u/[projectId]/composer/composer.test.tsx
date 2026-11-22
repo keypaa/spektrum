@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChatImageAttachment, ImageSupportPreference } from "@spektrum/shared/ai";
@@ -39,6 +39,7 @@ const baseChat = {
   parts: [],
   status: "idle" as const,
   error: null,
+  imageRejected: false,
   send: vi.fn(),
   loadThread: vi.fn(),
   reset: vi.fn(),
@@ -261,6 +262,24 @@ describe("Composer", () => {
     renderComposer({ error: "gateway responded 429 (rate limited)" });
     expect(screen.getByRole("alert").textContent).toContain("429");
   });
+
+  it("offers Retry without images only after an image rejection", async () => {
+    const chat = {
+      ...baseChat,
+      error: "image input not supported",
+      imageRejected: true,
+    };
+    renderComposer(chat);
+    const button = screen.getByTestId("retry-without-images");
+    expect(button.textContent).toContain("Retry without images");
+    await userEvent.click(button);
+    expect(chat.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not offer Retry without images for an ordinary error", () => {
+    renderComposer({ error: "rate limited", imageRejected: false });
+    expect(screen.queryByTestId("retry-without-images")).toBeNull();
+  });
 });
 
 describe("Composer image attachments", () => {
@@ -337,5 +356,45 @@ describe("Composer image attachments", () => {
   it("shows no warning when detection says yes", () => {
     renderComposer({}, true, "yes");
     expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("clears pending attachments when the session epoch changes", async () => {
+    pasteState.files = [attachment("a1")];
+    const view = renderPinned({ chat: { ...baseChat, sessionEpoch: 0 } });
+    paste(screen.getByLabelText("Ask anything"));
+    await screen.findByTestId("pasted-image");
+
+    view.rerender(
+      <Composer
+        {...view.props}
+        chat={{ ...baseChat, sessionEpoch: 1 }}
+      />,
+    );
+
+    expect(screen.queryByTestId("pasted-image")).toBeNull();
+  });
+
+  it("does not swallow a paste of an unsupported image type", () => {
+    renderComposer();
+    const area = screen.getByLabelText("Ask anything");
+    const pasteEvent = createEvent.paste(area, {
+      clipboardData: {
+        items: [item(new File(["x"], "a.bmp", { type: "image/bmp" }), "image/bmp")],
+      },
+    });
+    fireEvent(area, pasteEvent);
+    expect(pasteEvent.defaultPrevented).toBe(false);
+  });
+
+  it("does not swallow a mixed paste when image input is off", () => {
+    renderComposer({}, true, "yes", "off");
+    const area = screen.getByLabelText("Ask anything");
+    const pasteEvent = createEvent.paste(area, {
+      clipboardData: {
+        items: [item(new File(["x"], "a.png", { type: "image/png" }), "image/png")],
+      },
+    });
+    fireEvent(area, pasteEvent);
+    expect(pasteEvent.defaultPrevented).toBe(false);
   });
 });

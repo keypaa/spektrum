@@ -20,12 +20,27 @@ export const imageMimeTypeSchema = z.enum([
 
 export type ImageMimeType = z.infer<typeof imageMimeTypeSchema>;
 
+// A canonical base64 string: only the standard alphabet, padding only at the
+// end, and a multiple of four characters. `Buffer.from(..., "base64")` silently
+// ignores junk, so re-encoding must reproduce the input byte-for-byte too.
+// Kept server-side only: this module uses Node's `Buffer`.
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+const MAX_BASE64_LENGTH = Math.ceil(IMAGE_LIMITS.maxBytesPerImage / 3) * 4;
+
 /** A pasted image on its way to the chat route; `data` is base64 only. */
 export const chatImageAttachmentSchema = z.object({
   id: z.string(),
   mimeType: imageMimeTypeSchema,
   data: z
     .string()
+    .max(MAX_BASE64_LENGTH, { message: "Image data is too large" })
+    .refine(
+      (data) => BASE64_RE.test(data) && data.length % 4 === 0,
+      { message: "Image data must be base64" },
+    )
+    .refine((data) => Buffer.from(data, "base64").toString("base64") === data, {
+      message: "Image data must be canonical base64",
+    })
     .refine(
       (data) =>
         Buffer.from(data, "base64").byteLength <= IMAGE_LIMITS.maxBytesPerImage,

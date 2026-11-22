@@ -108,7 +108,13 @@ export const chatEventSchema = z.discriminatedUnion("event", [
   }),
   z.object({
     event: z.literal("error"),
-    data: z.object({ message: z.string(), retryable: z.boolean() }),
+    data: z.object({
+      message: z.string(),
+      retryable: z.boolean(),
+      // Structured signal for an image rejection, so the client does not have
+      // to parse the human-readable message to offer "Retry without images".
+      retryWithoutImages: z.boolean().optional(),
+    }),
   }),
 ]);
 

@@ -69,7 +69,9 @@ are PNG, JPEG, WebP, and GIF. The server enforces at most **4 images per
 request**, **1 MiB decoded per image**, and a **4 MiB total decoded history
 budget**. When those caps are exceeded the oldest images are dropped first; the
 request then carries the marker
-`[image omitted — re-attach to discuss]`.
+`[image omitted — re-attach to discuss]`. A request body declaring more than
+8 MiB is rejected with HTTP 413 before it is parsed, and base64 data must be
+canonical (junk characters are refused).
 
 **Wire format.** Image parts are OpenAI-compatible `image_url` parts whose URL
 is `data:<mime>;base64,...`. No `detail` field is sent. Text-only messages keep
@@ -78,10 +80,12 @@ the newest images into follow-ups within the same budget; **New chat** starts a
 fresh thread, so the next message is text-only again.
 
 **Retry.** If the gateway rejects an image request (HTTP 400 with an image
-mention in the error), the composer offers **Retry without images**. It reuses
-the failed turn's text and re-sends it without that turn's images; older images
-in the thread are unaffected. The failed turn's attachments stay stored and are
-still visible in the transcript.
+mention in the error), the composer shows a **Retry without images** button. It
+reuses the failed turn's already-persisted row (no duplicate bubble) and
+re-sends its text without the images. From then on every later message in the
+same thread omits history images, so a plain follow-up cannot be poisoned by
+the rejected attachment; the original images stay stored and visible in the
+transcript. **New chat** clears this state.
 
 ## Streaming and tools
 

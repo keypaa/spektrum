@@ -177,6 +177,83 @@ describe("useChat.send", () => {
     expect(result.current.parts).toHaveLength(2);
   });
 
+  it("omits history images on every later turn after a structured image rejection", async () => {
+    const errorFrame =
+      'event: meta\ndata: {"threadId":"t1","userMessageId":"u-42","model":"m"}\n\n' +
+      'event: error\ndata: {"message":"image rejected","retryable":false,"retryWithoutImages":true}\n\n';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(errorFrame, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      )
+      .mockResolvedValue(
+        new Response(SSE, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+    await waitFor(() => expect(result.current.imageRejected).toBe(true));
+
+    // The retry reuses the persisted user row captured from the meta event.
+    act(() => result.current.retry());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const retryBody = JSON.parse(
+      (fetchMock.mock.calls[1]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(retryBody.retryWithoutImages).toBe(true);
+    expect(retryBody.retryOfMessageId).toBe("u-42");
+    expect(retryBody.omitHistoryImages).toBe(true);
+    expect(retryBody).not.toHaveProperty("images");
+
+    // A plain follow-up also carries the flag, so the rejected image cannot
+    // poison later turns.
+    act(() => result.current.send("plain follow-up", "Medium", []));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const followUp = JSON.parse(
+      (fetchMock.mock.calls[2]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(followUp.omitHistoryImages).toBe(true);
+    expect(followUp).not.toHaveProperty("images");
+    expect(followUp).not.toHaveProperty("retryOfMessageId");
+  });
+
+  it("clears the rejection state and omit flag on reset", async () => {
+    const errorFrame =
+      'event: error\ndata: {"message":"image rejected. Retry without images.","retryable":false}\n\n';
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(errorFrame, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+    await waitFor(() => expect(result.current.imageRejected).toBe(true));
+
+    act(() => result.current.reset());
+    expect(result.current.imageRejected).toBe(false);
+
+    act(() => result.current.send("fresh", "Medium", []));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const body = JSON.parse(
+      (fetchMock.mock.calls[1]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("omitHistoryImages");
+  });
+
   it("revokes object URLs on reset", async () => {
     const fetchMock = mockFetch();
     const { result } = renderHook(() => useChat({ projectId: "p1" }));

@@ -44,15 +44,24 @@ export const dynamic = "force-dynamic";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const THINKING = ["Minimal", "Low", "Medium", "High", "Extra high"] as const;
+// Reject oversized uploads before reading the body or consuming rate limit.
+const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const bodySchema = z.object({
   threadId: z.string().uuid().optional(),
   message: z.string().min(1),
   thinking: z.enum(THINKING).default("Medium"),
   pinnedPaths: z.array(z.string()).optional(),
   images: chatImageAttachmentsSchema.optional(),
+  // Set once the gateway rejects an image in a thread. Every later turn in
+  // that thread must omit history images, otherwise the rejected image is
+  // re-attached forever and the thread can only be escaped with "New chat".
+  omitHistoryImages: z.boolean().optional(),
   // A retry after an image rejection reuses the failed turn's text. Its images
   // are already persisted, so they must not be re-attached from history.
   retryWithoutImages: z.boolean().optional(),
+  // Id of the already-persisted user turn being retried. When present the
+  // route reuses that row instead of appending a duplicate user message.
+  retryOfMessageId: z.string().min(1).optional(),
   selection: z
     .object({
       path: z.string(),
@@ -69,23 +78,16 @@ function fallbackTitle(message: string): string {
   return Array.from(message).slice(0, 60).join("");
 }
 
-/** Drop the failed turn's images from the history snapshot used by the
- * gateway. Older context images stay; only the last user turn is retried. */
-function withoutLastUserImages(history: HistoryTurn[]): HistoryTurn[] {
-  const copy = [...history];
-  for (let i = copy.length - 1; i >= 0; i -= 1) {
-    if (copy[i]!.role === "user") {
-      copy[i] = { ...copy[i]!, images: [] };
-      break;
-    }
-  }
-  return copy;
+/** Drop history images from the snapshot used by the gateway once an image has
+ * been rejected in this thread. Text and tool context are left untouched. */
+function withoutHistoryImages(history: HistoryTurn[]): HistoryTurn[] {
+  return history.map((turn) => ({ ...turn, images: [] }));
 }
 
 function gatewayErrorEvent(
   error: GatewayHttpError,
   hasImages: boolean,
-): { message: string; retryable: boolean } {
+): { message: string; retryable: boolean; retryWithoutImages?: boolean } {
   if (error.status === 401) {
     return { message: "The model rejected the request", retryable: false };
   }
@@ -94,6 +96,7 @@ function gatewayErrorEvent(
   return {
     message: imageRejected ? `${message} Retry without images.` : message,
     retryable: error.status === 429 || error.status >= 500,
+    ...(imageRejected ? { retryWithoutImages: true } : {}),
   };
 }
 
@@ -111,6 +114,15 @@ export async function POST(
     const project = await getProject(user.id, projectId);
     if (!project) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    // A declared size over the cap is rejected before reading/parsing the body
+    // (and before the rate limiter), so a huge upload cannot be decoded at all.
+    const declaredLength = req.headers.get("content-length");
+    if (declaredLength !== null) {
+      const length = Number(declaredLength);
+      if (Number.isFinite(length) && length > MAX_BODY_BYTES) {
+        return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
+      }
     }
     const body = bodySchema.parse(await req.json());
 
@@ -164,9 +176,10 @@ export async function POST(
     const mainFile = main?.path ?? "main.tex";
 
     const history = await recentTurns(thread.id);
-    const gatewayHistory = body.retryWithoutImages
-      ? withoutLastUserImages(history)
-      : history;
+    const gatewayHistory =
+      body.omitHistoryImages || body.retryWithoutImages
+        ? withoutHistoryImages(history)
+        : history;
     const model = resolved.chatModel;
     const thinking = body.thinking as ThinkingLevel;
 
@@ -192,7 +205,10 @@ export async function POST(
         const imageParts: ImagePart[] = [];
         let requestHadImages = false;
         try {
-          for (const attachment of body.images ?? []) {
+          // A retry reuses the already-persisted failed turn: its blobs and its
+          // user row already exist, so neither may be created a second time.
+          const isRetry = Boolean(body.retryOfMessageId);
+          for (const attachment of (isRetry ? [] : body.images) ?? []) {
             // Ownership was checked by getThread(project owner) above.
             const { part } = await storeChatImage(user.id, projectId, attachment);
             imageParts.push(part);
@@ -204,16 +220,22 @@ export async function POST(
           );
           requestHadImages = Array.isArray(userContent);
 
-          const userMessage = await appendMessage({
-            threadId: thread.id,
-            role: "user",
-            content: {
-              parts: [{ type: "text", text: body.message }, ...imageParts],
-            },
-          });
+          let userMessageId: string;
+          if (body.retryOfMessageId) {
+            userMessageId = body.retryOfMessageId;
+          } else {
+            const userMessage = await appendMessage({
+              threadId: thread.id,
+              role: "user",
+              content: {
+                parts: [{ type: "text", text: body.message }, ...imageParts],
+              },
+            });
+            userMessageId = userMessage.id;
+          }
           send("meta", {
             threadId: thread.id,
-            userMessageId: userMessage.id,
+            userMessageId,
             model,
           });
 
