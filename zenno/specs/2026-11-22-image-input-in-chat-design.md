@@ -135,7 +135,9 @@ base64 encoding.
 `streamGateway` (`apps/web/src/lib/ai/gateway.ts`) builds the user message as a
 content array only when `images.length > 0`; otherwise it keeps the current
 string. The model list and capability resolver are not called on every message
-— the resolved capability comes with the request config.
+by the server: detection is resolved once into a shared client-side helper and
+consumed by Settings and the composer. The chat route validates and forwards
+images unconditionally; it never re-checks capability.
 
 ### 3. Persistence and transcript
 
