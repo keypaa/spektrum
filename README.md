@@ -7,8 +7,9 @@ same browser, with the same muscle memory.
 Prism shuts down on 1 January 2027. Spektrum is the migration target: import a Prism
 export, and every project, file and conversation is where you left it.
 
-**Status:** phases 0–5 complete. 702 unit tests, 25 behavioural e2e, 9 AI e2e, and the
-reference production stack in `docker/compose.prod.yml`.
+**Status:** phases 0–5 complete. Full unit suite (777 passing), behavioural,
+compile and AI e2e suites, and the reference production stack in
+`docker/compose.prod.yml`.
 
 ## Quick start (development)
 
@@ -90,9 +91,10 @@ Two invariants worth knowing before changing anything:
 ## Tests
 
 ```bash
-pnpm test           # unit: 702 passed / 8 skipped (129 files)
-pnpm test:e2e       # Playwright behavioural: 25
-pnpm test:ai        # AI suite against a mock gateway: 9
+pnpm test                                  # unit suite
+pnpm test:e2e                              # Playwright behavioural suite
+pnpm exec playwright test --config playwright.compile.config.ts  # compile pipeline
+pnpm test:ai                               # AI suite against a mock gateway
 pnpm typecheck
 pnpm lint
 ```
@@ -102,9 +104,16 @@ that builds the three production images. No repository secrets are required.
 
 ## Documentation
 
+User and contributor guides:
+
+- [`docs/`](docs/) — index of the current system docs: AI providers and chat,
+  documents and PDFs, compilation, and troubleshooting
+- [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md) — deployment and operations
+
+Build record (kept for provenance):
+
 - [`zenno/specs/2026-11-07-spektrum-design.md`](zenno/specs/2026-11-07-spektrum-design.md) — the specification; the authority on *what* to build
 - [`zenno/plans/`](zenno/plans/) — one plan per phase, task by task, with the tests that gate each task
-- [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md) — deployment and operations
 
 ## Local-only files
 
