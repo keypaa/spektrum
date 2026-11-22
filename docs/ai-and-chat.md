@@ -48,6 +48,40 @@ The composer supports:
 - **Selection chips** — a highlighted editor range can be attached to a
   follow-up.
 - **Upload** (+) — adds files to the workspace before sending.
+- **Images** — paste a screenshot into the composer with Ctrl/Cmd+V. A thumbnail
+  appears above the text box (with a remove button); the image is sent with the
+  message on Enter. Pasted images are chat attachments, **not** workspace files:
+  they never enter the file tree or a compile revision, and the owner-only
+  thumbnail follows the same thread visibility as the conversation.
+
+### Image input: capability, limits, and retry
+
+**Capability.** Support is detected per model from the same `/models` payload
+Settings uses (input modalities, architecture/vision flags, or a known vision
+model id). **Settings → Integrations → Image input** overrides detection:
+**Auto** never blocks an attachment — it only shows a non-blocking notice when
+the model looks text-only or the signal is unknown — while **Force on** and
+**Force off** trust the operator and override detection in both directions.
+
+**Limits.** The browser downscales each image so its longest edge is at most
+1536 px, then re-encodes it (WebP, falling back to JPEG). Allowed source types
+are PNG, JPEG, WebP, and GIF. The server enforces at most **4 images per
+request**, **1 MiB decoded per image**, and a **4 MiB total decoded history
+budget**. When those caps are exceeded the oldest images are dropped first; the
+request then carries the marker
+`[image omitted — re-attach to discuss]`.
+
+**Wire format.** Image parts are OpenAI-compatible `image_url` parts whose URL
+is `data:<mime>;base64,...`. No `detail` field is sent. Text-only messages keep
+`content` as a plain string, byte-for-byte as before. Recent history carries
+the newest images into follow-ups within the same budget; **New chat** starts a
+fresh thread, so the next message is text-only again.
+
+**Retry.** If the gateway rejects an image request (HTTP 400 with an image
+mention in the error), the composer offers **Retry without images**. It reuses
+the failed turn's text and re-sends it without that turn's images; older images
+in the thread are unaffected. The failed turn's attachments stay stored and are
+still visible in the transcript.
 
 ## Streaming and tools
 
