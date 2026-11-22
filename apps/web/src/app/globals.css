@@ -135,3 +135,38 @@
     cursor: pointer;
   }
 }
+
+/* PDF.js text layer: transparent glyphs positioned over the canvas. Without
+   these rules the spans are visible blue text (or invisible), so you cannot
+   select or copy anything from the compiled PDF preview. */
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  color-scheme: only light;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+}
+
+.pdf-text-layer > span,
+.pdf-text-layer > br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.pdf-text-layer > span {
+  --font-height: 0;
+  font-size: calc(
+    var(--total-scale-factor, 1) * var(--min-font-size, 1) * var(--font-height)
+  );
+  transform: scaleX(var(--scale-x, 1)) rotate(var(--rotate, 0));
+}

@@ -99,4 +99,13 @@ describe("appendStreamDelta", () => {
     expect(parts).toHaveLength(2);
     expect(parts[1]).toEqual({ type: "thinking", text: "after tool" });
   });
+
+  it("does not append assistant text to the user's message", () => {
+    let parts = appendStreamDelta([], "text", "User: can you read this?");
+    parts = appendStreamDelta(parts, "text", "Yes, I can.");
+
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({ type: "text", text: "User: can you read this?" });
+    expect(parts[1]).toEqual({ type: "text", text: "Yes, I can." });
+  });
 });

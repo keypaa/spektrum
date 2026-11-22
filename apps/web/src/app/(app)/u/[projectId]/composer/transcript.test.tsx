@@ -62,6 +62,21 @@ describe("Transcript", () => {
     expect(screen.queryByRole("button", { name: "Copy thinking" })).toBeNull();
   });
 
+  it("keeps a follow-up user message out of the previous assistant reply", () => {
+    render(
+      <Transcript
+        {...props}
+        parts={[
+          { type: "text", text: "Previous answer" },
+          { type: "text", text: "User: follow up question" },
+        ]}
+      />,
+    );
+    const bubble = screen.getByText("follow up question");
+    expect(bubble.parentElement?.className).toContain("items-end");
+    expect(bubble.className).toContain("rounded-2xl");
+  });
+
   it("merges adjacent text fragments into one reply", () => {
     render(
       <Transcript

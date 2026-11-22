@@ -7,7 +7,7 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@spektrum/db";
 import { documents, projects } from "@spektrum/db/schema";
-import { getObject } from "@spektrum/storage";
+import { getDocumentObject } from "@/lib/document-blob";
 import { listProjects } from "@/lib/projects";
 import { writeZip } from "@/lib/import/zip";
 
@@ -102,7 +102,7 @@ async function readDocuments(
       continue;
     }
     if (!doc.blobKey) continue;
-    const object = await getObject("uploads", doc.blobKey);
+    const object = await getDocumentObject(doc.blobKey);
     out.push({ path: doc.path, data: new Uint8Array(object.body) });
   }
   return { projectName: project.name, docs: out };

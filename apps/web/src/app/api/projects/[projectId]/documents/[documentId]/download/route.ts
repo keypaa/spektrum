@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getObject } from "@spektrum/storage";
 import { StorageError } from "@spektrum/storage";
 import { requireUser } from "@/auth/session";
 import { errorResponse } from "@/auth/route-errors";
+import { getDocumentObject } from "@/lib/document-blob";
 import { ProjectNotFoundError, getDocumentById } from "@/lib/documents";
 
 // GET /api/projects/:projectId/documents/:documentId/download
@@ -59,7 +59,7 @@ export async function GET(
     };
 
     if (document.blobKey) {
-      const object = await getObject("uploads", document.blobKey);
+      const object = await getDocumentObject(document.blobKey);
       return new NextResponse(new Uint8Array(object.body), {
         status: 200,
         headers: {

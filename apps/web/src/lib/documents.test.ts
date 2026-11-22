@@ -1,7 +1,14 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
-import { projects, users } from "@spektrum/db/schema";
+import { documents, projects, users } from "@spektrum/db/schema";
+
+// uploadFiles writes binaries to object storage; these tests only assert the
+// database side (inline vs blob), so keep them off the network.
+vi.mock("@spektrum/storage", () => ({
+  putObject: vi.fn(async () => undefined),
+  deleteObject: vi.fn(async () => undefined),
+}));
 
 import {
   DocumentPathError,
@@ -137,6 +144,27 @@ describe("uploadFiles", () => {
     expect(second.documents).toHaveLength(0);
     expect(second.skipped).toEqual(["paper.tex"]);
   });
+
+  it("stores a PDF as a blob even when its bytes decode as UTF-8", async () => {
+    const ownerId = await makeOwner();
+    const projectId = await makeProject(ownerId);
+    // ASCII-only PDF bytes are valid UTF-8; they must still not become an
+    // editable inline document.
+    const bytes = new TextEncoder().encode(
+      "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n",
+    );
+
+    const result = await uploadFiles(ownerId, projectId, [
+      { name: "scan.pdf", bytes },
+    ]);
+    const stored = await getDocumentById(
+      ownerId,
+      projectId,
+      result.documents[0]!.id,
+    );
+    expect(stored?.content).toBeNull();
+    expect(stored?.blobKey).toBe(`${projectId}/scan.pdf`);
+  });
 });
 
 describe("seedProjectDocuments", () => {
@@ -214,6 +242,25 @@ describe("createDocument / listTree / getDocumentByPath", () => {
     expect((await getDocumentById(ownerId, projectId, created.id))?.path).toBe(
       "main.tex",
     );
+  });
+
+  it("finds a legacy NFD path through its NFC form", async () => {
+    const ownerId = await makeOwner();
+    const projectId = await makeProject(ownerId);
+    const nfd = "Cours 3 - Anthropoce\u0300ne.pdf";
+    const nfc = nfd.normalize("NFC");
+
+    // Rows imported before paths were canonicalised can still hold NFD.
+    await db.insert(documents).values({
+      projectId,
+      path: nfd,
+      kind: "img",
+      content: null,
+      blobKey: `${projectId}/${nfd}`,
+    });
+
+    const found = await getDocumentByPath(ownerId, projectId, nfc);
+    expect(found?.path).toBe(nfd);
   });
 
   it("returns null for an unknown path or id", async () => {

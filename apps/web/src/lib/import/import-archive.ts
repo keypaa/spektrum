@@ -243,7 +243,12 @@ async function insertDocument(
   file: ParsedFile,
   uploaded: Array<{ bucket: "uploads" | "pdf"; key: string }>,
 ): Promise<string> {
-  const inline = file.text !== null && file.bytes.byteLength <= MAX_INLINE_BYTES;
+  // Binary documents stay blobs even if the archive exposed their bytes as
+  // valid UTF-8 text; the viewer and read_pdf need the original file.
+  const inline =
+    file.kind !== "img" &&
+    file.text !== null &&
+    file.bytes.byteLength <= MAX_INLINE_BYTES;
   let blobKey: string | null = null;
   if (!inline) {
     blobKey = `${projectId}/${file.path}`;

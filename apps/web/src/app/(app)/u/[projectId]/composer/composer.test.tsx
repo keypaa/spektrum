@@ -229,6 +229,7 @@ describe("Composer", () => {
       parts: [{ type: "text", text: "assistant reply" }],
     });
     expect(screen.getByText("assistant reply")).toBeTruthy();
+    expect(screen.getByTestId("transcript-slot").className).toContain("-mr-6");
   });
 
   it("surfaces a failed request instead of showing nothing", () => {

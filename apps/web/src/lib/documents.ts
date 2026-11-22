@@ -9,13 +9,14 @@
 // the route JSON must agree on the shape, and a Date would not survive the
 // RSC serialisation the same way a string does.
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@spektrum/db";
 import { documents, projects } from "@spektrum/db/schema";
 import { revisionHash } from "@spektrum/shared/revision";
 import {
   DocumentPathError,
   normalizeDocumentPath,
+  unicodeVariants,
   type DocumentPathErrorCode,
 } from "@spektrum/shared/paths";
 import { listRevisionDocuments } from "@spektrum/db/documents";
@@ -196,6 +197,7 @@ export async function getDocumentByPath(
   projectId: string,
   path: string,
 ): Promise<DocumentRecord | null> {
+  const normalised = normalizeDocumentPath(path);
   const rows = await db
     .select({
       ...summaryColumns,
@@ -207,7 +209,7 @@ export async function getDocumentByPath(
     .where(
       and(
         projectFilter(ownerId, projectId),
-        eq(documents.path, normalizeDocumentPath(path)),
+        inArray(documents.path, unicodeVariants(normalised)),
       ),
     )
     .limit(1);
@@ -249,7 +251,12 @@ async function pathExists(
     .select({ id: documents.id })
     .from(documents)
     .innerJoin(projects, eq(documents.projectId, projects.id))
-    .where(and(projectFilter(ownerId, projectId), eq(documents.path, path)))
+    .where(
+      and(
+        projectFilter(ownerId, projectId),
+        inArray(documents.path, unicodeVariants(path)),
+      ),
+    )
     .limit(1);
   return Boolean(rows[0]);
 }
@@ -370,7 +377,10 @@ export async function renameDocument(
     .select({ id: documents.id })
     .from(documents)
     .where(
-      and(eq(documents.projectId, projectId), eq(documents.path, normalised)),
+      and(
+        eq(documents.projectId, projectId),
+        inArray(documents.path, unicodeVariants(normalised)),
+      ),
     )
     .limit(1);
   if (existing[0] && existing[0].id !== documentId) {
@@ -492,8 +502,12 @@ export async function uploadFiles(
   try {
     await db.transaction(async (tx) => {
       for (const { path, file } of accepted) {
+        const kind = kindForPath(path);
+        // PDFs and images are binary even when their bytes happen to be valid
+        // UTF-8 (ASCII-only PDF headers do this). Never decode them as text:
+        // the blob is the document, and read_pdf / the viewer need it intact.
         const text =
-          file.bytes.byteLength <= UPLOAD_INLINE_BYTES
+          kind !== "img" && file.bytes.byteLength <= UPLOAD_INLINE_BYTES
             ? decodeUpload(file.bytes)
             : null;
         let blobKey: string | null = null;
@@ -513,7 +527,7 @@ export async function uploadFiles(
           .values({
             projectId,
             path,
-            kind: kindForPath(path),
+            kind,
             content: text,
             blobKey,
           })

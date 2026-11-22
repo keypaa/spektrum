@@ -80,6 +80,9 @@ export function useAutosave(options: AutosaveOptions): AutosaveHandle {
 
   const send = useCallback(async (target: SaveTarget, keepalive = false): Promise<void> => {
     const o = optionsRef.current;
+    // A binary preview has no text document to save. This also protects the
+    // pagehide/visibility paths, which fire outside the editor's control.
+    if (!target.documentId) return;
     if (keepalive && target.value.length > KEEPALIVE_LIMIT_BYTES) {
       // Deliberately skipped (documented at the top of the file): Chromium
       // caps a keepalive fetch at 64 KiB and this body would not survive.

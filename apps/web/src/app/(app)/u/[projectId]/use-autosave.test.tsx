@@ -200,6 +200,21 @@ describe("useAutosave", () => {
     expect(keepaliveCalls).toHaveLength(0);
   });
 
+  it("does not save when there is no active text document", async () => {
+    const fetchMock = patchOk();
+    vi.stubGlobal("fetch", fetchMock);
+    currentDocId = "";
+    act(() => view.rerender(<Harness />));
+    latest = "preview shows no buffer";
+    handle.schedule();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   // The debounce can outlive the document that produced it: the user switches
   // tabs inside the 400 ms window. Reading the live documentId/value at fire
   // time wrote one document's text into another (observed: notes.tex receiving

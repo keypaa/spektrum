@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { forwardRef, useImperativeHandle, type ForwardedRef } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PREFERENCES } from "@spektrum/shared/preferences";
 import { PreferencesProvider } from "@/components/preferences-provider";
@@ -25,6 +26,9 @@ const state = vi.hoisted(() => ({
 vi.mock("next/dynamic", () => ({
   default: () =>
     forwardRef((props: Record<string, unknown>, ref: ForwardedRef<unknown>) => {
+      // The shell dynamically imports both Monaco and the PDF viewer. The
+      // viewer is the one that receives a pdfUrl.
+      if ("pdfUrl" in props) return <div data-testid="pdf-viewer" />;
       state.selectionHandler = props.onSelectionChange as (range: unknown) => void;
       useImperativeHandle(ref, () => ({ revealRange: state.revealRange }));
       return <div data-testid="monaco-editor" />;
@@ -141,6 +145,83 @@ describe("EditorClient", () => {
     // The dynamic Monaco import resolves asynchronously in tests.
     expect(await screen.findByTestId("monaco-editor")).toBeTruthy();
     expect(screen.getByTestId("composer-slot-placeholder")).toBeTruthy();
+  });
+
+  it("opens an uploaded PDF in the viewer instead of an empty code editor", async () => {
+    const pdf: DocumentSummary = {
+      id: "d2",
+      path: "paper.pdf",
+      kind: "img",
+      updatedAt: "2026-11-12T10:00:00.000Z",
+    };
+    renderShell({ documents: [...DOCS, pdf] });
+    expect(await screen.findByTestId("monaco-editor")).toBeTruthy();
+
+    await userEvent.click(screen.getByText("paper.pdf"));
+
+    expect(await screen.findByTestId("pdf-viewer")).toBeTruthy();
+    expect(screen.queryByTestId("monaco-editor")).toBeNull();
+  });
+
+  it("resizes the chat panel by dragging its top handle", () => {
+    renderShell();
+    const slot = screen.getByTestId("composer-slot-placeholder");
+    expect(slot.style.height).toBe("260px");
+
+    const handle = screen.getByRole("separator", { name: "Resize chat" });
+    expect(handle.className).toContain("w-10");
+    expect(handle.className).toContain("rounded-full");
+    fireEvent.pointerDown(handle, { clientY: 200, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 140, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientY: 140, pointerId: 1 });
+
+    expect(slot.style.height).toBe("320px");
+  });
+
+  it("shows the Prism-style chat header controls", () => {
+    renderShell();
+    const newChat = screen.getByRole("button", { name: "New chat" });
+    expect(newChat.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 20 20");
+    expect(screen.getByRole("button", { name: "Close chat" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pop out chat" })).toBeTruthy();
+    expect(screen.getByTestId("chat-panel").className).toContain("bg-bg-sidepanel/60");
+    expect(screen.getByTestId("chat-panel").className).toContain("backdrop-blur-xl");
+    const slot = screen.getByTestId("composer-slot-placeholder");
+    expect(slot.className).toContain("absolute");
+    expect(slot.parentElement?.className).toContain("relative");
+    expect(
+      screen.getByRole("separator", { name: "Resize chat" }).parentElement?.className,
+    ).toContain("h-1 ");
+  });
+
+  it("closes the chat and reopens it from the tab strip", async () => {
+    renderShell();
+    expect(screen.getByTestId("chat-panel")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Close chat" }));
+    expect(screen.queryByTestId("chat-panel")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Open chat" }));
+    expect(screen.getByTestId("chat-panel")).toBeTruthy();
+  });
+
+  it("pops the chat out into the right column and docks it back", async () => {
+    renderShell();
+    expect(screen.getByTestId("chat-panel")).toBeTruthy();
+
+    await userEvent.click(screen.getByRole("button", { name: "Pop out chat" }));
+
+    expect(screen.queryByTestId("chat-panel")).toBeNull();
+    expect(screen.getByTestId("chat-panel-popped")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "New chat" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Dock chat" }).querySelector("svg")?.classList.contains("rotate-180"),
+    ).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Dock chat" }));
+
+    expect(screen.getByTestId("chat-panel")).toBeTruthy();
+    expect(screen.queryByTestId("chat-panel-popped")).toBeNull();
   });
 
   it("renders without crashing and with no tab when there are no documents", () => {

@@ -11,6 +11,12 @@ describe("normalizeDocumentPath", () => {
     expect(normalizeDocumentPath("a//b.tex")).toBe("a/b.tex");
   });
 
+  it("canonicalises Unicode to NFC", () => {
+    expect(
+      normalizeDocumentPath("Cours 3 - Anthropoce\u0300ne.pdf"),
+    ).toBe("Cours 3 - Anthropocène.pdf");
+  });
+
   it.each([
     ["", "empty"],
     ["   ", "empty"],

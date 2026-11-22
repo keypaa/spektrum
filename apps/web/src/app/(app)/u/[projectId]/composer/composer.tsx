@@ -131,7 +131,7 @@ export function Composer({
         }}
       />
       {chat.parts.length > 0 ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div data-testid="transcript-slot" className="-mr-6 min-h-0 flex-1 overflow-hidden">
           <Transcript
             parts={chat.parts}
             onReviewDiff={onReviewDiff}

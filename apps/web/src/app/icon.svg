@@ -1,8 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="14" fill="#0d0e10"/>
-  <rect x="6.5" y="38" width="7" height="12" rx="3.5" fill="#5fc6dd"/>
-  <rect x="17.5" y="28" width="7" height="22" rx="3.5" fill="#81d6ee"/>
-  <rect x="28.5" y="16" width="7" height="34" rx="3.5" fill="#ade8f0"/>
-  <rect x="39.5" y="28" width="7" height="22" rx="3.5" fill="#81d6ee"/>
-  <rect x="50.5" y="38" width="7" height="12" rx="3.5" fill="#5fc6dd"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <!-- Transparent favicon: the mark fills the whole canvas, with a thin dark
+       keyline so the white strokes stay visible on light browser tabs. -->
+  <path d="M24 3 43 14v20L24 45 5 34V14z" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M24 3 43 14v20L24 45 5 34V14z" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/>
+  <g stroke="#000" stroke-width="5.4" stroke-linecap="round">
+    <path d="M16 33v-9"/>
+    <path d="M24 33V13"/>
+    <path d="M32 33V20"/>
+  </g>
+  <g stroke="#fff" stroke-width="3.4" stroke-linecap="round">
+    <path d="M16 33v-9"/>
+    <path d="M24 33V13"/>
+    <path d="M32 33V20"/>
+  </g>
 </svg>

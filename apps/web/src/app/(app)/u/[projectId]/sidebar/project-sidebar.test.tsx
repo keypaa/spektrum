@@ -192,10 +192,10 @@ describe("ProjectSidebar", () => {
     expect(props.onSwitchProject).toHaveBeenCalledWith("p2");
   });
 
-  it("replaces the header avatar with the view controls menu", async () => {
+  it("shows the workspace logo, account avatar and view controls in the header", async () => {
     const { props } = renderSidebar();
-    // Only the bottom-left account chip remains — no second avatar up top.
-    expect(screen.getAllByRole("button", { name: /account/i })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Go to homepage" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Keylhan Paumard account" })).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "View controls" }));
     expect(screen.getByTestId("view-controls-menu")).toBeTruthy();
     await userEvent.click(screen.getByRole("switch", { name: "Sidebar" }));
@@ -204,9 +204,19 @@ describe("ProjectSidebar", () => {
     );
   });
 
-  it("the account chip shows the name and Personal workspace", () => {
+  it("the logo returns to the project homepage", async () => {
+    const { props } = renderSidebar();
+    await userEvent.click(screen.getByRole("button", { name: "Go to homepage" }));
+    expect(props.onOpenDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws the logo without a solid background so it blends into the theme", () => {
     renderSidebar();
-    expect(screen.getByText("Keylhan Paumard")).toBeTruthy();
-    expect(screen.getByText("Personal workspace")).toBeTruthy();
+    const logo = screen
+      .getByRole("button", { name: "Go to homepage" })
+      .querySelector("svg");
+    expect(logo).toBeTruthy();
+    expect(logo?.querySelector("rect")).toBeNull();
+    expect(logo?.outerHTML).toContain("currentColor");
   });
 });

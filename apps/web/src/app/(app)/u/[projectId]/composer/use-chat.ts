@@ -9,6 +9,7 @@ import {
   type ThinkingLevel,
   type ToolName,
 } from "@spektrum/shared/ai";
+import { isUserTextPart, USER_TEXT_PREFIX } from "./chat-parts";
 
 /**
  * Append one streamed delta. Consecutive deltas of the same kind belong to a
@@ -22,6 +23,12 @@ export function appendStreamDelta(
 ): MessagePart[] {
   const last = parts.at(-1);
   if (last?.type === type) {
+    // Assistant text and the user's just-sent message are both plain text
+    // parts. Never fold the reply into the user bubble, even when the model
+    // emits text without a preceding thinking block.
+    if (type === "text" && isUserTextPart(last)) {
+      return [...parts, { type, text: delta }];
+    }
     const next = [...parts];
     next[next.length - 1] = { ...last, text: last.text + delta };
     return next;
@@ -42,7 +49,9 @@ export function partsFromThreadMessages(
       ((message.content as { parts?: MessagePart[] }).parts ?? []);
     if (message.role !== "user") return parts;
     return parts.map((part) =>
-      part.type === "text" ? { ...part, text: `User: ${part.text}` } : part,
+      part.type === "text"
+        ? { ...part, text: `${USER_TEXT_PREFIX}${part.text}` }
+        : part,
     );
   });
 }
@@ -131,9 +140,15 @@ export function useChat(input: {
       lastSend.current = { text, thinking, pinnedPaths, displayText, selection };
       setStatus("streaming");
       setError(null);
+      const shown = displayText ?? text;
       setParts((current) => [
         ...current,
-        { type: "text", text: displayText ?? `User: ${text}` },
+        {
+          type: "text",
+          text: shown.startsWith(USER_TEXT_PREFIX)
+            ? shown
+            : `${USER_TEXT_PREFIX}${shown}`,
+        },
       ]);
 
       void (async () => {

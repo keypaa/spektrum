@@ -74,7 +74,12 @@ import { fetchSyncTex } from "@/lib/synctex-client";
 import { nearestForward } from "@/components/pdf/use-sync-scroll";
 import { nearestAnchor } from "@/components/pdf/use-sync-jump";
 import type { Diagnostic, ProjectStats, SyncTexMap } from "@spektrum/shared";
-import { IconSliders, IconTools } from "@spektrum/ui/icons";
+import {
+  IconArrowRight,
+  IconClose,
+  IconSliders,
+  IconTools,
+} from "@spektrum/ui/icons";
 import { FileDropOverlay } from "@/components/upload/file-drop-overlay";
 import { parseOutline } from "@/lib/outline";
 
@@ -91,6 +96,26 @@ const PdfViewer = dynamic(
   () => import("@/components/pdf/pdf-viewer").then((m) => m.PdfViewer),
   { ssr: false },
 );
+
+const CHAT_MIN_HEIGHT = 160;
+const CHAT_MAX_VIEWPORT_FRACTION = 0.8;
+
+/** Prism's cleaner "new chat" glyph: a speech bubble with a plus. */
+function NewChatIcon() {
+  return (
+    <svg
+      fill="currentColor"
+      width={14}
+      height={14}
+      viewBox="0 0 20 20"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path d="M16.835 9.99967C16.8348 6.49037 13.8111 3.5817 10 3.5817C6.18893 3.5817 3.16523 6.49037 3.16504 9.99967C3.16504 11.4535 3.67943 12.7965 4.55273 13.8766C4.67524 14.0281 4.72534 14.2262 4.68945 14.4176C4.59391 14.9254 4.45927 15.4197 4.30469 15.904C4.93198 15.8203 5.5368 15.6959 6.12793 15.528L6.25391 15.5055C6.38088 15.4949 6.5091 15.5208 6.62305 15.5817C7.61731 16.1135 8.76917 16.4186 10 16.4186C13.8112 16.4186 16.835 13.5091 16.835 9.99967ZM18.165 9.99967C18.165 14.3143 14.4731 17.7487 10 17.7487C8.64395 17.7487 7.36288 17.4332 6.23438 16.8757C5.31485 17.118 4.36919 17.2694 3.37402 17.3307C3.14827 17.3446 2.93067 17.2426 2.79688 17.0602C2.66303 16.8778 2.63177 16.6396 2.71289 16.4284L2.91992 15.863C3.08238 15.3953 3.21908 14.9297 3.32227 14.4606C2.38719 13.2019 1.83496 11.6626 1.83496 9.99967C1.83515 5.68524 5.52703 2.25162 10 2.25162C14.473 2.25162 18.1649 5.68524 18.165 9.99967Z" />
+      <path d="M10 6.33498C10.3672 6.33502 10.665 6.63277 10.665 7.00002V9.33498L13 9.34865L13.1338 9.36232C13.4368 9.42427 13.665 9.69235 13.665 10.0137C13.665 10.335 13.4368 10.6031 13.1338 10.6651L13 10.6787L10.665 10.6651V13C10.665 13.3672 10.3672 13.665 10 13.6651C9.63278 13.6651 9.33505 13.3672 9.33496 13V10.6651L7 10.6787C6.63278 10.6787 6.33505 10.3809 6.33496 10.0137C6.33505 9.64649 6.63278 9.34865 7 9.34865L9.33496 9.33498V7.00002C9.33496 6.63275 9.63273 6.33498 10 6.33498Z" />
+    </svg>
+  );
+}
 
 export interface EditorClientProps {
   project: { id: string; name: string };
@@ -198,12 +223,43 @@ export function EditorClient({
   const [newFileOpen, setNewFileOpen] = useState(false);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // The chat panel keeps its automatic height until the user drags its top
+  // edge; after that an explicit pixel height wins.
+  const [chatHeight, setChatHeight] = useState<number | null>(null);
+  const [chatPoppedOut, setChatPoppedOut] = useState(false);
+  const chatSlotRef = useRef<HTMLDivElement>(null);
+  const chatDrag = useRef<{ startY: number; startHeight: number } | null>(null);
 
   useEffect(() => {
     if (!uploadNote) return;
     const timer = setTimeout(() => setUploadNote(null), 4000);
     return () => clearTimeout(timer);
   }, [uploadNote]);
+
+  useEffect(() => {
+    const move = (event: PointerEvent) => {
+      if (!chatDrag.current) return;
+      const next =
+        chatDrag.current.startHeight - (event.clientY - chatDrag.current.startY);
+      const max = Math.max(
+        CHAT_MIN_HEIGHT,
+        Math.round(window.innerHeight * CHAT_MAX_VIEWPORT_FRACTION),
+      );
+      setChatHeight(Math.min(max, Math.max(CHAT_MIN_HEIGHT, next)));
+    };
+    const stop = () => {
+      if (!chatDrag.current) return;
+      chatDrag.current = null;
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      document.body.style.userSelect = "";
+    };
+  }, []);
   const [renameTarget, setRenameTarget] = useState<DocumentSummary | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -241,6 +297,16 @@ export function EditorClient({
 
   const activePath = tabs.active;
   const activeDoc = docs.find((d) => d.path === activePath) ?? null;
+  // Binary documents have no editor buffer: PDFs go to the canvas viewer and
+  // images to an <img>, instead of Monaco showing an empty document.
+  const preview =
+    activeDoc?.kind === "img"
+      ? {
+          doc: activeDoc,
+          url: `/api/projects/${project.id}/documents/${activeDoc.id}/download`,
+          pdf: activeDoc.path.toLowerCase().endsWith(".pdf"),
+        }
+      : null;
   const activePathRef = useRef(activePath);
   activePathRef.current = activePath;
 
@@ -263,6 +329,9 @@ export function EditorClient({
   // must compare paths, not the RSC record.
   useEffect(() => {
     if (!activePath || activePath === loadedPath) return;
+    // Binary documents are rendered by their preview; there is no text buffer
+    // to load (and fetching one would leave Monaco holding the old file).
+    if (activeDoc?.kind === "img") return;
     let cancelled = false;
     // Snapshot the model's value when the fetch starts: if the user types
     // before it resolves, the fetched (older) content must not clobber the
@@ -296,7 +365,7 @@ export function EditorClient({
     return () => {
       cancelled = true;
     };
-  }, [activePath, loadedPath, project.id]);
+  }, [activePath, loadedPath, project.id, activeDoc?.kind]);
 
   const flashSaveNote = useCallback((kind: "saving" | "error") => {
     setSaveNote(kind);
@@ -306,7 +375,7 @@ export function EditorClient({
 
   const autosave = useAutosave({
     projectId: project.id,
-    documentId: activeDoc?.id ?? "",
+    documentId: preview ? "" : activeDoc?.id ?? "",
     // The editor is the source of truth for the live buffer; React state lags
     // a render behind it, and an unload-flush cannot afford that lag.
     getValue: () => editorRef.current?.getValue() ?? bufferRef.current,
@@ -387,13 +456,21 @@ export function EditorClient({
 
   const newChat = () => {
     chat.reset();
+    // Drop any custom panel height: the empty state needs its own comfortable
+    // size, otherwise the "Ready when you are!" block clips into the header.
+    setChatHeight(null);
     router.replace(`/u/${project.id}`, { scroll: false });
   };
 
-  /** The tab strip's chat button opens a fresh chat in the sidebar. */
+  /** The tab strip's chat button reopens a closed panel, or starts a new chat
+      when the panel is already visible. */
   const openChat = () => {
     setActiveSection("chats");
-    newChat();
+    if (!view.assistant) {
+      setView((current) => ({ ...current, assistant: true }));
+    } else {
+      newChat();
+    }
   };
 
   const leaveProject = async (href: string): Promise<void> => {
@@ -687,10 +764,12 @@ export function EditorClient({
       const url = new URL(window.location.href);
       url.searchParams.set("p", path);
       window.history.replaceState(null, "", url);
-      await autosave.flush();
+      // A binary preview has no text buffer to flush; running autosave here
+      // would target the preview's document id with the previous buffer.
+      if (activeDoc?.kind !== "img") await autosave.flush();
       dispatch({ type: "open", path });
     },
-    [autosave, tabs.active],
+    [autosave, tabs.active, activeDoc?.kind],
   );
 
   // --- Diff review (spec §7.4): one inline Monaco diff at a time. ---------
@@ -910,6 +989,98 @@ export function EditorClient({
     );
   };
 
+  const chatPanel = (popped: boolean) => (
+    <div
+      data-testid={popped ? "chat-panel-popped" : "chat-panel"}
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border-log)] bg-bg-sidepanel/60 backdrop-blur-xl"
+    >
+      {!popped ? (
+        <div className="flex h-1 w-full flex-none items-center justify-center">
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize chat"
+            onPointerDown={(event) => {
+              const measured =
+                chatSlotRef.current?.getBoundingClientRect().height ?? 0;
+              chatDrag.current = {
+                startY: event.clientY,
+                startHeight:
+                  measured > 0
+                    ? measured
+                    : chatHeight ?? (chat.parts.length > 0 ? 420 : 260),
+              };
+              document.body.style.userSelect = "none";
+            }}
+            className="h-1 w-10 cursor-row-resize rounded-full bg-[color:var(--border-outline)] transition-colors hover:bg-[color:var(--border-modal)]"
+          />
+        </div>
+      ) : null}
+      <div className="flex h-8 flex-none items-center justify-between border-b border-[color:var(--border-log)] px-3">
+        {!popped ? (
+          <button
+            type="button"
+            aria-label="New chat"
+            title="New chat"
+            onClick={newChat}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-text-editor-secondary hover:text-text-editor-primary"
+          >
+            <NewChatIcon />
+          </button>
+        ) : (
+          <span />
+        )}
+        <div className="flex items-center gap-0.5">
+            {!popped ? (
+              <button
+                type="button"
+                aria-label="Close chat"
+                title="Close chat"
+                onClick={() =>
+                  setView((current) => ({ ...current, assistant: false }))
+                }
+                className="flex h-6 w-6 items-center justify-center rounded-full text-text-editor-secondary hover:text-text-editor-primary"
+              >
+                <IconClose size={16} />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-label={popped ? "Dock chat" : "Pop out chat"}
+              title={popped ? "Dock chat" : "Pop out"}
+              onClick={() => setChatPoppedOut((value) => !value)}
+              className="flex h-6 w-6 items-center justify-center rounded-full text-text-editor-secondary hover:text-text-editor-primary"
+            >
+              <IconArrowRight size={16} className={popped ? "rotate-180" : undefined} />
+            </button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1">
+          <Composer
+            chat={chat}
+            aiEnabled={aiEnabled}
+            onReview={() =>
+              chat.send(
+                REVIEW_PROMPT,
+                "Extra high",
+                openTabs,
+                paperReviewStatusMessage(),
+              )
+            }
+            onUploadFiles={(files) => void handleUploadFiles(files)}
+            onReviewDiff={(part) => setReviewingId(part.id)}
+            documents={docs}
+            selection={selection}
+            onClearSelection={() => setSelection(null)}
+            onNavigateToSelection={(range) =>
+              editorRef.current?.revealRange(range.startLine, range.endLine)
+            }
+            beforeSend={() => autosave.flush()}
+          />
+      </div>
+    </div>
+  );
+
   return (
     <div
       ref={rootRef}
@@ -917,7 +1088,7 @@ export function EditorClient({
       style={
         {
           "--sidebar-width": layout.sidebarWidth,
-          "--right-pane-width": layout.rightPaneWidth,
+          "--right-pane-width": chatPoppedOut ? "677px" : layout.rightPaneWidth,
         } as React.CSSProperties
       }
       className="grid h-screen grid-cols-[var(--sidebar-width)_minmax(480px,1fr)_var(--right-pane-width)] overflow-hidden pr-4"
@@ -982,8 +1153,9 @@ export function EditorClient({
         )}
       </div>
 
-      {/* Centre column: header block (84 px), editor area, composer slot. */}
-      <div className="flex min-h-0 min-w-0 flex-col bg-bg-code">
+      {/* Centre column: the chat floats over the editor, like Prism, so the
+          translucent panel lets code show through behind it. */}
+      <div className="relative flex min-h-0 min-w-0 flex-col bg-bg-code">
         <div className="flex-none">
           <TabStrip
             tabs={tabDocs}
@@ -1042,7 +1214,28 @@ export function EditorClient({
           data-testid="editor-area-placeholder"
           className="relative min-h-0 flex-1 overflow-hidden bg-bg-code"
         >
-          {activePath ? (
+          {preview ? (
+            <div
+              data-testid="document-preview"
+              className="h-full min-h-0 bg-bg-preview"
+            >
+              {preview.pdf ? (
+                <PdfViewer
+                  pdfUrl={preview.url}
+                  revision={preview.doc.updatedAt}
+                  darkMode={preferences.pdfDarkMode}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center overflow-auto p-4">
+                  <img
+                    src={preview.url}
+                    alt={preview.doc.path}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          ) : activePath ? (
             <MonacoEditor
               ref={editorRef}
               path={activePath}
@@ -1095,33 +1288,21 @@ export function EditorClient({
         ) : (
           <div data-testid="editor-area-hidden" className="min-h-0 flex-1 bg-bg-code" />
         )}
-        {view.assistant ? (
+        {view.assistant && !chatPoppedOut ? (
         <div
+          ref={chatSlotRef}
           data-testid="composer-slot-placeholder"
-          className="flex-none border-t border-[color:var(--border-log)]"
-          style={{ height: chat.parts.length > 0 ? "min(45vh, 420px)" : "180px" }}
+          className="absolute inset-x-0 bottom-0 p-2"
+          style={{
+            height:
+              chatHeight !== null
+                ? `${chatHeight}px`
+                : chat.parts.length > 0
+                  ? "min(45vh, 420px)"
+                  : "260px",
+          }}
         >
-          <Composer
-            chat={chat}
-            aiEnabled={aiEnabled}
-            onReview={() =>
-              chat.send(
-                REVIEW_PROMPT,
-                "Extra high",
-                openTabs,
-                paperReviewStatusMessage(),
-              )
-            }
-            onUploadFiles={(files) => void handleUploadFiles(files)}
-            onReviewDiff={(part) => setReviewingId(part.id)}
-            documents={docs}
-            selection={selection}
-            onClearSelection={() => setSelection(null)}
-            onNavigateToSelection={(range) =>
-              editorRef.current?.revealRange(range.startLine, range.endLine)
-            }
-            beforeSend={() => autosave.flush()}
-          />
+          {chatPanel(false)}
         </div>
         ) : null}
       </div>
@@ -1129,7 +1310,11 @@ export function EditorClient({
       {/* Right column (PDF / info panel). Wrapped so the divider between it and
           the editor can be dragged; the hook writes --right-pane-width. */}
       <div className="relative min-h-0 min-w-0">
-      {view.pdf ? (
+      {view.assistant && chatPoppedOut ? (
+        <div data-testid="chat-popped-slot" className="h-full p-2">
+          {chatPanel(true)}
+        </div>
+      ) : view.pdf ? (
       <>
       {panel ? (
         <div data-testid="pdf-pane" className="h-full min-h-0 bg-bg-code p-2">

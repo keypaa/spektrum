@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { loadPdfDocument } from "./use-pdf-document";
 
 export interface PdfViewerHandle {
@@ -86,12 +87,14 @@ function PageCanvas({
   zoom: number;
 }): React.ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!doc) return;
     let cancelled = false;
     let task: { cancel(): void; promise: Promise<void> } | null = null;
-    void doc.getPage(page).then((pdfPage) => {
+    let textLayer: TextLayer | null = null;
+    void doc.getPage(page).then(async (pdfPage) => {
       if (cancelled || !canvasRef.current) return;
       const dpr = window.devicePixelRatio || 1;
       const viewport = pdfPage.getViewport({ scale: zoom * dpr });
@@ -102,14 +105,40 @@ function PageCanvas({
       canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
       task = pdfPage.render({ canvas, viewport });
       void task.promise.catch(() => undefined);
+
+      // A transparent text layer over the canvas is what makes the rendered
+      // page selectable/copyable. Its CSS width follows `--total-scale-factor`,
+      // which the viewer sets to the zoom level.
+      const container = textLayerRef.current;
+      if (!container) return;
+      container.replaceChildren();
+      const content = await pdfPage.getTextContent();
+      if (cancelled) return;
+      textLayer = new TextLayer({
+        textContentSource: content,
+        container,
+        viewport: pdfPage.getViewport({ scale: zoom }),
+      });
+      void textLayer.render().catch(() => undefined);
     });
     return () => {
       cancelled = true;
       task?.cancel();
+      textLayer?.cancel();
     };
   }, [doc, page, zoom]);
 
-  return <canvas ref={canvasRef} />;
+  return (
+    <>
+      <canvas ref={canvasRef} />
+      <div
+        ref={textLayerRef}
+        data-testid="pdf-text-layer"
+        className="pdf-text-layer"
+        style={{ "--total-scale-factor": zoom } as React.CSSProperties}
+      />
+    </>
+  );
 }
 
 export function PdfViewer({

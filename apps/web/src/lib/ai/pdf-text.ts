@@ -1,8 +1,8 @@
 // Server-side text extraction from PDFs stored in the uploads bucket.
 // pdfjs-dist is already used this way in apps/worker/src/compile.ts.
 
-import { getObject } from "@spektrum/storage";
 import { getDocumentByPath } from "@/lib/documents";
+import { getDocumentObject } from "@/lib/document-blob";
 
 const MAX_PDF_CHARS = 30_000;
 const CACHE_LIMIT = 20;
@@ -57,7 +57,7 @@ export async function extractPdfText(
 
   const blobKey = doc.blobKey;
   const pageTexts = await cachedPages(blobKey, async () => {
-    const object = await getObject("uploads", blobKey);
+    const object = await getDocumentObject(blobKey);
     const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
     const pdf = await getDocument({ data: new Uint8Array(object.body) }).promise;
     try {

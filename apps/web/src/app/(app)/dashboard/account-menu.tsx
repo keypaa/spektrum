@@ -11,9 +11,11 @@ import { ShortcutsDialog } from "@/components/shortcuts/shortcuts-dialog";
 export function AccountMenu({
   userEmail,
   trigger,
+  side = "top",
 }: {
   userEmail: string;
   trigger: React.ReactNode;
+  side?: "top" | "bottom";
 }) {
   const router = useRouter();
   const { open: openSettings } = useSettingsModal();
@@ -32,9 +34,10 @@ export function AccountMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-        {/* Bundle `mG`: side="top", align="start", sideOffset 8, width = the
-          trigger's available width capped at 300 px. */}
-        <DropdownMenuContent side="top" sideOffset={8} align="start" className="max-w-[300px]">
+        {/* Bundle `mG`: align="start", sideOffset 8, width = the trigger's
+          available width capped at 300 px. The sidebar's compact avatar sits
+          near the top of the viewport, so its menu opens downward. */}
+        <DropdownMenuContent side={side} sideOffset={8} align="start" className="max-w-[300px]">
           <DropdownMenuItem onSelect={() => openSettings()}>
             <IconSettings size={16} />
             Settings

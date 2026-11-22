@@ -24,7 +24,8 @@ import type { DocumentSummary, DocumentKind } from "@/lib/documents";
 import { matchHiddenFile } from "@/lib/hidden-files";
 import { FileRow } from "./file-row";
 import { ChatList, type ChatThreadSummary } from "./chat-list";
-import { AccountChip } from "./account-chip";
+import { AccountMenu } from "@/app/(app)/dashboard/account-menu";
+import { Logo } from "./logo";
 import { ViewControlsMenu, type ViewVisibility } from "./view-controls";
 import { OutlinePanel } from "./outline-panel";
 import type { OutlineNode } from "@/lib/outline";
@@ -136,7 +137,20 @@ export function ProjectSidebar({
           event.target.value = "";
         }}
       />
-      {/* Header: project switcher + view controls. */}
+      {/* Prism-style header: home logo, then project switcher + account. */}
+      <div className="flex h-12 flex-none items-center justify-between px-4">
+        <button
+          type="button"
+          aria-label="Go to homepage"
+          title="All projects"
+          onClick={onOpenDashboard}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-text-editor-primary transition-opacity hover:opacity-80"
+        >
+          <Logo size={28} />
+        </button>
+        <ViewControlsMenu value={view} onChange={onViewChange} />
+      </div>
+
       <div className="mx-3 mt-1 flex flex-row items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -171,7 +185,19 @@ export function ProjectSidebar({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <ViewControlsMenu value={view} onChange={onViewChange} />
+        <AccountMenu
+          userEmail={user.email}
+          side="bottom"
+          trigger={
+            <button
+              type="button"
+              aria-label={`${user.name} account`}
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-white text-sm font-medium text-black ring-2 ring-bg-sidepanel transition-colors hover:bg-bg-tertiary"
+            >
+              {user.name.charAt(0).toUpperCase()}
+            </button>
+          }
+        />
       </div>
 
       {/* Files / Chats underline row with the search and plus buttons. */}
@@ -289,7 +315,6 @@ export function ProjectSidebar({
 
       {/* Section outline of the active document, then the user chip. */}
       <OutlinePanel items={outline} onNavigate={onOutlineNavigate} />
-      <AccountChip user={user} />
     </div>
   );
 }

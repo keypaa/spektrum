@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import type { MessagePart } from "@spektrum/shared/ai";
 import { CopyButton } from "@/components/chat/copy-button";
 import { MarkdownContent } from "@/components/chat/markdown-content";
+import { isUserTextPart } from "./chat-parts";
 
 export function Transcript({
   parts,
@@ -22,7 +23,14 @@ export function Transcript({
     const last = visible.at(-1);
     if (part.type === "thinking" && last?.type === "thinking") {
       visible[visible.length - 1] = { ...last, text: last.text + part.text };
-    } else if (part.type === "text" && last?.type === "text") {
+    } else if (
+      part.type === "text" &&
+      last?.type === "text" &&
+      // A user turn and an assistant reply are both plain text parts. Merging
+      // across that boundary made the follow-up disappear into the previous
+      // answer.
+      isUserTextPart(last) === isUserTextPart(part)
+    ) {
       // Legacy replies were persisted as many small text parts (and a reload
       // can duplicate one). Render them as one message with one copy button.
       const text = part.text === last.text ? last.text : `${last.text}\n${part.text}`;

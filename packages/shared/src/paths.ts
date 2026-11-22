@@ -30,13 +30,17 @@ const MAX_PATH_LENGTH = 200;
  * rather than rewritten.
  */
 export function normalizeDocumentPath(input: string): string {
-  if (input.trim() === "") throw new DocumentPathError("empty");
-  if (input.length > MAX_PATH_LENGTH) throw new DocumentPathError("too_long");
-  if (input.startsWith("/")) throw new DocumentPathError("absolute");
-  if (input.includes("\\")) throw new DocumentPathError("separator");
-  if (/[\u0000-\u001f]/.test(input)) throw new DocumentPathError("characters");
+  // Canonical spelling matters because the path is also the storage key.
+  // Browsers on macOS send NFD (e + combining accent), while other sources
+  // send NFC; two spellings of the same name must not become two documents.
+  const value = input.normalize("NFC");
+  if (value.trim() === "") throw new DocumentPathError("empty");
+  if (value.length > MAX_PATH_LENGTH) throw new DocumentPathError("too_long");
+  if (value.startsWith("/")) throw new DocumentPathError("absolute");
+  if (value.includes("\\")) throw new DocumentPathError("separator");
+  if (/[\u0000-\u001f]/.test(value)) throw new DocumentPathError("characters");
 
-  const segments = input.split("/");
+  const segments = value.split("/");
   for (const segment of segments) {
     if (segment === ".." || segment === ".") {
       throw new DocumentPathError("traversal");
@@ -49,6 +53,15 @@ export function normalizeDocumentPath(input: string): string {
     throw new DocumentPathError("too_long");
   }
   return normalised;
+}
+
+/**
+ * Unicode spellings of the same string: the value itself, its NFC form and its
+ * NFD form. Used to reach rows and object-store keys written before paths were
+ * canonicalised, without rewriting user data in place.
+ */
+export function unicodeVariants(value: string): string[] {
+  return [...new Set([value, value.normalize("NFC"), value.normalize("NFD")])];
 }
 
 /**
