@@ -9,7 +9,10 @@ import { enqueueProjectCompile } from "@/lib/compile-request";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const bodySchema = z.object({ mainFile: z.string().min(1).max(200) });
+const bodySchema = z.object({
+  mainFile: z.string().min(1).max(200),
+  force: z.boolean().optional().default(false),
+});
 
 export async function POST(
   req: NextRequest,
@@ -23,7 +26,9 @@ export async function POST(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     const body = bodySchema.parse(await req.json());
-    const result = await enqueueProjectCompile(user, projectId, body.mainFile);
+    const result = await enqueueProjectCompile(user, projectId, body.mainFile, {
+      force: body.force,
+    });
 
     if (result.kind === "not_found") {
       return NextResponse.json({ error: "not_found" }, { status: 404 });

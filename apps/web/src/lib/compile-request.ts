@@ -25,6 +25,7 @@ export async function enqueueProjectCompile(
   user: { id: string },
   projectId: string,
   mainFile: string,
+  options: { force?: boolean } = {},
 ): Promise<CompileRequestResult> {
   const project = await getProject(user.id, projectId);
   if (!project) return { kind: "not_found" };
@@ -44,7 +45,7 @@ export async function enqueueProjectCompile(
         eq(pdfRenders.status, "ok"),
       ),
     );
-  if (cached) return { kind: "cached", revision };
+  if (cached && !options.force) return { kind: "cached", revision };
 
   const hourly = await consume(`compileHourly:${user.id}`, BUDGETS.compileHourly);
   if (!hourly.allowed) {

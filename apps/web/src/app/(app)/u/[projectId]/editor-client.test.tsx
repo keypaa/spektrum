@@ -229,6 +229,39 @@ describe("EditorClient", () => {
     expect(screen.queryByTestId("chat-panel-popped")).toBeNull();
   });
 
+  it("forces a fresh compile from the PDF refresh button", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response("{}", { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderShell({
+      mainFilePath: "main.tex",
+      initialRender: {
+        isCurrent: true,
+        status: "ok",
+        revision: "a".repeat(64),
+        pdfUrl: "/render.pdf",
+        lastOkRevision: "a".repeat(64),
+        mainFile: "main.tex",
+        durationMs: 10,
+        diagnostics: [],
+        stats: null,
+      },
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    const call = fetchMock.mock.calls.find(([url]) =>
+      String(url).includes("/compile"),
+    );
+    expect(call).toBeTruthy();
+    expect(JSON.parse(String(call![1]?.body))).toEqual({
+      mainFile: "main.tex",
+      force: true,
+    });
+  });
+
   it("keeps the PDF sheet square under a compile error banner", () => {
     renderShell({
       initialRender: {

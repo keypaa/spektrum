@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseRenderEvent } from "./render-client";
+
+vi.mock("@spektrum/shared/http/guard", () => ({ assertSameOrigin: vi.fn() }));
+
+import { requestCompile } from "./compile-client";
 
 describe("parseRenderEvent", () => {
   it("parses a status event", () => {
@@ -49,5 +53,26 @@ describe("parseRenderEvent", () => {
   it("returns null for malformed data", () => {
     expect(parseRenderEvent("{")).toBeNull();
     expect(parseRenderEvent(JSON.stringify({ event: "bogus" }))).toBeNull();
+  });
+});
+
+describe("requestCompile", () => {
+  it("sends the force flag for a manual recompile", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+      new Response(JSON.stringify({ revision: "a".repeat(64), cached: false }), {
+        status: 202,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestCompile("p1", "main.tex", true);
+
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      mainFile: "main.tex",
+      force: true,
+    });
+    vi.unstubAllGlobals();
   });
 });

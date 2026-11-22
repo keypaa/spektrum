@@ -11,11 +11,12 @@ async function readError(res: Response): Promise<string> {
 export async function requestCompile(
   projectId: string,
   mainFile: string,
+  force = false,
 ): Promise<{ revision: string; cached: boolean }> {
   const res = await fetch(`/api/projects/${projectId}/compile`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ mainFile }),
+    body: JSON.stringify({ mainFile, force }),
   });
   if (!res.ok) throw new Error(await readError(res));
   return (await res.json()) as { revision: string; cached: boolean };

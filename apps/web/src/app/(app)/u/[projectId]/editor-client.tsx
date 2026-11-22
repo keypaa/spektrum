@@ -227,6 +227,8 @@ export function EditorClient({
   // edge; after that an explicit pixel height wins.
   const [chatHeight, setChatHeight] = useState<number | null>(null);
   const [chatPoppedOut, setChatPoppedOut] = useState(false);
+  const [currentOverride, setCurrentOverride] = useState<string | null>(null);
+  const [compileNotice, setCompileNotice] = useState<string | null>(null);
   const chatSlotRef = useRef<HTMLDivElement>(null);
   const chatDrag = useRef<{ startY: number; startHeight: number } | null>(null);
 
@@ -607,7 +609,7 @@ export function EditorClient({
         render: render.status,
         isCurrent: initialRender?.isCurrent ?? false,
         dirty: false,
-        currentRevision: initialRender?.revision ?? null,
+        currentRevision: currentOverride ?? initialRender?.revision ?? null,
       }) === "failed"
     : initialRender?.status === "error";
   const errorDiagnostic = failed
@@ -680,9 +682,19 @@ export function EditorClient({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const compile = useCallback(async () => {
+  const compile = useCallback(async (force = false) => {
     if (!mainFilePath) return;
-    await requestCompile(project.id, mainFilePath).catch(() => undefined);
+    setCompileNotice(null);
+    try {
+      const result = await requestCompile(project.id, mainFilePath, force);
+      // The server skipped the queue because this revision already compiled;
+      // remember it so a late SSE error for an older revision cannot stick.
+      if (result.cached) setCurrentOverride(result.revision);
+    } catch (error) {
+      setCompileNotice(
+        error instanceof Error ? error.message : "Compile request failed",
+      );
+    }
   }, [project.id, mainFilePath]);
 
   // Project open: compile when the persisted render is not the current revision.
@@ -1201,6 +1213,10 @@ export function EditorClient({
                 >
                   {saveNote === "error" ? "Save failed" : "Saving…"}
                 </span>
+              ) : compileNotice ? (
+                <span role="alert" data-testid="compile-notice" className="flex-none text-xs text-fg-error">
+                  {compileNotice}
+                </span>
               ) : null
             }
           />
@@ -1386,7 +1402,7 @@ export function EditorClient({
                   render: render.status,
                   isCurrent: initialRender?.isCurrent ?? false,
                   dirty,
-                  currentRevision: initialRender?.revision ?? null,
+                  currentRevision: currentOverride ?? initialRender?.revision ?? null,
                 })}
                 page={page}
                 numPages={numPages}
@@ -1405,7 +1421,7 @@ export function EditorClient({
                     }
                   });
                 }}
-                onRefresh={() => void compile()}
+                onRefresh={() => void compile(true)}
                 onGoToPdf={() => revealPdfLine(cursorLine.current)}
                 onSearch={() => setSearchOpen(true)}
                 pdfUrl={pdfUrl}
