@@ -992,7 +992,7 @@ export function EditorClient({
   const chatPanel = (popped: boolean) => (
     <div
       data-testid={popped ? "chat-panel-popped" : "chat-panel"}
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border-log)] bg-bg-sidepanel/60 backdrop-blur-xl"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[color:var(--border-log)] bg-bg-sidepanel/85 backdrop-blur-xl backdrop-brightness-50"
     >
       {!popped ? (
         <div className="flex h-1 w-full flex-none items-center justify-center">
@@ -1203,10 +1203,6 @@ export function EditorClient({
                 </span>
               ) : null
             }
-          />
-          <div
-            data-testid="editor-icon-strip"
-            className="h-4 border-b-2 border-[color:var(--border-log)]"
           />
         </div>
         {view.code ? (

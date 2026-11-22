@@ -78,9 +78,17 @@ export async function getLatestRender(
     .limit(100);
 
   if (rows.length === 0) return null;
-  const latest = rows[0]!;
-  const lastOk = rows.find((row) => row.status === "ok");
   const hash = revisionHash(await listRevisionDocuments(projectId));
+  // A newer failed render for an older revision must not mask a successful
+  // render of the current documents — that would show a permanent "Failed"
+  // banner and make manual recompiles look like they do nothing (the server
+  // correctly treats the current revision as cached).
+  const current = rows.find((row) => row.revisionHash === hash);
+  const latest = current ?? rows[0]!;
+  const lastOk =
+    current?.status === "ok"
+      ? current
+      : rows.find((row) => row.status === "ok");
 
   return {
     render: {
@@ -95,7 +103,7 @@ export async function getLatestRender(
         ? `/api/projects/${projectId}/render/${lastOk.revisionHash}/pdf`
         : null,
       lastOkRevision: lastOk?.revisionHash ?? null,
-      isCurrent: latest.revisionHash === hash,
+      isCurrent: current !== undefined,
     },
     revisionHash: hash,
   };

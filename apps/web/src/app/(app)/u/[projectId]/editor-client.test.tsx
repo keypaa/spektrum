@@ -139,6 +139,7 @@ describe("EditorClient", () => {
     expect(screen.getByText("Files")).toBeTruthy();
     expect(screen.getByText("Chats")).toBeTruthy();
     expect(screen.getByTestId("tab-main.tex").textContent).toContain("main.tex");
+    expect(screen.queryByTestId("editor-icon-strip")).toBeNull();
     // Right pane's captured pre-compile state.
     expect(screen.getByTestId("pdf-pane")).toBeTruthy();
     expect(screen.getAllByText("Initializing...").length).toBeGreaterThanOrEqual(1);
@@ -184,8 +185,9 @@ describe("EditorClient", () => {
     expect(newChat.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 20 20");
     expect(screen.getByRole("button", { name: "Close chat" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Pop out chat" })).toBeTruthy();
-    expect(screen.getByTestId("chat-panel").className).toContain("bg-bg-sidepanel/60");
+    expect(screen.getByTestId("chat-panel").className).toContain("bg-bg-sidepanel/85");
     expect(screen.getByTestId("chat-panel").className).toContain("backdrop-blur-xl");
+    expect(screen.getByTestId("chat-panel").className).toContain("backdrop-brightness-50");
     const slot = screen.getByTestId("composer-slot-placeholder");
     expect(slot.className).toContain("absolute");
     expect(slot.parentElement?.className).toContain("relative");

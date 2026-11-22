@@ -53,7 +53,7 @@ afterAll(async () => {
 });
 
 describe("render store", () => {
-  it("returns the last ok render's pdfUrl even when the newest row errored", async () => {
+  it("prefers the current revision's ok render over a newer stale failure", async () => {
     const owner = await makeOwner(`a-${crypto.randomUUID()}@test.local`);
     const projectId = await makeProject(owner);
     await db.insert(documents).values({
@@ -61,6 +61,41 @@ describe("render store", () => {
       path: "main.tex",
       kind: "tex",
       content: CONTENT,
+    });
+    await db.insert(pdfRenders).values({
+      projectId,
+      revisionHash: HASH,
+      status: "ok",
+      pdfKey: `pdf/${projectId}/${HASH}.pdf`,
+      mainFile: "main.tex",
+    });
+    await db.insert(pdfRenders).values({
+      projectId,
+      revisionHash: "c".repeat(64),
+      status: "error",
+      mainFile: "main.tex",
+      log: "! LaTeX Error: boom",
+    });
+
+    const latest = await getLatestRender(owner, projectId);
+    expect(latest?.render.revision).toBe(HASH);
+    expect(latest?.render.status).toBe("ok");
+    expect(latest?.render.lastOkRevision).toBe(HASH);
+    expect(latest?.render.pdfUrl).toBe(
+      `/api/projects/${projectId}/render/${HASH}/pdf`,
+    );
+    expect(latest?.render.isCurrent).toBe(true);
+    expect(latest?.render.diagnostics).toEqual([]);
+  });
+
+  it("shows the newest stale failure when the documents no longer match it", async () => {
+    const owner = await makeOwner(`a-${crypto.randomUUID()}@test.local`);
+    const projectId = await makeProject(owner);
+    await db.insert(documents).values({
+      projectId,
+      path: "main.tex",
+      kind: "tex",
+      content: `${CONTENT}\n% changed\n`,
     });
     await db.insert(pdfRenders).values({
       projectId,
