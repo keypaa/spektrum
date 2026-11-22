@@ -45,6 +45,17 @@ describe("useChat.send", () => {
     expect(body.selection).toEqual(selection);
   });
 
+  it("records pinned files as @mentions in the displayed user message", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    act(() => result.current.send("hello", "Medium", ["a.tex"]));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(result.current.parts[0]).toEqual({
+      type: "text",
+      text: "User: hello @a.tex",
+    });
+  });
+
   it("resends the selection on retry", async () => {
     const fetchMock = mockFetch();
     const { result } = renderHook(() => useChat({ projectId: "p1" }));

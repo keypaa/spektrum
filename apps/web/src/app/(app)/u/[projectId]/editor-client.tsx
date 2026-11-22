@@ -412,9 +412,31 @@ export function EditorClient({
   const [pdfUrl, setPdfUrl] = useState<string | null>(
     initialRender?.pdfUrl ?? null,
   );
+  // Server-authoritative view of the latest render. SSE events are hints;
+  // /render/latest (backed by getLatestRender) decides which revision is
+  // current, so a directly-issued compile still updates the pill/banner.
+  const [liveRender, setLiveRender] = useState(initialRender);
+  useEffect(() => setLiveRender(initialRender), [initialRender]);
   useEffect(() => {
     if (render.status?.event === "result") setPdfUrl(render.status.pdfUrl);
   }, [render.status]);
+
+  const refreshRender = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}/render/latest`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const body = (await res.json()) as { render: typeof liveRender };
+      setLiveRender(body.render);
+    } catch {
+      // Keep the last known render; the stream will try again on the next event.
+    }
+  }, [project.id]);
+
+  useEffect(() => {
+    if (render.status) void refreshRender();
+  }, [render.status, refreshRender]);
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
@@ -584,7 +606,7 @@ export function EditorClient({
 
 
   const [latestDiagnostics, setLatestDiagnostics] = useState<Diagnostic[]>(
-    initialRender?.diagnostics ?? [],
+    liveRender?.diagnostics ?? [],
   );
   useEffect(() => {
     if (render.status?.event !== "status" || render.status.state !== "error")
@@ -609,11 +631,11 @@ export function EditorClient({
   const failed = render.status
     ? pillState({
         render: render.status,
-        isCurrent: initialRender?.isCurrent ?? false,
+        isCurrent: liveRender?.isCurrent ?? false,
         dirty: false,
-        currentRevision: currentOverride ?? initialRender?.revision ?? null,
+        currentRevision: currentOverride ?? liveRender?.revision ?? null,
       }) === "failed"
-    : initialRender?.status === "error";
+    : liveRender?.status === "error";
   const errorDiagnostic = failed
     ? (diagnostics.find((d) => d.severity === "error") ?? diagnostics[0] ?? null)
     : null;
@@ -624,7 +646,7 @@ export function EditorClient({
   const stats =
     render.status?.event === "result"
       ? render.status.stats
-      : (initialRender?.stats ?? null);
+      : (liveRender?.stats ?? null);
   const [snapshotRows, setSnapshotRows] = useState<SnapshotRow[]>([]);
 
   useEffect(() => {
@@ -689,9 +711,10 @@ export function EditorClient({
     setCompileNotice(null);
     try {
       const result = await requestCompile(project.id, mainFilePath, force);
-      // The server skipped the queue because this revision already compiled;
-      // remember it so a late SSE error for an older revision cannot stick.
-      if (result.cached) setCurrentOverride(result.revision);
+      // The revision we just asked to compile is now the one the SSE events
+      // should be judged against: a cached hit means it is already current,
+      // and an enqueued job means its result/status events belong on screen.
+      setCurrentOverride(result.revision);
     } catch (error) {
       setCompileNotice(
         error instanceof Error ? error.message : "Compile request failed",
@@ -1402,9 +1425,9 @@ export function EditorClient({
               <PdfChrome
                 state={pillState({
                   render: render.status,
-                  isCurrent: initialRender?.isCurrent ?? false,
+                  isCurrent: liveRender?.isCurrent ?? false,
                   dirty,
-                  currentRevision: currentOverride ?? initialRender?.revision ?? null,
+                  currentRevision: currentOverride ?? liveRender?.revision ?? null,
                 })}
                 page={page}
                 numPages={numPages}
@@ -1427,10 +1450,10 @@ export function EditorClient({
                 onGoToPdf={() => revealPdfLine(cursorLine.current)}
                 onSearch={() => setSearchOpen(true)}
                 pdfUrl={pdfUrl}
-                mainFile={initialRender?.mainFile ?? null}
-                durationMs={initialRender?.durationMs ?? null}
-                isCurrent={initialRender?.isCurrent ?? false}
-                revision={initialRender?.revision ?? null}
+                mainFile={liveRender?.mainFile ?? null}
+                durationMs={liveRender?.durationMs ?? null}
+                isCurrent={liveRender?.isCurrent ?? false}
+                revision={liveRender?.revision ?? null}
                 darkMode={preferences.pdfDarkMode}
                 zoomShortcuts={preferences.pdfZoomShortcuts}
               />
@@ -1438,7 +1461,7 @@ export function EditorClient({
             <div className="min-h-0 flex-1">
               <PdfViewer
                 pdfUrl={pdfUrl}
-                revision={initialRender?.revision ?? ""}
+                revision={liveRender?.revision ?? ""}
                 searchQuery={pdfQuery}
                 zoom={zoom / 100}
                 darkMode={preferences.pdfDarkMode}

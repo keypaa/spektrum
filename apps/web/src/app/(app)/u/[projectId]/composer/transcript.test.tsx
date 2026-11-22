@@ -18,6 +18,21 @@ describe("Transcript", () => {
     expect(screen.queryByText(/User: hello/)).toBeNull();
   });
 
+  it("shows @mentioned files as pills above the user message", () => {
+    render(
+      <Transcript
+        {...props}
+        parts={[{ type: "text", text: "User: read @main.tex and @brief.pdf please" }]}
+      />,
+    );
+    const pills = screen.getAllByTestId("user-mention");
+    expect(pills.map((pill) => pill.textContent)).toEqual([
+      "@main.tex",
+      "@brief.pdf",
+    ]);
+    expect(screen.getByText("read and please")).toBeTruthy();
+  });
+
   it("renders assistant markdown with a copy button", () => {
     render(
       <Transcript {...props} parts={[{ type: "text", text: "**Pay attention**" }]} />,
@@ -52,6 +67,22 @@ describe("Transcript", () => {
     );
     expect(screen.queryByText("Thinking")).toBeNull();
     expect(screen.getByText("Answer")).toBeTruthy();
+  });
+
+  it("collapses repeated identical tool calls and results", () => {
+    render(
+      <Transcript
+        {...props}
+        parts={[
+          { type: "tool_call", id: "1", name: "edit_file", args: { path: "main.tex" } },
+          { type: "tool_result", id: "1", ok: false, summary: "oldText occurs 0 times" },
+          { type: "tool_call", id: "2", name: "edit_file", args: { path: "main.tex" } },
+          { type: "tool_result", id: "2", ok: false, summary: "oldText occurs 0 times" },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText("edit_file")).toHaveLength(1);
+    expect(screen.getAllByText("oldText occurs 0 times")).toHaveLength(1);
   });
 
   it("keeps the reasoning block free of action buttons", () => {

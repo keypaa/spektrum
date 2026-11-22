@@ -21,6 +21,28 @@ export function Transcript({
   const visible: MessagePart[] = [];
   for (const part of parts) {
     const last = visible.at(-1);
+    // A model retrying the same edit emits identical tool parts. Showing each
+    // attempt filled the transcript with duplicates of the same failure.
+    if (part.type === "tool_call") {
+      const previousCall = [...visible]
+        .reverse()
+        .find((candidate) => candidate.type === "tool_call");
+      if (
+        previousCall?.type === "tool_call" &&
+        previousCall.name === part.name &&
+        JSON.stringify(previousCall.args) === JSON.stringify(part.args)
+      ) {
+        continue;
+      }
+    }
+    if (
+      part.type === "tool_result" &&
+      last?.type === "tool_result" &&
+      last.ok === part.ok &&
+      last.summary === part.summary
+    ) {
+      continue;
+    }
     if (part.type === "thinking" && last?.type === "thinking") {
       visible[visible.length - 1] = { ...last, text: last.text + part.text };
     } else if (
@@ -59,10 +81,27 @@ export function Transcript({
         if (part.type === "text") {
           const isUser = part.text.startsWith("User: ");
           const text = isUser ? part.text.slice("User: ".length) : part.text;
+          const mentions = text.match(/@[^\s@]+/g) ?? [];
+          const body = mentions.length
+            ? text.replace(/@[^\s@]+/g, "").replace(/\s+/g, " ").trim()
+            : text;
           return isUser ? (
             <div key={index} className="flex flex-col items-end gap-1">
               <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-bg-tertiary px-3 py-2 text-xs leading-4 text-text-editor-primary">
-                {text}
+                {mentions.length ? (
+                  <div className="mb-1 flex flex-wrap justify-end gap-1">
+                    {mentions.map((mention, mentionIndex) => (
+                      <span
+                        key={mentionIndex}
+                        data-testid="user-mention"
+                        className="rounded-full bg-bg-app px-2 py-0.5 text-[11px] text-text-editor-secondary"
+                      >
+                        {mention}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {body}
               </div>
               <CopyButton text={text} label="Copy message" />
             </div>

@@ -141,13 +141,19 @@ export function useChat(input: {
       setStatus("streaming");
       setError(null);
       const shown = displayText ?? text;
+      // Pinned files are context, not prose. Record them as @mentions in the
+      // displayed message so the transcript can render them as chips.
+      const mentions = pinnedPaths
+        .map((path) => `@${path}`)
+        .filter((mention) => !shown.includes(mention));
+      const display = mentions.length ? `${shown} ${mentions.join(" ")}` : shown;
       setParts((current) => [
         ...current,
         {
           type: "text",
-          text: shown.startsWith(USER_TEXT_PREFIX)
-            ? shown
-            : `${USER_TEXT_PREFIX}${shown}`,
+          text: display.startsWith(USER_TEXT_PREFIX)
+            ? display
+            : `${USER_TEXT_PREFIX}${display}`,
         },
       ]);
 

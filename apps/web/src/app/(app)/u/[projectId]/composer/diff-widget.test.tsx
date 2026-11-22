@@ -96,6 +96,7 @@ describe("DiffWidget", () => {
     renderWidget();
     expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reject" }).className).not.toContain("border");
     expect(screen.getByRole("button", { name: "Accept all" })).toBeTruthy();
   });
 

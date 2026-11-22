@@ -167,7 +167,7 @@ export function DiffWidget({
               type="button"
               onClick={() => void reject()}
               disabled={busy || working}
-              className="h-7 rounded-full border border-[color:var(--border-log)] px-3 text-xs disabled:opacity-50"
+              className="h-7 rounded-full px-3 text-xs disabled:opacity-50"
             >
               Reject
             </button>
