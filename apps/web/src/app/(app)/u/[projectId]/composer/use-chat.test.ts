@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatImageAttachment } from "@spektrum/shared/ai";
 import {
   appendStreamDelta,
   partsFromThreadMessages,
@@ -27,8 +28,22 @@ function mockFetch(): ReturnType<typeof vi.fn> {
   return fetchMock;
 }
 
+const IMAGE: ChatImageAttachment = {
+  id: "client-1",
+  mimeType: "image/png",
+  data: "AQIDBA==",
+};
+
+beforeEach(() => {
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: vi.fn(() => "blob:local-image"),
+  });
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  delete (URL as unknown as Record<string, unknown>).createObjectURL;
 });
 
 describe("useChat.send", () => {
@@ -65,6 +80,54 @@ describe("useChat.send", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const init = fetchMock.mock.calls[1]![1] as RequestInit;
     expect(JSON.parse(init.body as string).selection).toEqual(selection);
+  });
+
+  it("sends images in the POST body and appends optimistic image parts", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string).images).toEqual([IMAGE]);
+    expect(result.current.parts[0]).toEqual({ type: "text", text: "User: look" });
+    expect(result.current.parts[1]).toMatchObject({
+      type: "image",
+      blobKey: "blob:local-image",
+      name: "Image 1",
+      mimeType: "image/png",
+    });
+    expect((result.current.parts[1] as { id: string }).id).toMatch(/^local-/);
+  });
+
+  it("keeps a text-only POST body byte-for-byte when no images are passed", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+
+    act(() => result.current.send("hello", "Medium", []));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).not.toHaveProperty("images");
+    expect(result.current.parts).toHaveLength(1);
+  });
+
+  it("resends images on retry", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const init = fetchMock.mock.calls[1]![1] as RequestInit;
+    expect(JSON.parse(init.body as string).images).toEqual([IMAGE]);
   });
 });
 

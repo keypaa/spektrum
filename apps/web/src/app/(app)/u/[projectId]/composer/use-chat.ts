@@ -5,11 +5,29 @@ import { useSearchParams } from "next/navigation";
 import {
   chatEventSchema,
   type ChatEvent,
+  type ChatImageAttachment,
   type MessagePart,
   type ThinkingLevel,
   type ToolName,
 } from "@spektrum/shared/ai";
 import { isUserTextPart, USER_TEXT_PREFIX } from "./chat-parts";
+
+/**
+ * Live thumbnails must survive the send until the persisted image parts (whose
+ * ids are server-generated) arrive on the next thread load, so build a local
+ * object URL from the attachment's base64 bytes.
+ */
+function objectUrlFor(image: ChatImageAttachment): string {
+  const binary = atob(image.data);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const blob = new Blob([bytes], { type: image.mimeType });
+  return typeof URL.createObjectURL === "function"
+    ? URL.createObjectURL(blob)
+    : `data:${image.mimeType};base64,${image.data}`;
+}
 
 /**
  * Append one streamed delta. Consecutive deltas of the same kind belong to a
@@ -73,6 +91,7 @@ export interface ChatController {
     pinnedPaths: string[],
     displayText?: string,
     selection?: LineSelection,
+    images?: ChatImageAttachment[],
   ): void;
   loadThread(threadId: string): Promise<void>;
   reset(): void;
@@ -105,6 +124,7 @@ export function useChat(input: {
     pinnedPaths: string[];
     displayText?: string | undefined;
     selection?: LineSelection | undefined;
+    images?: ChatImageAttachment[] | undefined;
   } | null>(null);
 
   const loadThread = useCallback(
@@ -132,12 +152,13 @@ export function useChat(input: {
       pinnedPaths: string[],
       displayText?: string,
       selection?: LineSelection,
+      images?: ChatImageAttachment[],
     ) => {
       if (cb.current.disabled) return;
       controller.current?.abort();
       const abort = new AbortController();
       controller.current = abort;
-      lastSend.current = { text, thinking, pinnedPaths, displayText, selection };
+      lastSend.current = { text, thinking, pinnedPaths, displayText, selection, images };
       setStatus("streaming");
       setError(null);
       const shown = displayText ?? text;
@@ -147,6 +168,14 @@ export function useChat(input: {
         .map((path) => `@${path}`)
         .filter((mention) => !shown.includes(mention));
       const display = mentions.length ? `${shown} ${mentions.join(" ")}` : shown;
+      // Live ids are local: the persisted image parts get server-generated ids.
+      const imageParts: MessagePart[] = (images ?? []).map((image, index) => ({
+        type: "image",
+        id: `local-${image.id}`,
+        blobKey: objectUrlFor(image),
+        name: `Image ${index + 1}`,
+        mimeType: image.mimeType,
+      }));
       setParts((current) => [
         ...current,
         {
@@ -155,6 +184,7 @@ export function useChat(input: {
             ? display
             : `${USER_TEXT_PREFIX}${display}`,
         },
+        ...imageParts,
       ]);
 
       void (async () => {
@@ -170,6 +200,7 @@ export function useChat(input: {
                 thinking,
                 pinnedPaths,
                 ...(selection ? { selection } : {}),
+                ...(images && images.length > 0 ? { images } : {}),
               }),
               signal: abort.signal,
             },
@@ -323,6 +354,7 @@ export function useChat(input: {
         lastSend.current.pinnedPaths,
         lastSend.current.displayText,
         lastSend.current.selection,
+        lastSend.current.images,
       );
     }
   }, [send]);
@@ -335,6 +367,8 @@ export function useChat(input: {
           lastSend.current.thinking,
           lastSend.current.pinnedPaths,
           lastSend.current.displayText,
+          undefined,
+          lastSend.current.images,
         );
       }
     },

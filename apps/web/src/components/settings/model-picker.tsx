@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IconChevronDown } from "@spektrum/ui/icons";
+import type { ImageSupport } from "@/lib/ai/model-capabilities";
 
 export interface ModelOption {
   id: string;
   label: string;
+  imageSupport?: ImageSupport | undefined;
 }
 
 /**

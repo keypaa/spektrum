@@ -190,4 +190,24 @@ describe("IntegrationsSection — AI provider and model", () => {
     await userEvent.click(screen.getByRole("option", { name: /Use "local-fast"/ }));
     expect(screen.getByText(/Custom endpoint · local-model/)).toBeTruthy();
   });
+
+  it("persists the Auto/Force on/Force off image input override", async () => {
+    renderSection();
+    const select = (await screen.findByLabelText("Image input")) as HTMLSelectElement;
+    expect(select.value).toBe("auto");
+
+    await userEvent.selectOptions(select, "off");
+
+    await waitFor(() => {
+      const put = (
+        globalThis.fetch as unknown as { mock: { calls: unknown[][] } }
+      ).mock.calls.find(
+        (call) => (call[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(put).toBeTruthy();
+      expect(
+        JSON.parse(String((put![1] as RequestInit).body)).llm.imageSupport,
+      ).toBe("off");
+    });
+  });
 });

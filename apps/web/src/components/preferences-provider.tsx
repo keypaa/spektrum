@@ -124,8 +124,13 @@ export function PreferencesProvider({
   );
 }
 
+/** For surfaces that work standalone (and in tests) without a provider. */
+export function useOptionalPreferences(): PreferencesContextValue | null {
+  return useContext(PreferencesContext);
+}
+
 export function usePreferences(): PreferencesContextValue {
-  const ctx = useContext(PreferencesContext);
+  const ctx = useOptionalPreferences();
   if (!ctx) throw new Error("usePreferences must be used inside PreferencesProvider");
   return ctx;
 }
