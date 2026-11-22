@@ -140,4 +140,50 @@ describe("Transcript", () => {
     render(<Transcript {...props} parts={[]} streaming />);
     expect(screen.getByText("Thinking...")).toBeTruthy();
   });
+
+  it("renders a thumbnail for an optimistic local image part", () => {
+    render(
+      <Transcript
+        {...props}
+        projectId="p1"
+        threadId="t1"
+        parts={[
+          { type: "text", text: "User: look" },
+          {
+            type: "image",
+            id: "local-client-1",
+            blobKey: "blob:local-image",
+            name: "Image 1",
+            mimeType: "image/png",
+          },
+        ]}
+      />,
+    );
+    const img = screen.getByTestId("user-image");
+    expect(img.getAttribute("src")).toBe("blob:local-image");
+  });
+
+  it("renders a persisted thumbnail through the owner-only route", () => {
+    render(
+      <Transcript
+        {...props}
+        projectId="p1"
+        threadId="t1"
+        parts={[
+          { type: "text", text: "User: look" },
+          {
+            type: "image",
+            id: "server-part-1",
+            blobKey: "chat/p1/server-part-1.png",
+            name: "server-part-1.png",
+            mimeType: "image/png",
+          },
+        ]}
+      />,
+    );
+    const img = screen.getByTestId("user-image");
+    expect(img.getAttribute("src")).toBe(
+      "/api/projects/p1/chat/attachments/server-part-1?threadId=t1",
+    );
+  });
 });

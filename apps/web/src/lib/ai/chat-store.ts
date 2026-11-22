@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { deleteObject } from "@spektrum/storage";
 import { db } from "@spektrum/db";
 import { chatMessages, chatThreads, projects } from "@spektrum/db/schema";
 import type { MessagePart } from "@spektrum/shared/ai";
@@ -123,12 +124,44 @@ export async function renameThread(input: {
   return { ...thread, title: input.title, titleSource: "manual" };
 }
 
+/** Remove every attachment blob referenced by a thread's persisted parts.
+  * Must run before the thread row is deleted: messages cascade away with it. */
+export async function deleteChatImages(threadId: string): Promise<void> {
+  const rows = await db
+    .select({ content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId));
+  const keys = new Set<string>();
+  for (const row of rows) {
+    const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
+    for (const part of parts) {
+      if (part.type === "image" && part.blobKey) keys.add(part.blobKey);
+    }
+  }
+  await Promise.all(
+    [...keys].map((key) =>
+      deleteObject("uploads", key).catch(() => undefined),
+    ),
+  );
+}
+
+/** Attachment blobs are not cascaded by the database, so a project deletion
+  * has to clean up each of its threads explicitly. */
+export async function deleteProjectChatImages(projectId: string): Promise<void> {
+  const rows = await db
+    .select({ id: chatThreads.id })
+    .from(chatThreads)
+    .where(eq(chatThreads.projectId, projectId));
+  await Promise.all(rows.map((row) => deleteChatImages(row.id)));
+}
+
 export async function deleteThread(input: {
   threadId: string;
   userId: string;
 }): Promise<boolean> {
   const thread = await getThread(input);
   if (!thread) return false;
+  await deleteChatImages(input.threadId);
   await db.delete(chatThreads).where(eq(chatThreads.id, input.threadId));
   return true;
 }

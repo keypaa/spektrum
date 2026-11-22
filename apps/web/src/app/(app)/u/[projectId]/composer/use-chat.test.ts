@@ -39,11 +39,16 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(() => "blob:local-image"),
   });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: vi.fn(),
+  });
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   delete (URL as unknown as Record<string, unknown>).createObjectURL;
+  delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
 });
 
 describe("useChat.send", () => {
@@ -128,6 +133,83 @@ describe("useChat.send", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const init = fetchMock.mock.calls[1]![1] as RequestInit;
     expect(JSON.parse(init.body as string).images).toEqual([IMAGE]);
+  });
+
+  it("retry without images reuses the same turn and omits images", async () => {
+    const errorFrame =
+      'event: error\ndata: {"message":"image input not supported. Retry without images.","retryable":false}\n\n';
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(errorFrame, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(SSE, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+    await waitFor(() =>
+      expect(result.current.error).toContain("Retry without images"),
+    );
+    // The optimistic user text + image are already in the transcript.
+    expect(result.current.parts).toHaveLength(2);
+
+    act(() => result.current.retry());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    const body = JSON.parse(
+      (fetchMock.mock.calls[1]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(body.message).toBe("look");
+    expect(body.retryWithoutImages).toBe(true);
+    expect(body).not.toHaveProperty("images");
+    // No second user turn and no re-added optimistic parts.
+    expect(result.current.parts).toHaveLength(2);
+  });
+
+  it("revokes object URLs on reset", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    act(() => result.current.reset());
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:local-image");
+  });
+
+  it("revokes object URLs when loading a thread", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    act(() =>
+      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const loadFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ thread: { id: "t1" }, messages: [] }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", loadFetch);
+
+    await act(async () => {
+      await result.current.loadThread("t1");
+    });
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:local-image");
   });
 });
 

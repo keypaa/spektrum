@@ -1,5 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import { deleteObject } from "@spektrum/storage";
+import { softDeleteProject } from "@/lib/projects";
 import { db, pool } from "@spektrum/db";
 import {
   chatMessages,
@@ -21,6 +23,10 @@ import {
   touchedPaths,
   updateDiffDecision,
 } from "./chat-store";
+
+vi.mock("@spektrum/storage", () => ({
+  deleteObject: vi.fn(async () => undefined),
+}));
 
 const run = Math.random().toString(36).slice(2, 10);
 const userId = `chat-${run}`;
@@ -267,5 +273,51 @@ describe("chat-store messages", () => {
     expect(diff && diff.type === "diff" ? diff.status : null).toBe("accepted");
 
     expect(await updateDiffDecision({ threadId, userId, messageId, diffId: "missing", decision: "rejected" })).toBe(false);
+  });
+});
+
+describe("chat attachment cleanup", () => {
+  it("deleting a thread deletes its attachment blobs", async () => {
+    vi.mocked(deleteObject).mockClear();
+    const victim = await createThread({ projectId, userId, title: "Blobs" });
+    const image: MessagePart = {
+      type: "image",
+      id: crypto.randomUUID(),
+      blobKey: `chat/${projectId}/cleanup.png`,
+      name: "cleanup.png",
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId: victim.id,
+      role: "user",
+      content: { parts: [image] },
+    });
+
+    expect(await deleteThread({ threadId: victim.id, userId })).toBe(true);
+
+    expect(deleteObject).toHaveBeenCalledWith("uploads", image.blobKey);
+  });
+
+  it("deleting a project deletes its threads' attachment blobs", async () => {
+    vi.mocked(deleteObject).mockClear();
+    const pid = crypto.randomUUID();
+    await db.insert(projects).values({ id: pid, ownerId: userId, name: "Blobs" });
+    const victim = await createThread({ projectId: pid, userId, title: "Blobs" });
+    const image: MessagePart = {
+      type: "image",
+      id: crypto.randomUUID(),
+      blobKey: `chat/${pid}/project-cleanup.png`,
+      name: "project-cleanup.png",
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId: victim.id,
+      role: "user",
+      content: { parts: [image] },
+    });
+
+    await softDeleteProject(userId, pid);
+
+    expect(deleteObject).toHaveBeenCalledWith("uploads", image.blobKey);
   });
 });

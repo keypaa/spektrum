@@ -197,6 +197,8 @@ export function Composer({
             parts={chat.parts}
             onReviewDiff={onReviewDiff}
             streaming={streaming}
+            projectId={chat.projectId}
+            threadId={chat.threadId}
           />
         </div>
       ) : (

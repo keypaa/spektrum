@@ -34,6 +34,7 @@ const DOCS: DocumentSummary[] = [
 const SELECTION = { path: "main.tex", startLine: 55, endLine: 112 };
 
 const baseChat = {
+  projectId: "p1",
   threadId: null,
   parts: [],
   status: "idle" as const,
