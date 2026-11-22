@@ -68,13 +68,26 @@ describe("chat image attachments", () => {
     expect(Buffer.from(vi.mocked(putObject).mock.calls[0]![2] as Uint8Array)).toEqual(
       bytes,
     );
+    // The part id is generated here, never taken from the client attachment.
+    expect(part.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(part.id).not.toBe(attachment.id);
     expect(part).toEqual({
       type: "image",
-      id: attachment.id,
+      id: part.id,
       blobKey,
       name: `${attachment.id}.png`,
       mimeType: "image/png",
     });
+  });
+
+  it("generates distinct ids for duplicate client attachment ids", async () => {
+    const first = await storeChatImage("user-1", PROJECT_ID, attachment);
+    const second = await storeChatImage("user-1", PROJECT_ID, attachment);
+
+    expect(first.part.id).not.toBe(second.part.id);
+    expect(first.blobKey).not.toBe(second.blobKey);
   });
 
   it("reads the bytes back", async () => {

@@ -23,6 +23,18 @@ const state = vi.hoisted(() => ({
   gatewayInput: null as null | Record<string, unknown>,
   titleInput: null as null | Record<string, unknown>,
   contextInputs: [] as Array<Record<string, unknown>>,
+  objects: new Map<string, { body: Uint8Array; contentType: string }>(),
+  history: [] as Array<{
+    role: "user" | "assistant";
+    text: string;
+    images: Array<{
+      type: "image";
+      id: string;
+      blobKey: string;
+      name: string;
+      mimeType: string;
+    }>;
+  }>,
 }));
 
 vi.mock("@/auth/session", async (importOriginal) => {
@@ -66,6 +78,20 @@ vi.mock("@/lib/documents", () => ({
   ],
 }));
 
+vi.mock("@spektrum/storage", () => ({
+  StorageError: class StorageError extends Error {},
+  putObject: vi.fn(
+    async (_bucket: string, key: string, body: Uint8Array, contentType: string) => {
+      state.objects.set(key, { body, contentType });
+    },
+  ),
+  getObject: vi.fn(async (_bucket: string, key: string) => {
+    const found = state.objects.get(key);
+    if (!found) throw new Error("not_found");
+    return { body: Buffer.from(found.body), size: found.body.byteLength };
+  }),
+}));
+
 vi.mock("@/lib/ai/chat-store", () => ({
   createThread: async () => ({ id: "thread-1" }),
   getThread: async () => state.thread,
@@ -73,7 +99,7 @@ vi.mock("@/lib/ai/chat-store", () => ({
     state.appends.push(input);
     return { id: input.id ?? `m${state.appends.length}` };
   },
-  recentTurns: async () => [],
+  recentTurns: async () => state.history,
   touchedPaths: async () => [],
 }));
 
@@ -130,6 +156,36 @@ const req = (body: unknown) =>
   }) as never;
 const ctx = { params: Promise.resolve({ projectId: PROJECT_ID }) };
 
+const gatewayContent = () =>
+  (
+    state.gatewayInput!.messages as Array<{
+      role: string;
+      content: string | Array<Record<string, unknown>>;
+    }>
+  )[1]!.content;
+
+const PNG = Buffer.from("89504e470d0a1a0a", "hex");
+const attachment = (id: string) => ({
+  id,
+  mimeType: "image/png" as const,
+  data: PNG.toString("base64"),
+});
+
+/** Persist an image in history so buildUserContent can re-attach it. */
+async function seedHistoryImage() {
+  const blobKey = `chat/${PROJECT_ID}/${crypto.randomUUID()}.png`;
+  state.objects.set(blobKey, { body: PNG, contentType: "image/png" });
+  const part = {
+    type: "image" as const,
+    id: crypto.randomUUID(),
+    blobKey,
+    name: "old.png",
+    mimeType: "image/png",
+  };
+  state.history.push({ role: "user" as const, text: "look", images: [part] });
+  return part;
+}
+
 beforeEach(() => {
   state.user = { id: "u1", email: "u@x", role: "owner" };
   state.allowed = true;
@@ -147,6 +203,8 @@ beforeEach(() => {
   state.baseUrl = "https://configured.example/v1";
   state.chatModel = "configured-chat";
   state.fastModel = "configured-fast";
+  state.objects.clear();
+  state.history = [];
 });
 
 describe("POST /chat", () => {
@@ -294,5 +352,138 @@ describe("POST /chat", () => {
     expect(body).toContain("event: error");
     expect(body).toContain('"retryable":false');
     expect(body).not.toContain("test-key");
+  });
+
+  it("stores images and persists image parts on the user message", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({ message: "what is this", images: [attachment("client-1")] }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    await res.text();
+
+    const userAppend = state.appends[0]!;
+    expect(userAppend.role).toBe("user");
+    const parts = (userAppend.content as { parts: Array<Record<string, unknown>> })
+      .parts;
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({ type: "text", text: "what is this" });
+    const imagePart = parts[1]!;
+    expect(imagePart.type).toBe("image");
+    expect(imagePart.id).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(imagePart.id).not.toBe("client-1");
+    expect(imagePart.mimeType).toBe("image/png");
+    expect(String(imagePart.blobKey)).toMatch(
+      new RegExp(`^chat/${PROJECT_ID}/[0-9a-f-]+\\.png$`),
+    );
+    expect([...state.objects.keys()]).toContain(imagePart.blobKey);
+  });
+
+  it("sends a content array to the gateway when images are present", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({ message: "what is this", images: [attachment("client-2")] }),
+      ctx,
+    );
+    await res.text();
+
+    const content = gatewayContent();
+    expect(Array.isArray(content)).toBe(true);
+    const parts = content as Array<Record<string, unknown>>;
+    expect(parts[0]).toEqual({ type: "text", text: "what is this" });
+    const image = parts.find((part) => part.type === "image_url") as {
+      image_url: Record<string, unknown>;
+    };
+    expect(image.image_url.url).toBe(
+      `data:image/png;base64,${PNG.toString("base64")}`,
+    );
+    expect(image.image_url).not.toHaveProperty("detail");
+  });
+
+  it("keeps gateway content a plain string for text-only messages", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(req({ message: "hello" }), ctx);
+    await res.text();
+    expect(gatewayContent()).toBe("hello");
+  });
+
+  it("emits error event with retryable:false for an image rejection", async () => {
+    state.gateway = async function* () {
+      throw new GatewayHttpError(
+        400,
+        "image input not supported by model sk-abcdefgh12345678",
+      );
+      yield { type: "done" };
+    };
+    const res = await POST(
+      req({ message: "what is this", images: [attachment("client-3")] }),
+      ctx,
+    );
+    const body = await res.text();
+    expect(body).toContain("event: error");
+    expect(body).toContain('"retryable":false');
+    expect(body).toContain("image input not supported by model");
+    expect(body).toContain("Retry without images");
+    expect(body).not.toContain("sk-abcdefgh12345678");
+  });
+
+  it("generates distinct server-side part ids for duplicate client ids", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({
+        message: "two",
+        images: [attachment("same-id"), attachment("same-id")],
+      }),
+      ctx,
+    );
+    await res.text();
+    const parts = (
+      state.appends[0]!.content as { parts: Array<Record<string, unknown>> }
+    ).parts.filter((part) => part.type === "image");
+    expect(parts).toHaveLength(2);
+    expect(parts[0]!.id).not.toBe(parts[1]!.id);
+    expect(parts[0]!.id).not.toBe("same-id");
+    expect(parts[1]!.id).not.toBe("same-id");
+  });
+
+  it("keeps recent history images on a normal follow-up turn", async () => {
+    await seedHistoryImage();
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({ message: "and now?", threadId: crypto.randomUUID() }),
+      ctx,
+    );
+    await res.text();
+    expect(Array.isArray(gatewayContent())).toBe(true);
+  });
+
+  it("omits the failed turn's images when retryWithoutImages is true", async () => {
+    const historyPart = await seedHistoryImage();
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const res = await POST(
+      req({
+        message: "look",
+        threadId: crypto.randomUUID(),
+        retryWithoutImages: true,
+      }),
+      ctx,
+    );
+    await res.text();
+    expect(gatewayContent()).toBe("look");
+    // The original image stays persisted and truthful in the transcript.
+    expect(state.objects.has(historyPart.blobKey)).toBe(true);
   });
 });

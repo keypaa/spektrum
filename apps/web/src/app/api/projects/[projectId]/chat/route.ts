@@ -10,6 +10,7 @@ import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
 import { redactSecrets } from "@spektrum/shared/log/redact";
 import {
   SYSTEM_PROMPT,
+  chatImageAttachmentsSchema,
   toolSchemas,
   type MessagePart,
   type ThinkingLevel,
@@ -26,7 +27,13 @@ import {
   touchedPaths,
 } from "@/lib/ai/chat-store";
 import { buildContext } from "@/lib/ai/context";
-import { GatewayHttpError, streamGateway } from "@/lib/ai/gateway";
+import { storeChatImage } from "@/lib/ai/image-attachments";
+import { buildUserContent, type HistoryTurn, type ImagePart } from "@/lib/ai/multimodal";
+import {
+  GatewayHttpError,
+  streamGateway,
+  type GatewayMessage,
+} from "@/lib/ai/gateway";
 import { executeTool } from "@/lib/ai/tools";
 import { resolveLlmConfigForRequest } from "@/lib/ai/keys";
 import { recordUsage } from "@/lib/ai/usage";
@@ -42,6 +49,10 @@ const bodySchema = z.object({
   message: z.string().min(1),
   thinking: z.enum(THINKING).default("Medium"),
   pinnedPaths: z.array(z.string()).optional(),
+  images: chatImageAttachmentsSchema.optional(),
+  // A retry after an image rejection reuses the failed turn's text. Its images
+  // are already persisted, so they must not be re-attached from history.
+  retryWithoutImages: z.boolean().optional(),
   selection: z
     .object({
       path: z.string(),
@@ -56,6 +67,34 @@ const bodySchema = z.object({
 
 function fallbackTitle(message: string): string {
   return Array.from(message).slice(0, 60).join("");
+}
+
+/** Drop the failed turn's images from the history snapshot used by the
+ * gateway. Older context images stay; only the last user turn is retried. */
+function withoutLastUserImages(history: HistoryTurn[]): HistoryTurn[] {
+  const copy = [...history];
+  for (let i = copy.length - 1; i >= 0; i -= 1) {
+    if (copy[i]!.role === "user") {
+      copy[i] = { ...copy[i]!, images: [] };
+      break;
+    }
+  }
+  return copy;
+}
+
+function gatewayErrorEvent(
+  error: GatewayHttpError,
+  hasImages: boolean,
+): { message: string; retryable: boolean } {
+  if (error.status === 401) {
+    return { message: "The model rejected the request", retryable: false };
+  }
+  const message = redactSecrets(error.message);
+  const imageRejected = hasImages && error.status === 400 && /image/i.test(message);
+  return {
+    message: imageRejected ? `${message} Retry without images.` : message,
+    retryable: error.status === 429 || error.status >= 500,
+  };
 }
 
 export async function POST(
@@ -125,6 +164,9 @@ export async function POST(
     const mainFile = main?.path ?? "main.tex";
 
     const history = await recentTurns(thread.id);
+    const gatewayHistory = body.retryWithoutImages
+      ? withoutLastUserImages(history)
+      : history;
     const model = resolved.chatModel;
     const thinking = body.thinking as ThinkingLevel;
 
@@ -147,11 +189,27 @@ export async function POST(
           if (!closed) controller.enqueue(encoder.encode(": ping\n\n"));
         }, 10_000);
 
+        const imageParts: ImagePart[] = [];
+        let requestHadImages = false;
         try {
+          for (const attachment of body.images ?? []) {
+            // Ownership was checked by getThread(project owner) above.
+            const { part } = await storeChatImage(user.id, projectId, attachment);
+            imageParts.push(part);
+          }
+          const userContent = await buildUserContent(
+            body.message,
+            imageParts,
+            gatewayHistory,
+          );
+          requestHadImages = Array.isArray(userContent);
+
           const userMessage = await appendMessage({
             threadId: thread.id,
             role: "user",
-            content: { parts: [{ type: "text", text: body.message }] },
+            content: {
+              parts: [{ type: "text", text: body.message }, ...imageParts],
+            },
           });
           send("meta", {
             threadId: thread.id,
@@ -172,17 +230,12 @@ export async function POST(
             ),
             history,
           });
-          const messages: Array<{
-            role: "system" | "user" | "assistant" | "tool";
-            content: string;
-            tool_calls?: unknown[];
-            tool_call_id?: string;
-          }> = [
+          const messages: GatewayMessage[] = [
             {
               role: "system",
               content: SYSTEM_PROMPT + "\n\n" + context.text,
             },
-            { role: "user", content: body.message },
+            { role: "user", content: userContent },
           ];
 
           let inputTokens = 0;
@@ -454,13 +507,7 @@ export async function POST(
           finish();
         } catch (error) {
           if (error instanceof GatewayHttpError) {
-            send("error", {
-              message:
-                error.status === 401
-                  ? "The model rejected the request"
-                  : redactSecrets(error.message),
-              retryable: error.status === 429 || error.status >= 500,
-            });
+            send("error", gatewayErrorEvent(error, requestHadImages));
           } else {
             send("error", {
               message: "The model request failed",

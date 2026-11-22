@@ -26,14 +26,18 @@ export async function storeChatImage(
   attachment: ChatImageAttachment,
 ): Promise<{ blobKey: string; part: ImagePart }> {
   const ext = EXT_BY_MIME[attachment.mimeType];
-  const blobKey = `chat/${projectId}/${crypto.randomUUID()}.${ext}`;
+  // The part id is server-owned. A client-supplied attachment id can be
+  // duplicated by a buggy client, which would collide in the transcript and
+  // make findImagePart() resolve the wrong blob.
+  const id = crypto.randomUUID();
+  const blobKey = `chat/${projectId}/${id}.${ext}`;
   const bytes = Buffer.from(attachment.data, "base64");
   await putObject("uploads", blobKey, bytes, attachment.mimeType);
   return {
     blobKey,
     part: {
       type: "image",
-      id: attachment.id,
+      id,
       blobKey,
       name: `${attachment.id}.${ext}`,
       mimeType: attachment.mimeType,
