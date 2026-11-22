@@ -91,12 +91,22 @@ const handlersNamed = (
   return [...own, ...Object.values(object).flatMap((child) => handlersNamed(child, name))];
 };
 
-describe.skipIf(!dockerAvailable())("Caddyfile", () => {
-  it("passes `caddy validate`", () => {
-    expect(validate()).toContain("Valid configuration");
-  });
+// Each check spawns a Docker container; a cold image pull on CI can take well
+// over Vitest's 5 s default, so every case gets an explicit budget.
+const DOCKER_TEST_TIMEOUT = 120_000;
 
-  it("collects metrics on the admin endpoint only, not on the public site", () => {
+describe.skipIf(!dockerAvailable())("Caddyfile", () => {
+  it(
+    "passes `caddy validate`",
+    () => {
+      expect(validate()).toContain("Valid configuration");
+    },
+    DOCKER_TEST_TIMEOUT,
+  );
+
+  it(
+    "collects metrics on the admin endpoint only, not on the public site",
+    () => {
     const config = adapt();
 
     /** Every `handler` name anywhere in the adapted config. */
@@ -111,28 +121,34 @@ describe.skipIf(!dockerAvailable())("Caddyfile", () => {
     // A site-level `metrics` directive becomes a metrics *handler* on the
     // public route; the global option configures the admin endpoint instead.
     expect(handlers(config)).not.toContain("metrics");
-    expect(readFileSync(caddyfile, "utf8")).toMatch(/^\tmetrics$/m);
-  });
+      expect(readFileSync(caddyfile, "utf8")).toMatch(/^\tmetrics$/m);
+    },
+    DOCKER_TEST_TIMEOUT,
+  );
 
   // next.config.ts already sets these five, and a plain `header` directive
   // appends to them: every response then carried two CSPs, which browsers
   // intersect. Caddy must overwrite (`>`), which adapts to `set`, not `add`.
-  it("overwrites the app's security headers instead of appending", () => {
-    const [headers] = handlersNamed(adapt(), "headers");
-    expect(headers).toBeDefined();
-    const response = headers.response as {
-      set?: Record<string, string[]>;
-      add?: Record<string, string[]>;
-    };
-    for (const name of [
-      "Content-Security-Policy",
-      "X-Content-Type-Options",
-      "X-Frame-Options",
-      "Referrer-Policy",
-      "Permissions-Policy",
-    ]) {
-      expect(Object.keys(response.set ?? {})).toContain(name);
-      expect(Object.keys(response.add ?? {})).not.toContain(name);
-    }
-  });
+  it(
+    "overwrites the app's security headers instead of appending",
+    () => {
+      const [headers] = handlersNamed(adapt(), "headers");
+      expect(headers).toBeDefined();
+      const response = headers.response as {
+        set?: Record<string, string[]>;
+        add?: Record<string, string[]>;
+      };
+      for (const name of [
+        "Content-Security-Policy",
+        "X-Content-Type-Options",
+        "X-Frame-Options",
+        "Referrer-Policy",
+        "Permissions-Policy",
+      ]) {
+        expect(Object.keys(response.set ?? {})).toContain(name);
+        expect(Object.keys(response.add ?? {})).not.toContain(name);
+      }
+    },
+    DOCKER_TEST_TIMEOUT,
+  );
 });
