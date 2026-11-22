@@ -107,7 +107,7 @@ that builds the three production images. No repository secrets are required.
 User and contributor guides:
 
 - [`docs/`](docs/) — index of the current system docs: AI providers and chat,
-  documents and PDFs, compilation, and troubleshooting
+  image input in chat, documents and PDFs, compilation, and troubleshooting
 - [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md) — deployment and operations
 
 Build record (kept for provenance):

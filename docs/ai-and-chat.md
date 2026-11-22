@@ -56,6 +56,9 @@ The composer supports:
 
 ### Image input: capability, limits, and retry
 
+For the complete data flow, storage model, file map and troubleshooting, see
+[Image input in the AI chat](image-chat-input.md).
+
 **Capability.** Support is detected per model from the same `/models` payload
 Settings uses (input modalities, architecture/vision flags, or a known vision
 model id). **Settings → Integrations → Image input** overrides detection:

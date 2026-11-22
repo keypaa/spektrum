@@ -7,6 +7,7 @@ without becoming a wall of text.
 | Document | Read this when… |
 |---|---|
 | [AI providers and chat](ai-and-chat.md) | configuring a provider/key, using the chat panel, understanding tools and diff proposals |
+| [Image input in the AI chat](image-chat-input.md) | pasting images, capability detection, storage, history budget, rejection recovery |
 | [Documents and PDFs](documents-and-pdf.md) | uploading files, opening a PDF, text extraction, why a scan cannot be read as text |
 | [Compilation and PDF preview](compilation.md) | wondering when a compile runs, what the status pill means, or how the PDF stays up to date |
 | [Troubleshooting](troubleshooting.md) | something looks stuck: rate limits, stale statuses, missing keys, PDF issues |
