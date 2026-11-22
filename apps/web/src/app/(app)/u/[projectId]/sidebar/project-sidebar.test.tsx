@@ -216,6 +216,7 @@ describe("ProjectSidebar", () => {
       .getByRole("button", { name: "Go to homepage" })
       .querySelector("svg");
     expect(logo).toBeTruthy();
+    expect(logo?.getAttribute("viewBox")).toBe("0 0 16 16");
     expect(logo?.querySelector("rect")).toBeNull();
     expect(logo?.outerHTML).toContain("currentColor");
   });

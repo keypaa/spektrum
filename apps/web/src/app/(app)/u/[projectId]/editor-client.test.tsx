@@ -182,7 +182,7 @@ describe("EditorClient", () => {
   it("shows the Prism-style chat header controls", () => {
     renderShell();
     const newChat = screen.getByRole("button", { name: "New chat" });
-    expect(newChat.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 20 20");
+    expect(newChat.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 16 16");
     expect(screen.getByRole("button", { name: "Close chat" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Pop out chat" })).toBeTruthy();
     expect(screen.getByTestId("chat-panel").className).toContain("bg-bg-sidepanel/85");
