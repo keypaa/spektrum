@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@spektrum/db";
 import { chatMessages, chatThreads, projects } from "@spektrum/db/schema";
 import type { MessagePart } from "@spektrum/shared/ai";
+import type { HistoryTurn } from "./multimodal";
 
 export interface ThreadRow {
   id: string;
@@ -280,26 +281,27 @@ export async function firstExchange(threadId: string): Promise<{
   return { user, assistant };
 }
 
-export async function recentTurns(threadId: string): Promise<
-  Array<{ role: "user" | "assistant"; text: string }>
-> {
+export async function recentTurns(threadId: string): Promise<HistoryTurn[]> {
   const rows = await db
     .select({ role: chatMessages.role, content: chatMessages.content })
     .from(chatMessages)
     .where(eq(chatMessages.threadId, threadId))
     .orderBy(desc(chatMessages.createdAt))
     .limit(40);
-  return rows
-    .reverse()
-    .flatMap((row) => {
-      if (row.role !== "user" && row.role !== "assistant") return [];
-      const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
-      const text = parts
-        .filter((part) => part.type === "text")
-        .map((part) => (part.type === "text" ? part.text : ""))
-        .join("");
-      return text ? [{ role: row.role, text }] : [];
-    });
+  return rows.reverse().flatMap((row) => {
+    if (row.role !== "user" && row.role !== "assistant") return [];
+    const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
+    const text = parts
+      .filter((part) => part.type === "text")
+      .map((part) => (part.type === "text" ? part.text : ""))
+      .join("");
+    const images = parts.filter(
+      (part): part is Extract<MessagePart, { type: "image" }> =>
+        part.type === "image",
+    );
+    // Keep image-only turns too: their images still belong in later requests.
+    return [{ role: row.role, text, images }];
+  });
 }
 
 /** Find the image part for an attachment within a thread, or null.

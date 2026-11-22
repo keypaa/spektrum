@@ -131,6 +131,30 @@ describe("chat-store messages", () => {
     expect(turns[0]?.text).toMatch(/^Q/);
   });
 
+  it("returns image parts alongside text in recent turns", async () => {
+    const id = crypto.randomUUID();
+    const image: MessagePart = {
+      type: "image",
+      id,
+      blobKey: `chat/${projectId}/${id}.png`,
+      name: `${id}.png`,
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId,
+      role: "user",
+      // An image-only message must survive as a turn even with empty text.
+      content: { parts: [image] },
+    });
+
+    const turns = await recentTurns(threadId);
+    expect(turns[turns.length - 1]).toEqual({
+      role: "user",
+      text: "",
+      images: [image],
+    });
+  });
+
   it("collects touched paths from tool calls", async () => {
     const tool = (name: string, path: string): MessagePart => ({
       type: "tool_call",

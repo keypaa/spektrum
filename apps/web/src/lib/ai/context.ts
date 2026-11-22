@@ -4,6 +4,7 @@ import { listContextDocuments } from "@spektrum/db/documents";
 import { pdfRenders } from "@spektrum/db/schema";
 import type { Diagnostic } from "@spektrum/shared/compile";
 import { getProject } from "@/lib/projects";
+import type { ImagePart } from "./multimodal";
 import { extractPdfText } from "./pdf-text";
 
 const MAX_PINNED_PDF_CHARS = 12_000;
@@ -34,7 +35,13 @@ export async function buildContext(input: {
   pinnedPaths?: string[];
   touchedPaths?: string[];
   selection?: { path: string; startLine: number; endLine: number };
-  history: Array<{ role: "user" | "assistant"; text: string }>;
+  // Accepts multimodal HistoryTurn[]; image parts are deliberately ignored
+  // here — the prompt context stays text-only (images go out via content arrays).
+  history: Array<{
+    role: "user" | "assistant";
+    text: string;
+    images?: ImagePart[];
+  }>;
   limit?: number;
 }): Promise<{
   text: string;
