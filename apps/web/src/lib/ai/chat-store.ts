@@ -302,6 +302,28 @@ export async function recentTurns(threadId: string): Promise<
     });
 }
 
+/** Find the image part for an attachment within a thread, or null.
+ *
+ * Ownership is deliberately not checked here: callers scope the lookup with
+ * `getThread({ threadId, userId })` first (project owner only).
+ */
+export async function findImagePart(
+  threadId: string,
+  attachmentId: string,
+): Promise<Extract<MessagePart, { type: "image" }> | null> {
+  const rows = await db
+    .select({ content: chatMessages.content })
+    .from(chatMessages)
+    .where(eq(chatMessages.threadId, threadId));
+  for (const row of rows) {
+    const parts = (row.content as { parts?: MessagePart[] }).parts ?? [];
+    for (const part of parts) {
+      if (part.type === "image" && part.id === attachmentId) return part;
+    }
+  }
+  return null;
+}
+
 export async function touchedPaths(threadId: string): Promise<string[]> {
   const rows = await db
     .select({ content: chatMessages.content })

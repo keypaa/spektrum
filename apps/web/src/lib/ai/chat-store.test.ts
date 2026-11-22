@@ -11,6 +11,7 @@ import {
   appendMessage,
   createThread,
   deleteThread,
+  findImagePart,
   firstExchange,
   getMessage,
   getThread,
@@ -144,6 +145,44 @@ describe("chat-store messages", () => {
     });
     const paths = await touchedPaths(threadId);
     expect(paths).toEqual(["a.tex", "b.tex"]);
+  });
+
+  it("finds an image part only within its thread", async () => {
+    const id = crypto.randomUUID();
+    const part: MessagePart = {
+      type: "image",
+      id,
+      blobKey: `chat/${projectId}/${id}.png`,
+      name: `${id}.png`,
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId,
+      role: "user",
+      content: { parts: [text("look"), part] },
+    });
+    expect(await findImagePart(threadId, id)).toEqual(part);
+    expect(await findImagePart(threadId, crypto.randomUUID())).toBeNull();
+
+    const otherThread = await createThread({
+      projectId: otherProjectId,
+      userId: otherId,
+      title: "Other image",
+    });
+    const otherPart: MessagePart = {
+      type: "image",
+      id: crypto.randomUUID(),
+      blobKey: `chat/${otherProjectId}/${id}.png`,
+      name: `${id}.png`,
+      mimeType: "image/png",
+    };
+    await appendMessage({
+      threadId: otherThread.id,
+      role: "user",
+      content: { parts: [otherPart] },
+    });
+    expect(await findImagePart(otherThread.id, otherPart.id)).toEqual(otherPart);
+    expect(await findImagePart(threadId, otherPart.id)).toBeNull();
   });
 
   it("flips only the matching diff part", async () => {
