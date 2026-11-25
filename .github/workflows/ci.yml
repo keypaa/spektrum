@@ -104,6 +104,40 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Start SeaweedFS (S3 API)
+        run: |
+          docker run -d --name seaweedfs -p 8333:8333 -p 9333:9333 \
+            chrislusf/seaweedfs:latest@sha256:ccad23e18639c8b98cee17e7100b95830a06077b56d8e5b006d6dcf8ec5e94a0 server -dir=/data -s3 -s3.port=8333
+          # The port answering means nothing: SeaweedFS also has to have a
+          # *volume node* before it can store anything. Ask the master to assign
+          # in the bucket we care about and restart the store if it cannot.
+          for i in $(seq 1 20); do
+            if curl -fsS "http://localhost:9333/dir/assign?collection=spektrum-pdf" 2>/dev/null | grep -q '"fid"'; then
+              echo "object store can assign volumes"
+              exit 0
+            fi
+            echo "store not ready (attempt $i); restarting it" >&2
+            docker restart seaweedfs >/dev/null
+            sleep 5
+          done
+          echo "object store never became writable" >&2
+          exit 1
+      - name: Create the buckets
+        run: |
+          # `ensureBucket` throws on a not-yet-ready store; retry rather than
+          # failing the job on a cold start.
+          for i in $(seq 1 20); do
+            pnpm --filter @spektrum/web exec tsx src/cli/ensure-buckets.ts && \
+              pnpm --filter @spektrum/web exec tsx src/cli/s3-probe.ts && exit 0
+            echo "object store attempt $i failed; retrying" >&2
+            sleep 3
+          done
+          exit 1
+        env:
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_SECRET_KEY: spektrum-secret
+          S3_ACCESS_KEY: spektrum
       - run: pnpm exec playwright install --with-deps chromium
       - name: Create + migrate e2e database
         run: |
@@ -128,12 +162,22 @@ jobs:
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           E2E_DB_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_ACCESS_KEY: spektrum
+          S3_SECRET_KEY: spektrum-secret
       - run: pnpm test:ai
         env:
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           E2E_DB_URL: postgres://spektrum:spektrum@localhost:5432/spektrum_test
           LLM_KEY_ENCRYPTION_SECRET: e2e-key-encryption-secret-32ch!x
+          # Pasted chat images are stored in the uploads bucket; without an S3
+          # endpoint the chat route 500s and the image e2e never sees a reply.
+          S3_ENDPOINT: http://localhost:8333
+          S3_BUCKET: spektrum-uploads
+          S3_ACCESS_KEY: spektrum
+          S3_SECRET_KEY: spektrum-secret
 
   compile:
     runs-on: ubuntu-latest
