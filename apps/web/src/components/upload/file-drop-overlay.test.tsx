@@ -41,6 +41,21 @@ describe("FileDropOverlay", () => {
     expect(screen.queryByTestId("file-drop-overlay")).toBeNull();
   });
 
+  it("does not hand over files that exceed the workspace cap", () => {
+    const onFiles = vi.fn();
+    render(<FileDropOverlay onFiles={onFiles} />);
+    const huge = new File(["x"], "huge.pdf", { type: "application/pdf" });
+    Object.defineProperty(huge, "size", { value: 31 * 1024 * 1024 });
+    const small = fileDrag().files[0]!;
+
+    fireEvent.drop(window, {
+      dataTransfer: { types: ["Files"], files: [huge, small] },
+    });
+
+    expect(onFiles).toHaveBeenCalledTimes(1);
+    expect(onFiles.mock.calls[0]![0]).toEqual([small]);
+  });
+
   it("ignores drags that carry no files", () => {
     const onFiles = vi.fn();
     render(<FileDropOverlay onFiles={onFiles} />);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { uploadBytesToR2 } from "@/lib/upload/client";
 import {
   Dialog,
   DialogAction,
@@ -31,10 +32,14 @@ export function isZipArchive(file: File): boolean {
   return file.name.toLowerCase().endsWith(".zip");
 }
 
+// Keep in sync with MAX_UPLOAD_BYTES.import on the server; importing that
+// module here would pull the server-only quota client into the browser bundle.
+const MAX_IMPORT_BYTES = 26 * 1024 * 1024;
+
 const ERROR_COPY: Record<string, string> = {
   unauthorized: "You are not signed in.",
   forbidden: "This archive could not be imported.",
-  too_large: "That archive is too large. The limit is 30 MB.",
+  too_large: "That archive is too large. The limit is 26 MB.",
   rate_limited: "You are importing too often. Try again in a minute.",
   bad_request: "That file is not a Prism archive.",
 };
@@ -59,13 +64,31 @@ export function ImportDialog({
       setError("Prism exports are .zip archives — only .zip archives can be imported.");
       return;
     }
+    // Refuse early rather than PUT a file the signing route would reject.
+    if (file.size > MAX_IMPORT_BYTES) {
+      setError(ERROR_COPY.too_large!);
+      return;
+    }
     setPending(true);
     setError(null);
     setReport(null);
     try {
-      const form = new FormData();
-      form.append("archive", file);
-      const res = await fetch("/api/import", { method: "POST", body: form });
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const blobKey = await uploadBytesToR2({
+        bytes,
+        contentType: "application/zip",
+        kind: "import",
+        ext: "zip",
+      });
+      const res = await fetch("/api/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          blobKey,
+          contentType: "application/zip",
+        }),
+      });
       const body = (await res.json().catch(() => ({}))) as {
         report?: ImportReport;
         error?: string;
@@ -80,8 +103,9 @@ export function ImportDialog({
         return;
       }
       setReport(body.report);
-    } catch {
-      setError("Import failed. Check your connection and try again.");
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "";
+      setError(ERROR_COPY[code] ?? "Import failed. Check your connection and try again.");
     } finally {
       setPending(false);
     }

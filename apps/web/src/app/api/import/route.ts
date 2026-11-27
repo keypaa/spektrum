@@ -1,10 +1,12 @@
 // POST /api/import — Prism archive import (spec §13.2).
 //
-// The archive is untrusted, so the guards run before the body is read:
-// session -> same-origin -> rate limit -> `content-length` -> parse. The body
-// is parsed only after the declared length is under the cap, and a parse
-// failure (Next truncating an over-limit body) is a 400, never a 500.
+// The archive arrives as a signed R2 key, never in the request body: on the
+// serverless plan Vercel caps request bodies at 4.5 MB. Guards run before the
+// bytes are read: session -> same-origin -> rate limit -> body -> scoped key ->
+// object -> magic bytes. A parse failure is a 400, never a 500.
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getObject, StorageError } from "@spektrum/storage";
 import { requireUser } from "@/auth/session";
 import { assertSameOrigin } from "@spektrum/shared/http/guard";
 import { loadWebEnv } from "@spektrum/shared/env";
@@ -13,12 +15,20 @@ import { errorResponse } from "@/auth/route-errors";
 import { importArchive } from "@/lib/import/import-archive";
 import { limitsFromEnv } from "@/lib/import/limits";
 import { assertZipMagic, SniffError } from "@/lib/upload/sniff";
+import { assertScopedKey } from "@/lib/upload/scoped-key";
+import { consumeStorageQuota, MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
 import { ZipError } from "@/lib/import/zip";
 
 export const runtime = "nodejs";
 
-/** Fallback cap when `IMPORT_MAX_FILE_BYTES` is unset. */
-const DEFAULT_MAX_BYTES = 30 * 1024 * 1024;
+const CONTENT_TYPE = z.string().min(1).max(255).regex(/^[\x20-\x7e]+$/);
+
+export const importBodySchema = z.object({
+  name: z.string().min(1).max(1024),
+  blobKey: z.string().min(1),
+  contentType: CONTENT_TYPE.optional(),
+});
+export type ImportBody = z.infer<typeof importBodySchema>;
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,31 +47,39 @@ export async function POST(req: NextRequest) {
     }
 
     const limits = limitsFromEnv();
-    // The proxy buffers the body before the route sees it, so the declared
-    // length is the only cheap way to refuse an oversize upload.
-    const cap = limits.maxFileBytes ?? DEFAULT_MAX_BYTES;
+    // The JSON body is tiny, but keep the declared-length guard: a proxy that
+    // buffers an oversize body must never reach the importer. `limits` still
+    // governs the entries *inside* the archive (readZip/parsePrismArchive).
+    const cap = MAX_UPLOAD_BYTES.import;
     const declared = Number(req.headers.get("content-length") ?? 0);
     if (declared > cap) {
       return NextResponse.json({ error: "too_large" }, { status: 413 });
     }
 
-    const form = await req.formData().catch(() => null);
-    if (!form) {
+    const body: ImportBody = importBodySchema.parse(await req.json());
+    // The key is a bearer credential minted by /api/uploads/sign. Re-check its
+    // shape against this user before reading anything out of the bucket.
+    if (!assertScopedKey(user.id, "import", body.blobKey)) {
       return NextResponse.json({ error: "bad_request" }, { status: 400 });
     }
-    const file = form.get("archive");
-    if (!(file instanceof File)) {
-      return NextResponse.json(
-        { error: "bad_request", message: "multipart field 'archive' is required" },
-        { status: 400 },
-      );
+
+    let object: Awaited<ReturnType<typeof getObject>>;
+    try {
+      object = await getObject("uploads", body.blobKey);
+    } catch (e) {
+      if (e instanceof StorageError) {
+        return NextResponse.json({ error: "bad_request" }, { status: 400 });
+      }
+      throw e;
     }
-    if (file.size > cap) {
+    // A presigned PUT cannot enforce content-length: the actual object decides.
+    if (object.size > cap) {
       return NextResponse.json({ error: "too_large" }, { status: 413 });
     }
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    // Content type is decided from the bytes, not the file name.
+    const bytes = new Uint8Array(object.body);
+    // Content type is decided from the bytes, not the file name or the client's
+    // declared type.
     try {
       assertZipMagic(bytes);
     } catch (e) {
@@ -70,6 +88,21 @@ export async function POST(req: NextRequest) {
       }
       throw e;
     }
+
+    // Charge the daily byte budget again now that the object is persisted.
+    const quota = await consumeStorageQuota(user.id, object.size);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        { error: "rate_limited" },
+        {
+          status: 429,
+          headers: {
+            "retry-after": String(Math.max(1, Math.ceil(quota.retryAfterMs / 1000))),
+          },
+        },
+      );
+    }
+
     const report = await importArchive(user.id, bytes, limits);
     return NextResponse.json({ report });
   } catch (e) {

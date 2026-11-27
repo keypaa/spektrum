@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconUpload } from "@spektrum/ui/icons";
 
+// Keep in sync with MAX_UPLOAD_BYTES.workspace on the server; that module is
+// server-only, so the browser guard uses a local constant. Oversized files are
+// never signed/PUT to R2 — uploadDocumentsRequest sends the rest by key.
+const MAX_WORKSPACE_FILE_BYTES = 30 * 1024 * 1024;
+
 /**
  * Window-wide drag target for file uploads.
  *
@@ -46,7 +51,9 @@ export function FileDropOverlay({
       event.preventDefault();
       depth.current = 0;
       setActive(false);
-      const files = Array.from(event.dataTransfer?.files ?? []);
+      const files = Array.from(event.dataTransfer?.files ?? []).filter(
+        (file) => file.size <= MAX_WORKSPACE_FILE_BYTES,
+      );
       if (files.length > 0) onFilesRef.current(files);
     };
 
@@ -82,7 +89,7 @@ export function FileDropOverlay({
           Drop files to upload
         </p>
         <p className="text-xs text-text-editor-secondary">
-          Added to this project&apos;s files
+          Added to this project&apos;s files (up to 30 MB each)
         </p>
       </div>
     </div>
