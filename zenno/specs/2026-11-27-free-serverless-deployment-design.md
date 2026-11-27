@@ -223,14 +223,33 @@ it changes what the product can do and therefore needs your confirmation.
 - Exact WASM engine/package-server choice and how to host its assets on R2.
 - Signed-URL upload shape for PDF/log/SyncTeX and retention policy.
 - How to condition `output: "standalone"` for Vercel without touching VPS builds.
-- Whether OAuth is enabled now or later (buttons stay hidden without creds).
 - Fallback naming if `spektrum.vercel.app` is already taken.
 
-## 13. Needs your decision before this is approved
+## 13. Builder-check resolutions and remaining decisions
 
-1. **Compile fidelity:** accept browser WASM with its package/BibTeX limits
+Resolved by the project/conversation (recorded so a builder need not guess):
+- **No data migration.** Nothing is live on the VPS path yet; this branch is a
+  clean-slate deployment. Fresh Neon/R2/Upstash instances are sufficient.
+- **WASM engine licensing.** My call: prefer a permissive engine. If only an
+  AGPL engine can meet the compile requirements, load it as an external CDN
+  asset with attribution rather than vendoring or modifying it in this repo.
+- **OAuth timing.** My call: keep Google/GitHub wired but hidden until you add
+  credentials; email/password signup works from day one.
+
+A builder check surfaced two more scope questions. All decisions still needed
+from the owner, most important first, with the facts needed to decide:
+
+1. **LLM access for public users.** Today the server `LLM_API_KEY` is used only
+   for the `owner` role; ordinary members are expected to bring their own key.
+   If public chat must work out of the box, the plan needs a per-user quota or
+   budget design and the "zero cost" claim needs revisiting. If BYOK stands,
+   onboarding must state that chat requires a personal key.
+2. **Upload size.** Vercel Functions accept 4.5 MB request bodies by default;
+   the 20 MiB opt-in needs 4 GB performance memory, which is Pro/Enterprise
+   only. Today imports allow 26 MB and image chat declares an 8 MiB guard (four
+   1 MiB base64 images ≈ 5.3 MB). Keeping those limits needs signed
+   direct-to-R2 uploads; otherwise caps must be lowered and documented.
+3. **Compile fidelity.** Accept browser WASM with its package/BibTeX limits
    (recommended), keep a server-side WASM function, or ship without compile?
-2. **Free providers outside Vercel:** are Neon + Upstash + R2 acceptable, or
+4. **Free providers outside Vercel.** Are Neon + Upstash + R2 acceptable, or
    must everything besides the app host live on Vercel/Cloudflare only?
-3. **OAuth scope:** Google/GitHub now (you provide creds), or leave it wired but
-   disabled until later?
