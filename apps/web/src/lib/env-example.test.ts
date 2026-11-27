@@ -30,6 +30,8 @@ describe("environment contract", () => {
     const required = [
       "PUBLIC_URL",
       "ACME_EMAIL",
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
       "S3_ENDPOINT",
       "S3_BUCKET",
       "S3_PDF_BUCKET",
@@ -48,6 +50,18 @@ describe("environment contract", () => {
     ];
     const missing = required.filter((name) => !keys.has(name));
     expect(missing).toEqual([]);
+  });
+
+  it("accepts a REST-only datastore configuration", () => {
+    const env = loadWebEnv({
+      ...base,
+      REDIS_URL: undefined,
+      UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "rest-token",
+    });
+    expect(env.redisUrl).toBe("");
+    expect(env.upstashRedisRestUrl).toBe("https://example.upstash.io");
+    expect(env.upstashRedisRestToken).toBe("rest-token");
   });
 
   it("exposes the import limits, with defaults and overrides", () => {

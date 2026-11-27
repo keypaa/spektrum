@@ -21,7 +21,12 @@ const envSecret = (name: string, min: number) =>
 // read as DATABASE_URL, BETTER_AUTH_SECRET, etc. — what an operator greps for.
 const envVarSchema = z.object({
   DATABASE_URL: envString("DATABASE_URL"),
-  REDIS_URL: envString("REDIS_URL"),
+  // Either REDIS_URL (TCP, VPS/dev) or BOTH Upstash REST variables (serverless
+  // Vercel functions) must be set. The cross-field check lives in loadWebEnv
+  // so it can be reported together with every other problem in one pass.
+  REDIS_URL: envString("REDIS_URL").optional(),
+  UPSTASH_REDIS_REST_URL: envString("UPSTASH_REDIS_REST_URL").optional(),
+  UPSTASH_REDIS_REST_TOKEN: envString("UPSTASH_REDIS_REST_TOKEN").optional(),
   BETTER_AUTH_SECRET: envSecret("BETTER_AUTH_SECRET", 32),
   BETTER_AUTH_URL: z.string().url("BETTER_AUTH_URL must be a URL"),
   LLM_KEY_ENCRYPTION_SECRET: envSecret("LLM_KEY_ENCRYPTION_SECRET", 32),
@@ -62,7 +67,10 @@ export type EnvVars = z.infer<typeof envVarSchema>;
 // `authSecret` is `BETTER_AUTH_SECRET`, etc.
 export interface WebEnv {
   databaseUrl: string;
+  /** Empty string when configured with Upstash REST only. */
   redisUrl: string;
+  upstashRedisRestUrl?: string | undefined;
+  upstashRedisRestToken?: string | undefined;
   authSecret: string;
   authUrl: string;
   llmKeyEncryptionSecret: string;
@@ -102,44 +110,57 @@ export function loadWebEnv(source: NodeJS.ProcessEnv = process.env): WebEnv {
   }
   const result = envVarSchema.safeParse(raw);
 
-  if (result.success) {
-    const v = result.data;
-    return {
-      databaseUrl: v.DATABASE_URL,
-      redisUrl: v.REDIS_URL,
-      authSecret: v.BETTER_AUTH_SECRET,
-      authUrl: v.BETTER_AUTH_URL,
-      llmKeyEncryptionSecret: v.LLM_KEY_ENCRYPTION_SECRET,
-      llmBaseUrl: v.LLM_BASE_URL,
-      llmApiKey: v.LLM_API_KEY,
-      llmModelChat: v.LLM_MODEL_CHAT,
-      llmModelFast: v.LLM_MODEL_FAST,
-      allowPublicSignup: v.ALLOW_PUBLIC_SIGNUP ?? false,
-      googleClientId: v.GOOGLE_CLIENT_ID,
-      googleClientSecret: v.GOOGLE_CLIENT_SECRET,
-      githubClientId: v.GITHUB_CLIENT_ID,
-      githubClientSecret: v.GITHUB_CLIENT_SECRET,
-      s3Endpoint: v.S3_ENDPOINT,
-      s3Bucket: v.S3_BUCKET,
-      s3PdfBucket: v.S3_PDF_BUCKET,
-      s3AccessKey: v.S3_ACCESS_KEY,
-      s3SecretKey: v.S3_SECRET_KEY,
-      s3Region: v.S3_REGION,
-      importMaxFileBytes: v.IMPORT_MAX_FILE_BYTES,
-      importMaxTotalBytes: v.IMPORT_MAX_TOTAL_BYTES,
-      importMaxEntries: v.IMPORT_MAX_ENTRIES,
-      importMaxRatio: v.IMPORT_MAX_RATIO,
-      importMaxProjects: v.IMPORT_MAX_PROJECTS,
-      sentryDsn: v.SENTRY_DSN,
-      metricsToken: v.METRICS_TOKEN,
-      nodeEnv: v.NODE_ENV,
-    };
+  // Cross-field rule: at least one complete Redis transport. Empty strings
+  // were filtered out above, so truthiness here means "actually configured".
+  const hasRedis =
+    Boolean(raw.REDIS_URL) ||
+    (Boolean(raw.UPSTASH_REDIS_REST_URL) &&
+      Boolean(raw.UPSTASH_REDIS_REST_TOKEN));
+  const lines = result.success
+    ? []
+    : result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+  if (!hasRedis) {
+    lines.push(
+      "REDIS_URL: set REDIS_URL or both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN",
+    );
+  }
+  if (!result.success || !hasRedis) {
+    throw new Error(
+      `Invalid environment configuration:\n${lines.map((l) => `  - ${l}`).join("\n")}`,
+    );
   }
 
-  const lines = result.error.issues.map(
-    (i) => `${i.path.join(".")}: ${i.message}`,
-  );
-  throw new Error(
-    `Invalid environment configuration:\n${lines.map((l) => `  - ${l}`).join("\n")}`,
-  );
+  const v = result.data;
+  return {
+    databaseUrl: v.DATABASE_URL,
+    redisUrl: v.REDIS_URL ?? "",
+    upstashRedisRestUrl: v.UPSTASH_REDIS_REST_URL,
+    upstashRedisRestToken: v.UPSTASH_REDIS_REST_TOKEN,
+    authSecret: v.BETTER_AUTH_SECRET,
+    authUrl: v.BETTER_AUTH_URL,
+    llmKeyEncryptionSecret: v.LLM_KEY_ENCRYPTION_SECRET,
+    llmBaseUrl: v.LLM_BASE_URL,
+    llmApiKey: v.LLM_API_KEY,
+    llmModelChat: v.LLM_MODEL_CHAT,
+    llmModelFast: v.LLM_MODEL_FAST,
+    allowPublicSignup: v.ALLOW_PUBLIC_SIGNUP ?? false,
+    googleClientId: v.GOOGLE_CLIENT_ID,
+    googleClientSecret: v.GOOGLE_CLIENT_SECRET,
+    githubClientId: v.GITHUB_CLIENT_ID,
+    githubClientSecret: v.GITHUB_CLIENT_SECRET,
+    s3Endpoint: v.S3_ENDPOINT,
+    s3Bucket: v.S3_BUCKET,
+    s3PdfBucket: v.S3_PDF_BUCKET,
+    s3AccessKey: v.S3_ACCESS_KEY,
+    s3SecretKey: v.S3_SECRET_KEY,
+    s3Region: v.S3_REGION,
+    importMaxFileBytes: v.IMPORT_MAX_FILE_BYTES,
+    importMaxTotalBytes: v.IMPORT_MAX_TOTAL_BYTES,
+    importMaxEntries: v.IMPORT_MAX_ENTRIES,
+    importMaxRatio: v.IMPORT_MAX_RATIO,
+    importMaxProjects: v.IMPORT_MAX_PROJECTS,
+    sentryDsn: v.SENTRY_DSN,
+    metricsToken: v.METRICS_TOKEN,
+    nodeEnv: v.NODE_ENV,
+  };
 }

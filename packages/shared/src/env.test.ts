@@ -9,11 +9,56 @@ const base = {
   LLM_KEY_ENCRYPTION_SECRET: "y".repeat(32),
 };
 
+// Serverless Vercel env: no TCP URL, Upstash REST instead.
+const restOnly = {
+  DATABASE_URL: base.DATABASE_URL,
+  BETTER_AUTH_SECRET: base.BETTER_AUTH_SECRET,
+  BETTER_AUTH_URL: base.BETTER_AUTH_URL,
+  LLM_KEY_ENCRYPTION_SECRET: base.LLM_KEY_ENCRYPTION_SECRET,
+  UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+  UPSTASH_REDIS_REST_TOKEN: "rest-token",
+};
+
 describe("loadWebEnv", () => {
   it("accepts a minimal valid environment", () => {
     const env = loadWebEnv(base);
     expect(env.allowPublicSignup).toBe(false);
     expect(env.authUrl).toBe("http://localhost:3000");
+  });
+
+  // Either transport is valid; getRedis() still prefers REDIS_URL when both
+  // are present (VPS/dev behaviour must stay byte-for-byte unchanged).
+  it("accepts REDIS_URL alone and keeps the TCP URL verbatim", () => {
+    const env = loadWebEnv(base);
+    expect(env.redisUrl).toBe("redis://localhost:6379");
+    expect(env.upstashRedisRestUrl).toBeUndefined();
+    expect(env.upstashRedisRestToken).toBeUndefined();
+  });
+
+  it("accepts Upstash REST vars alone with an empty redisUrl", () => {
+    const env = loadWebEnv(restOnly);
+    expect(env.redisUrl).toBe("");
+    expect(env.upstashRedisRestUrl).toBe("https://example.upstash.io");
+    expect(env.upstashRedisRestToken).toBe("rest-token");
+  });
+
+  it("rejects an environment with no Redis configuration", () => {
+    const { REDIS_URL: _tcp, ...noRedis } = base;
+    expect(() => loadWebEnv(noRedis)).toThrow(
+      /REDIS_URL.*UPSTASH_REDIS_REST_URL.*UPSTASH_REDIS_REST_TOKEN/,
+    );
+  });
+
+  it("rejects incomplete Upstash REST configuration", () => {
+    expect(() =>
+      loadWebEnv({ ...restOnly, UPSTASH_REDIS_REST_TOKEN: undefined }),
+    ).toThrow(/UPSTASH_REDIS_REST_TOKEN/);
+  });
+
+  it("keeps REDIS_URL as the configured URL when both transports are set", () => {
+    expect(loadWebEnv({ ...base, ...restOnly }).redisUrl).toBe(
+      "redis://localhost:6379",
+    );
   });
 
   it("rejects a BETTER_AUTH_SECRET shorter than 32 chars", () => {
