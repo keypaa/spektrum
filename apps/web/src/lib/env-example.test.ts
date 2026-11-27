@@ -6,13 +6,25 @@ import { loadWebEnv } from "@spektrum/shared/env";
 
 const examplePath = resolve(import.meta.dirname, "../../../../.env.example");
 
+const exampleLines = (): string[] =>
+  readFileSync(examplePath, "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+
 const exampleKeys = (): Set<string> =>
-  new Set(
-    readFileSync(examplePath, "utf8")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "" && !line.startsWith("#"))
-      .map((line) => line.split("=")[0]!.trim()),
+  new Set(exampleLines().map((line) => line.split("=")[0]!.trim()));
+
+// Values as an operator would copy them into a deployment environment,
+// including keys that are documented but intentionally blank.
+const exampleValues = (): Record<string, string> =>
+  Object.fromEntries(
+    exampleLines()
+      .filter((line) => line.includes("="))
+      .map((line) => {
+        const [key, ...value] = line.split("=");
+        return [key!.trim(), value.join("=").trim()] as const;
+      }),
   );
 
 const base: NodeJS.ProcessEnv = {
@@ -56,6 +68,23 @@ describe("environment contract", () => {
     const env = loadWebEnv({
       ...base,
       REDIS_URL: undefined,
+      UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "rest-token",
+    });
+    expect(env.redisUrl).toBe("");
+    expect(env.upstashRedisRestUrl).toBe("https://example.upstash.io");
+    expect(env.upstashRedisRestToken).toBe("rest-token");
+  });
+
+  it("does not select the TCP Redis path when the example file is copied into a REST-only deployment", () => {
+    const copied = exampleValues();
+    // The key stays documented for VPS/dev, but copying the file must not
+    // silently enable ioredis (which cannot open sockets on Vercel).
+    expect(copied.REDIS_URL).toBe("");
+
+    const env = loadWebEnv({
+      ...copied,
+      NODE_ENV: "test",
       UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
       UPSTASH_REDIS_REST_TOKEN: "rest-token",
     });

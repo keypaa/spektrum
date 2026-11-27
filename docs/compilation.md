@@ -63,8 +63,14 @@ while a direct API compile of the current revision shows its error correctly.
 The PDF pane keeps the last successful PDF URL when a compile fails, so you can
 still read the previous output while fixing the error. Compile errors appear in
 a red banner above the toolbar with a **View log** shortcut. In the tab that
-compiled, the PDF is shown from a local object URL; after reload it is read
-from R2 through a signed GET (CORS must allow GET from the app origin).
+compiled, the PDF is shown from a local object URL; after reload the browser
+loads it from the app's own
+`/api/projects/:projectId/render/:revision/pdf` route, which checks ownership
+and reads the object server-side with `getObject`/`getObjectRange` (ranges make
+PDF.js paging work). No signed R2 GET is used for the PDF, so PDF reads do not
+depend on bucket CORS. SyncTeX is the exception: the browser obtains a signed
+URL from `/api/projects/:projectId/render/:revision/synctex/url` and then reads
+the object directly from R2, which does require GET to be allowed by CORS.
 
 - Cursor movement in the editor highlights the matching PDF line (SyncTeX).
 - Double-clicking a PDF line jumps back to the source.

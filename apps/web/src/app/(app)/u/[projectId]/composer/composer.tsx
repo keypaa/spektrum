@@ -183,6 +183,20 @@ export function Composer({
     previewUrls.current.clear();
   }, []);
 
+  const removeImage = useCallback(
+    (index: number) => {
+      const image = images[index];
+      if (image?.previewUrl) {
+        previewUrls.current.delete(image.previewUrl);
+        if (typeof URL.revokeObjectURL === "function") {
+          URL.revokeObjectURL(image.previewUrl);
+        }
+      }
+      setImages((current) => current.filter((_entry, i) => i !== index));
+    },
+    [images],
+  );
+
   useEffect(() => () => revokePreviews(), [revokePreviews]);
 
   // New chat / loading a thread starts with an empty composer: drop the
@@ -351,11 +365,7 @@ export function Composer({
                 <button
                   type="button"
                   aria-label="Remove image"
-                  onClick={() =>
-                    setImages((current) =>
-                      current.filter((_entry, i) => i !== index),
-                    )
-                  }
+                  onClick={() => removeImage(index)}
                   className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-bg-tertiary text-text-editor-secondary hover:text-text-editor-primary"
                 >
                   <IconClose size={12} />

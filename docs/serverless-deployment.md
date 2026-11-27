@@ -42,10 +42,10 @@ stays in the hostname. Substitute that URL everywhere below.
 1. Create a free Redis database in the same region.
 2. Copy the REST URL and token into `UPSTASH_REDIS_REST_URL` and
    `UPSTASH_REDIS_REST_TOKEN`.
-3. **Leave `REDIS_URL` unset.** `REDIS_URL` wins when both transports are
-   configured, and `ioredis` sockets cannot run in Vercel functions. The
-   `.env.example` file still contains a `redis://redis:6379` placeholder for the
-   VPS/dev path — do **not** copy that value into a Vercel environment variable.
+3. **Leave `REDIS_URL` empty or unset.** `REDIS_URL` wins whenever it has a
+   value, and `ioredis` sockets cannot run in Vercel functions. `.env.example`
+   ships `REDIS_URL=` (blank) with a VPS/dev comment; keep it blank on Vercel.
+   Never copy a `redis://…` value into a Vercel environment variable.
 
 ### Cloudflare R2
 
@@ -56,10 +56,14 @@ stays in the hostname. Substitute that URL everywhere below.
    `S3_PDF_BUCKET=spektrum-pdf`, and the token's access/secret key.
 3. Add a **CORS policy on both buckets** allowing **PUT and GET** from the app
    origin (`https://spektrum.vercel.app`, plus a Preview origin if you use one).
-   PUT is needed for signed browser uploads; GET is needed for signed PDF and
-   SyncTeX reads. Allow `content-type` and the `x-amz-*` request headers and
-   expose `ETag`. A PUT-only policy breaks downloads and a GET-only policy
-   breaks every upload.
+   PUT is needed for signed browser uploads; GET is needed for the browser-side
+   SyncTeX read (the client follows a signed URL minted by
+   `/api/projects/:projectId/render/:revision/synctex/url`). The PDF itself is
+   streamed server-side by `/api/projects/:projectId/render/:revision/pdf` via
+   `getObject`/`getObjectRange`, so a signed R2 PDF GET is **not** required —
+   allowing GET on the PDF bucket is harmless. Allow `content-type` and the
+   `x-amz-*` request headers and expose `ETag`. A PUT-only policy breaks
+   SyncTeX downloads and a GET-only policy breaks every upload.
 
 ## 3. Environment variables (Vercel project → Production and Preview)
 
@@ -68,7 +72,7 @@ stays in the hostname. Substitute that URL everywhere below.
 | `DATABASE_URL` | Neon pooled URL, `sslmode=require` |
 | `UPSTASH_REDIS_REST_URL` | Upstash REST URL |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash REST token |
-| `REDIS_URL` | **unset** (see the warning in §2) |
+| `REDIS_URL` | **empty or unset** (see §2) |
 | `BETTER_AUTH_SECRET` | generated, ≥32 chars (`openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | `https://spektrum.vercel.app` |
 | `LLM_KEY_ENCRYPTION_SECRET` | generated, ≥32 chars; changing it loses BYOK keys |
@@ -103,7 +107,9 @@ uses the CDN directly, so the env values above are what make it work today.
 `vercel.json` runs `pnpm install --frozen-lockfile` and
 `pnpm --filter @spektrum/web build` from the repository root. Vercel sets
 `VERCEL=1`, which makes `next.config.ts` skip `output: "standalone"` and makes
-the PDF-worker copy script skip the standalone-only target. `maxDuration = 300`
+the PDF-worker copy script warn and skip the standalone-only server target when
+that directory is absent (VPS/dev builds still fail loudly if it is missing).
+`maxDuration = 300`
 is exported from the chat and render-commit routes.
 
 There is no shell on Vercel, so run schema/owner setup locally against Neon:
@@ -148,9 +154,9 @@ shell is needed.
 - [ ] Create a project, create/edit/save a file, reload — content persists.
 - [ ] Compile: first load downloads ~30 MB of engine assets; PDF preview, log
       and diagnostics appear; **Reload** shows the persisted render for the
-      current revision (signed R2 GET works).
-- [ ] Cursor-to-PDF SyncTeX jump works (signed SyncTeX GET works; CORS GET on
-      both buckets).
+      current revision (the app streams it from R2, no signed PDF GET).
+- [ ] Cursor-to-PDF SyncTeX jump works (browser follows a signed SyncTeX GET;
+      requires CORS GET on the PDF bucket).
 - [ ] Chat text with a BYOK key streams SSE and edits propose diffs; a
       member without a key is told to add one in Settings.
 - [ ] Paste an image into chat, send it, reload the thread and see the

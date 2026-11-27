@@ -148,6 +148,21 @@ describe("getRedis selection", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("uses REST when REDIS_URL is present but empty (as copied from .env.example)", async () => {
+    // Vercel env values copied from .env.example carry REDIS_URL=""; an empty
+    // value must not select ioredis, whose sockets cannot work on Vercel.
+    vi.stubEnv("REDIS_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", REST_URL);
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", TOKEN);
+    const { calls, impl } = fakeFetch(() => "OK");
+    vi.stubGlobal("fetch", impl);
+
+    await getRedis().set("rest:empty-tcp-url", "v");
+    expect(calls.map((c) => c.command)).toEqual([
+      ["SET", "rest:empty-tcp-url", "v"],
+    ]);
+  });
+
   it("fails loudly when neither Redis configuration is present", () => {
     vi.stubEnv("REDIS_URL", undefined);
     vi.stubEnv("UPSTASH_REDIS_REST_URL", undefined);

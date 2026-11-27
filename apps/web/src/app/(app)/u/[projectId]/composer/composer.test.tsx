@@ -322,15 +322,17 @@ describe("Composer image attachments", () => {
     return { kind: "file", type, getAsFile: () => file } as unknown as DataTransferItem;
   }
 
-  it("shows pasted thumbnails and removes one on click", async () => {
+  it("shows pasted thumbnails and revokes the removed one's object URL", async () => {
     pasteState.files = [attachment("a1"), attachment("a2")];
     const { chat } = renderComposer();
 
     paste(screen.getByLabelText("Ask anything"));
 
     expect(await screen.findAllByTestId("pasted-image")).toHaveLength(2);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
     await userEvent.click(screen.getAllByRole("button", { name: "Remove image" })[0]!);
     expect(screen.getAllByTestId("pasted-image")).toHaveLength(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:local-image");
     expect(chat.send).not.toHaveBeenCalled();
   });
 
