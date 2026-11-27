@@ -3,6 +3,7 @@ import {
   IMAGE_LIMITS,
   chatImageAttachmentSchema,
   chatImageAttachmentsSchema,
+  chatImageRefsSchema,
   imageSupportSchema,
 } from "./images";
 
@@ -91,6 +92,41 @@ describe("chatImageAttachmentsSchema", () => {
     expect(
       chatImageAttachmentSchema.safeParse(attachment({ data })).success,
     ).toBe(false);
+  });
+});
+
+describe("chatImageRefsSchema", () => {
+  const ref = (overrides: Record<string, unknown> = {}) => ({
+    id: crypto.randomUUID(),
+    blobKey: `u/u1/chat-image/${crypto.randomUUID()}.png`,
+    mimeType: "image/png",
+    name: "shot.png",
+    ...overrides,
+  });
+
+  it("accepts up to four uploaded blob keys", () => {
+    expect(
+      chatImageRefsSchema.parse(Array.from({ length: 4 }, () => ref())),
+    ).toHaveLength(4);
+  });
+
+  it("rejects a fifth image", () => {
+    expect(
+      chatImageRefsSchema.safeParse(Array.from({ length: 5 }, () => ref()))
+        .success,
+    ).toBe(false);
+  });
+
+  it("requires all four fields and an allowed MIME type", () => {
+    expect(chatImageRefsSchema.safeParse([ref({ blobKey: undefined })]).success).toBe(
+      false,
+    );
+    expect(chatImageRefsSchema.safeParse([ref({ name: undefined })]).success).toBe(
+      false,
+    );
+    expect(chatImageRefsSchema.safeParse([ref({ mimeType: "image/bmp" })]).success).toBe(
+      false,
+    );
   });
 });
 

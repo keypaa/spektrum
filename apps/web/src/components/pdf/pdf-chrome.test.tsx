@@ -137,6 +137,36 @@ describe("PdfChrome", () => {
     expect(screen.getByTestId("pdf-pill")).toBeTruthy();
   });
 
+  it("exposes locally compiled PDF bytes as a blob URL for download and open", () => {
+    if (typeof URL.createObjectURL !== "function") {
+      Object.defineProperty(URL, "createObjectURL", {
+        value: vi.fn(() => "blob:local-pdf"),
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: vi.fn(),
+        configurable: true,
+        writable: true,
+      });
+    }
+    const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:local-pdf");
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const bytes = new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55]);
+
+    const { unmount } = render(
+      <PdfChrome {...base} state="compiled" pdfBytes={bytes} />,
+    );
+
+    const blob = create.mock.calls[0]![0] as Blob;
+    expect(blob.type).toBe("application/pdf");
+    expect(blob.size).toBe(bytes.byteLength);
+    const download = screen.getByRole("link", { name: "Download" }) as HTMLAnchorElement;
+    expect(download.href).toContain("blob:local-pdf");
+    unmount();
+    expect(revoke).toHaveBeenCalledWith("blob:local-pdf");
+  });
+
   // The bar auto-hides 2 s after the last pointer *move*. It used to do that
   // even while the pointer was resting on it, so the bar vanished from under the
   // cursor and the click landed on the page beneath.

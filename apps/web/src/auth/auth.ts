@@ -13,7 +13,7 @@ import { hashPassword, verifyPassword } from "./password";
 import { assertSignupAllowed, hasValidInvite } from "./signup-gate";
 import { validateProviderUserInfo } from "./oauth-gate";
 import { RESET_TOKEN_PREFIX, hashResetIdentifier } from "./password-reset";
-import { redisSecondaryStorage } from "@spektrum/shared/rate-limit";
+import { BUDGETS, redisSecondaryStorage } from "@spektrum/shared/rate-limit";
 
 function createAuth() {
   const env = loadWebEnv();
@@ -113,7 +113,12 @@ function createAuth() {
       max: 100,
       customRules: {
         "/sign-in/email": { window: 15 * 60, max: 5 },
-        "/sign-up/email": { window: 15 * 60, max: 5 },
+        // free-tier abuse control: public signup is capped by the shared
+        // budget (3 / 15 min per IP) rather than the generic 5 / 15 min.
+        "/sign-up/email": {
+          window: BUDGETS.signup.windowMs / 1000, // Better Auth uses seconds
+          max: BUDGETS.signup.limit,
+        },
       },
     },
     plugins: [

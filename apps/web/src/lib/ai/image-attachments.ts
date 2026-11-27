@@ -1,48 +1,60 @@
-// Pasted chat images are attachments, not workspace files: they live in the
-// `uploads` bucket under chat/<projectId>/<uuid>.<ext> and never enter the file
-// tree or the compile revision. The key is scoped by project, not by uploader;
-// ownership is enforced by callers through `getThread` (project owner only).
-import { getObject, putObject } from "@spektrum/storage";
-import type {
-  ChatImageAttachment,
-  ImageMimeType,
-  MessagePart,
-} from "@spektrum/shared/ai";
+// Pasted chat images are attachments, not workspace files. The browser puts
+// the bytes straight into R2 and sends only a key: this module re-checks that
+// the key belongs to this user and is of the chat-image kind, then reads the
+// object back so its actual size is enforced before the key is persisted.
+// The quota was charged when /api/uploads/sign minted the key; no charge here.
+import { getObject } from "@spektrum/storage";
+import type { ChatImageRef, MessagePart } from "@spektrum/shared/ai";
+import { assertScopedKey } from "@/lib/upload/scoped-key";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
 
 type ImagePart = Extract<MessagePart, { type: "image" }>;
 
-const EXT_BY_MIME: Record<ImageMimeType, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
+export type ResolvedChatImage =
+  | { kind: "ok"; part: ImagePart }
+  | { kind: "foreign" }
+  | { kind: "missing" }
+  | { kind: "too_large" };
 
-export async function storeChatImage(
-  // Ownership is checked by the chat route before storing; the key is
-  // project-scoped, so the uploader's id is not part of it.
-  _userId: string,
-  projectId: string,
-  attachment: ChatImageAttachment,
-): Promise<{ blobKey: string; part: ImagePart }> {
-  const ext = EXT_BY_MIME[attachment.mimeType];
-  // The part id is server-owned. A client-supplied attachment id can be
-  // duplicated by a buggy client, which would collide in the transcript and
-  // make findImagePart() resolve the wrong blob.
-  const id = crypto.randomUUID();
-  const blobKey = `chat/${projectId}/${id}.${ext}`;
-  const bytes = Buffer.from(attachment.data, "base64");
-  await putObject("uploads", blobKey, bytes, attachment.mimeType);
+/** Build the persisted part from the ref. ids are client-supplied for live
+ * thumbnails; generate one when absent or collided in the same request. */
+export function chatImagePart(ref: ChatImageRef, usedIds?: Set<string>): ImagePart {
+  const id = ref.id && !usedIds?.has(ref.id) ? ref.id : crypto.randomUUID();
+  usedIds?.add(id);
   return {
-    blobKey,
-    part: {
-      type: "image",
-      id,
-      blobKey,
-      name: `${attachment.id}.${ext}`,
-      mimeType: attachment.mimeType,
-    },
+    type: "image",
+    id,
+    blobKey: ref.blobKey,
+    name: ref.name || "image",
+    mimeType: ref.mimeType,
   };
+}
+
+/**
+ * Validate a client-supplied key before any part is persisted. A foreign key
+ * is a client error; an unreadable object is reported as "missing" so the
+ * caller can omit it without turning the whole turn into a 500.
+ */
+export async function resolveChatImageRef(
+  userId: string,
+  ref: ChatImageRef,
+  usedIds?: Set<string>,
+): Promise<ResolvedChatImage> {
+  if (!assertScopedKey(userId, "chat-image", ref.blobKey)) {
+    return { kind: "foreign" };
+  }
+  let object: Awaited<ReturnType<typeof getObject>>;
+  try {
+    object = await getObject("uploads", ref.blobKey);
+  } catch {
+    // Same degradation as buildUserContent: an inaccessible image is omitted,
+    // never fatal to the surrounding text turn.
+    return { kind: "missing" };
+  }
+  if (object.size > MAX_UPLOAD_BYTES["chat-image"]) {
+    return { kind: "too_large" };
+  }
+  return { kind: "ok", part: chatImagePart(ref, usedIds) };
 }
 
 /** Read a chat attachment's decoded bytes by its blob key. */

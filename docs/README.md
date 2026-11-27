@@ -11,6 +11,7 @@ without becoming a wall of text.
 | [Documents and PDFs](documents-and-pdf.md) | uploading files, opening a PDF, text extraction, why a scan cannot be read as text |
 | [Compilation and PDF preview](compilation.md) | wondering when a compile runs, what the status pill means, or how the PDF stays up to date |
 | [Troubleshooting](troubleshooting.md) | something looks stuck: rate limits, stale statuses, missing keys, PDF issues |
+| [Serverless deployment](serverless-deployment.md) | deploying the free public Vercel instance: provisioning, env vars, smoke checklist, quotas, limits |
 
 The authoritative product specification is
 [`zenno/specs/2026-11-07-spektrum-design.md`](../zenno/specs/2026-11-07-spektrum-design.md).

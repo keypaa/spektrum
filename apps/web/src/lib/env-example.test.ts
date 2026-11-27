@@ -6,13 +6,25 @@ import { loadWebEnv } from "@spektrum/shared/env";
 
 const examplePath = resolve(import.meta.dirname, "../../../../.env.example");
 
+const exampleLines = (): string[] =>
+  readFileSync(examplePath, "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"));
+
 const exampleKeys = (): Set<string> =>
-  new Set(
-    readFileSync(examplePath, "utf8")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "" && !line.startsWith("#"))
-      .map((line) => line.split("=")[0]!.trim()),
+  new Set(exampleLines().map((line) => line.split("=")[0]!.trim()));
+
+// Values as an operator would copy them into a deployment environment,
+// including keys that are documented but intentionally blank.
+const exampleValues = (): Record<string, string> =>
+  Object.fromEntries(
+    exampleLines()
+      .filter((line) => line.includes("="))
+      .map((line) => {
+        const [key, ...value] = line.split("=");
+        return [key!.trim(), value.join("=").trim()] as const;
+      }),
   );
 
 const base: NodeJS.ProcessEnv = {
@@ -30,9 +42,14 @@ describe("environment contract", () => {
     const required = [
       "PUBLIC_URL",
       "ACME_EMAIL",
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
       "S3_ENDPOINT",
       "S3_BUCKET",
       "S3_PDF_BUCKET",
+      "S3_ACCESS_KEY",
+      "S3_SECRET_KEY",
+      "S3_REGION",
       "IMPORT_MAX_FILE_BYTES",
       "IMPORT_MAX_TOTAL_BYTES",
       "IMPORT_MAX_ENTRIES",
@@ -45,6 +62,35 @@ describe("environment contract", () => {
     ];
     const missing = required.filter((name) => !keys.has(name));
     expect(missing).toEqual([]);
+  });
+
+  it("accepts a REST-only datastore configuration", () => {
+    const env = loadWebEnv({
+      ...base,
+      REDIS_URL: undefined,
+      UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "rest-token",
+    });
+    expect(env.redisUrl).toBe("");
+    expect(env.upstashRedisRestUrl).toBe("https://example.upstash.io");
+    expect(env.upstashRedisRestToken).toBe("rest-token");
+  });
+
+  it("does not select the TCP Redis path when the example file is copied into a REST-only deployment", () => {
+    const copied = exampleValues();
+    // The key stays documented for VPS/dev, but copying the file must not
+    // silently enable ioredis (which cannot open sockets on Vercel).
+    expect(copied.REDIS_URL).toBe("");
+
+    const env = loadWebEnv({
+      ...copied,
+      NODE_ENV: "test",
+      UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+      UPSTASH_REDIS_REST_TOKEN: "rest-token",
+    });
+    expect(env.redisUrl).toBe("");
+    expect(env.upstashRedisRestUrl).toBe("https://example.upstash.io");
+    expect(env.upstashRedisRestToken).toBe("rest-token");
   });
 
   it("exposes the import limits, with defaults and overrides", () => {
@@ -70,5 +116,31 @@ describe("environment contract", () => {
   it("rejects a non-numeric or negative import limit", () => {
     expect(() => loadWebEnv({ ...base, IMPORT_MAX_ENTRIES: "many" })).toThrow();
     expect(() => loadWebEnv({ ...base, IMPORT_MAX_RATIO: "-1" })).toThrow();
+  });
+
+  it("exposes all six S3 settings with the storage defaults", () => {
+    const defaults = loadWebEnv(base);
+    expect(defaults.s3Endpoint).toBe("http://localhost:9000");
+    expect(defaults.s3Bucket).toBe("spektrum-uploads");
+    expect(defaults.s3PdfBucket).toBe("spektrum-pdf");
+    expect(defaults.s3AccessKey).toBe("spektrum");
+    expect(defaults.s3SecretKey).toBe("spektrum-secret");
+    expect(defaults.s3Region).toBe("auto");
+
+    const overridden = loadWebEnv({
+      ...base,
+      S3_ENDPOINT: "https://acct.r2.cloudflarestorage.com",
+      S3_BUCKET: "custom-uploads",
+      S3_PDF_BUCKET: "custom-pdf",
+      S3_ACCESS_KEY: "r2-key",
+      S3_SECRET_KEY: "r2-secret",
+      S3_REGION: "eu-west-1",
+    });
+    expect(overridden.s3Endpoint).toBe("https://acct.r2.cloudflarestorage.com");
+    expect(overridden.s3Bucket).toBe("custom-uploads");
+    expect(overridden.s3PdfBucket).toBe("custom-pdf");
+    expect(overridden.s3AccessKey).toBe("r2-key");
+    expect(overridden.s3SecretKey).toBe("r2-secret");
+    expect(overridden.s3Region).toBe("eu-west-1");
   });
 });

@@ -2,6 +2,7 @@
 // normalisation the New file dialog uses.
 
 import type { DocumentRecord, UploadResult } from "@/lib/documents";
+import { uploadBytesToR2 } from "@/lib/upload/client";
 
 async function readError(res: Response): Promise<string> {
   try {
@@ -31,11 +32,28 @@ export async function uploadDocumentsRequest(
   projectId: string,
   files: File[],
 ): Promise<UploadResult> {
-  const form = new FormData();
-  for (const file of files) form.append("files", file);
+  // Bytes go to R2 first; the route receives only the signed keys. The
+  // extension is taken from the file name and normalised for the scoped key.
+  const payload = await Promise.all(
+    files.map(async (file) => {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const rawExt = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const ext = /^[a-z0-9]{1,16}$/.test(rawExt) ? rawExt : "bin";
+      const contentType = file.type || "application/octet-stream";
+      const blobKey = await uploadBytesToR2({
+        bytes,
+        contentType,
+        kind: "workspace",
+        ext,
+        projectId,
+      });
+      return { name: file.name, blobKey, contentType: file.type || undefined };
+    }),
+  );
   const res = await fetch(`/api/projects/${projectId}/upload`, {
     method: "POST",
-    body: form,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ files: payload }),
   });
   if (!res.ok) throw new Error((await readError(res)) || "Upload failed");
   return (await res.json()) as UploadResult;

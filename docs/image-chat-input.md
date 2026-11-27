@@ -23,22 +23,25 @@ see [AI providers and chat](ai-and-chat.md#image-input-capability-limits-and-ret
 ## 2. End-to-end flow
 
 ```
-Clipboard ──paste──▶ composer (downscale/encode)
+Clipboard ──paste──▶ composer (downscale/encode, ≤1 MiB each)
                     │  thumbnail: blob: URL
                     ▼
-              POST /api/projects/:id/chat
-              { message, images, omitHistoryImages?, retryOfMessageId? }
-                    │  413 if content-length > 8 MiB
-                    │  zod: MIME allowlist, canonical base64, ≤1 MiB/image, ≤4 images
+              POST /api/uploads/sign → PUT signed R2 URL (bytes bypass the app)
+                    │  key: u/<userId>/chat-image/<uuid>.<ext> (server-scoped)
                     ▼
-              storeChatImage → uploads bucket: chat/<projectId>/<uuid>.<ext>
-                    │  persisted as an `image` part on the user message
+              POST /api/projects/:id/chat
+              { message, images: [{id, blobKey, mimeType, name}], omitHistoryImages?, retryOfMessageId? }
+                    │  413 if content-length > 8 MiB (Vercel's 4.5 MB cap applies first)
+                    │  zod: ≤4 refs, MIME allowlist; server verifies key owner/kind,
+                    │  getObject and actual size ≤1 MiB before persisting the key
+                    ▼
+              persisted as an `image` part on the user message (blobKey, never bytes)
                     ▼
               buildUserContent(text, current images, recent history images)
                     │  ≤4 images, ≤4 MiB decoded; older → omission marker
                     ▼
               streamGateway → POST <baseUrl>/chat/completions
-                    content: string | [text part, image_url parts…]
+                    content: string | [text part, data:<mime>;base64 image_url parts…]
                     ▼
               SSE events → transcript (local blob: URL or owner-only thumbnail route)
 ```
@@ -74,12 +77,17 @@ decision path and lets custom gateways work.
 
 ## 4. Data shapes
 
-Attachment on the wire from the browser (`ChatImageAttachment`):
+Attachment on the wire from the browser (`ChatImageRef`):
 
 ```ts
-{ id: string; mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
-  data: string } // base64 only, no data: prefix
+{ id: string; blobKey: string; // u/<userId>/chat-image/<uuid>.<ext>, signed PUT
+  mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  name: string }
 ```
+
+The older inline-base64 `ChatImageAttachment` shape is no longer accepted by
+the chat route: the browser uploads bytes directly to R2 so no serverless
+function sees them.
 
 Persisted message part (`MessagePart` union):
 
@@ -111,18 +119,22 @@ Gateway user content:
 3. Encodes WebP at decreasing quality, falls back to JPEG, and stops as soon as
    the result is ≤ **1 MiB**. The returned MIME comes from the actual
    `blob.type`, so a WebP-to-PNG browser fallback is labelled correctly.
-4. Base64-encodes the bytes for the POST body; source metadata/EXIF is dropped
-   by re-encoding.
+4. Requests a signed PUT URL from `/api/uploads/sign` for the `chat-image`
+   kind, PUTs the encoded bytes straight to R2, and sends only the returned
+   `blobKey` to the chat route; source metadata/EXIF is dropped by re-encoding.
 
 The composer keeps optimistic thumbnails as `URL.createObjectURL()` values and
 revokes them on reset, thread load, and unmount.
 
 ## 6. Storage and thumbnails
 
-- `storeChatImage()` writes to the **uploads** S3 bucket under
-  `chat/<projectId>/<uuid>.<ext>` and generates the part id server-side. A
-  client-supplied `id` survives only as a display `name`; duplicate client ids
-  cannot collide.
+- `/api/uploads/sign` mints a short-lived PUT URL for a **server-scoped** key
+  `u/<userId>/chat-image/<uuid>.<ext>` in the **uploads** R2 bucket; the browser
+  PUTs the bytes there. The chat route's `resolveChatImageRef()` rejects keys
+  outside that prefix/kind, re-reads the object with `getObject`, and enforces
+  the 1 MiB cap on the **actual** size before persisting the key. The byte
+  budget was already charged when the URL was minted. A client-supplied `id`
+  survives only as a display `name`; duplicate client ids cannot collide.
 - Live thumbnails use the optimistic `blob:` URL. After reload, thumbnails come
   from
   `GET /api/projects/:projectId/chat/attachments/:attachmentId?threadId=...`.
@@ -183,13 +195,15 @@ after a rejection loses the omit flag (known limitation).
 | Decoded bytes per image | 1 MiB |
 | Decoded history budget | 4 MiB |
 | Browser downscale | 1536 px longest edge |
-| Request body | 8 MiB declared `content-length` → 413 |
+| Request body | 8 MiB declared `content-length` → 413 (Vercel: 4.5 MB platform cap first) |
 | MIME allowlist | PNG, JPEG, WebP, GIF |
+| Key prefix | `u/<userId>/chat-image/` (any other owner or kind is rejected) |
 | Thumbnail visibility | Project owner only |
 
-Base64 data is validated as canonical with a length cap before `Buffer.from`;
-junk characters are refused. The browser never calls that Node-only schema —
-validation happens on the server.
+The browser sends keys, not base64; only the gateway payload is re-encoded as a
+data URL from the R2 bytes. The server validates the key, the MIME allowlist and
+the object's real size; the browser-side downscale is a convenience, not the
+security boundary.
 
 ## 10. File map
 
@@ -197,7 +211,7 @@ validation happens on the server.
 |---|---|
 | Contracts | `packages/shared/src/ai/images.ts`, `packages/shared/src/ai.ts`, `packages/shared/src/preferences.ts` |
 | Capability | `apps/web/src/lib/ai/model-capabilities.ts`, `apps/web/src/lib/ai/image-capability.ts`, `apps/web/src/lib/ai/models.ts` |
-| Storage | `apps/web/src/lib/ai/image-attachments.ts`, `apps/web/src/app/api/projects/[projectId]/chat/attachments/[attachmentId]/route.ts` |
+| Storage | `apps/web/src/lib/ai/image-attachments.ts`, `apps/web/src/app/api/uploads/sign/route.ts`, `apps/web/src/lib/upload/{scoped-key.ts,quotas.ts,client.ts}`, `apps/web/src/app/api/projects/[projectId]/chat/attachments/[attachmentId]/route.ts` |
 | Protocol/history | `apps/web/src/lib/ai/multimodal.ts`, `apps/web/src/lib/ai/gateway.ts`, `apps/web/src/lib/ai/chat-store.ts`, `apps/web/src/lib/ai/context.ts` |
 | Route | `apps/web/src/app/api/projects/[projectId]/chat/route.ts` |
 | UI | `apps/web/src/app/(app)/u/[projectId]/composer/{composer.tsx,use-chat.ts,transcript.tsx,image-paste.ts}`, `apps/web/src/components/settings/sections/integrations-section.tsx` |
@@ -214,4 +228,5 @@ validation happens on the server.
   thread id; check that you are the project owner and that the blob was not
   deleted with its thread.
 - **Image disappeared after paste** — the type was outside the allowlist, the
-  source was too large, or **Force off** is set.
+  source was too large, the signed PUT failed (check R2 CORS allows PUT from the
+  app origin), or **Force off** is set.

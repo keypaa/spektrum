@@ -65,6 +65,21 @@ service. Only Caddy publishes ports. The full runbook — provisioning, backups,
 shutdown, rollback, security notes, troubleshooting — is
 [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md).
 
+## Free serverless deployment (Vercel Hobby)
+
+This branch also deploys to a free Vercel Hobby project at
+`https://spektrum.vercel.app` (or `spektrum-<suffix>.vercel.app` if taken):
+public signup, BYOK chat, browser-WASM compilation and R2-backed persistence,
+with Neon Postgres and Upstash Redis over REST. No worker, Docker socket,
+host cron or local disk. Hobby is non-commercial with a 4.5 MB request-body
+cap and 300 s function limit.
+
+Provisioning, the environment-variable table, local migration/owner bootstrap,
+the signup flip, quotas, backups and known limits are in
+[`docs/serverless-deployment.md`](docs/serverless-deployment.md). Do **not**
+set `REDIS_URL` there — `.env.example`'s `redis://redis:6379` placeholder is
+for the VPS path only.
+
 ## How it is built
 
 | Path | What |
@@ -108,7 +123,9 @@ User and contributor guides:
 
 - [`docs/`](docs/) — index of the current system docs: AI providers and chat,
   image input in chat, documents and PDFs, compilation, and troubleshooting
-- [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md) — deployment and operations
+- [`docs/serverless-deployment.md`](docs/serverless-deployment.md) — free Vercel
+  deployment: provisioning, env table, smoke checklist, quotas and limits
+- [`zenno/docs/phase-5-launch.md`](zenno/docs/phase-5-launch.md) — VPS deployment and operations
 
 Build record (kept for provenance):
 

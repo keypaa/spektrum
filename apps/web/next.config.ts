@@ -1,12 +1,19 @@
 import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import { cspOrigins } from "./src/lib/serverless-config";
+
+// Vercel sets VERCEL=1 during its build. Its builder owns the output layout,
+// so the VPS-only standalone server must not be emitted there.
+const isVercel = process.env.VERCEL === "1";
 
 const base: NextConfig = {
-  // Standalone output for the production image (docker/Dockerfile.web). The
-  // tracing root is the monorepo root: `packages/*` export TypeScript source
-  // through the workspace `exports` map, so the trace has to start above them.
-  output: "standalone",
+  // Standalone output is for the production image (docker/Dockerfile.web);
+  // Vercel builds its own function bundles. The tracing root stays for both:
+  // `packages/*` export TypeScript source through the workspace `exports` map,
+  // so any trace (including Vercel's function trace) has to start at the
+  // monorepo root or those files are missing at runtime.
+  ...(isVercel ? {} : { output: "standalone" as const }),
   outputFileTracingRoot: path.resolve(import.meta.dirname, "../.."),
   // `proxy.ts` buffers the request body so the route can read it more than
   // once; the default 10 MB would truncate a Prism archive and turn a
@@ -17,6 +24,9 @@ const base: NextConfig = {
   // The same hardening Caddy sets (docker/Caddyfile), for deployments that are
   // not behind it. Caddy's copy wins where both apply.
   async headers() {
+    // Read at call time so build-time env changes are honoured; empty values
+    // leave the CSP exactly as self-only (the VPS/Caddy path is unchanged).
+    const origins = cspOrigins(process.env);
     return [
       {
         source: "/:path*",
@@ -32,12 +42,14 @@ const base: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // Siglum's worker loads its fetched busytex.js from a blob URL.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+              // The worker itself is created from a blob URL (unchanged).
               "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
-              "connect-src 'self'",
+              ["connect-src 'self'", ...origins].join(" "),
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

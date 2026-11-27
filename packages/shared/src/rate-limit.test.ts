@@ -9,6 +9,13 @@ describe("BUDGETS (spec §10.5)", () => {
     expect(BUDGETS.ai).toEqual({ limit: 30, windowMs: 60_000 });
     expect(BUDGETS.upload).toEqual({ limit: 20, windowMs: 60_000 });
   });
+
+  // Free-tier abuse controls (serverless plan Tasks 3 and 9). These pins stop
+  // the budgets being quietly loosened when public signup is switched on.
+  it("pins the free-tier signup and daily storage budgets", () => {
+    expect(BUDGETS.signup).toEqual({ limit: 3, windowMs: 15 * 60_000 });
+    expect(BUDGETS.storageDay).toEqual({ limit: 1, windowMs: 24 * 60 * 60_000 });
+  });
 });
 
 describe("consume", () => {

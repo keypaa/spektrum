@@ -239,6 +239,9 @@ importers:
       '@sentry/nextjs':
         specifier: 8.55.0
         version: 8.55.0(@opentelemetry/context-async-hooks@1.30.1(@opentelemetry/api@1.10.0))(@opentelemetry/core@1.30.1(@opentelemetry/api@1.10.0))(@opentelemetry/instrumentation@0.57.2(@opentelemetry/api@1.10.0)(supports-color@7.2.0))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.10.0))(next@16.4.5(@babel/core@7.29.13(supports-color@7.2.0))(@opentelemetry/api@1.10.0)(@playwright/test@1.65.0)(@types/node@26.6.6)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@7.2.0)(webpack@5.112.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.32)(sharp@0.35.5(@types/node@26.6.6)))
+      '@siglum/engine':
+        specifier: 0.2.2
+        version: 0.2.2
       '@spektrum/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -442,6 +445,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 3.1168.0
         version: 3.1168.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: 3.1168.0
+        version: 3.1168.0
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -561,6 +567,10 @@ packages:
 
   '@aws-sdk/nested-clients@3.998.3':
     resolution: {integrity: sha512-acHTTzMB13CU6dU4sxABYExMI3PQM2zStWH2MiUwJp/7QKTrLg2f7mbzSXoegW2kYOk2tdqQYagsZrWB8Xv7eA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/s3-request-presigner@3.1168.0':
+    resolution: {integrity: sha512-HLjffsA8Di01lZuChctZAhbLsK2CuM8dE1D2+rA/jaerV5W2pj65iBmed15kouJFXTX3XhTF2mFxEEUxMoP4yw==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/signature-v4-multi-region@3.996.52':
@@ -2466,6 +2476,12 @@ packages:
     peerDependencies:
       webpack: '>=4.40.0'
 
+  '@siglum/engine@0.2.2':
+    resolution: {integrity: sha512-fUCf7rtS6SFx8ah5c02Lune5fvw6sdSmrfdqcSoc4ObAeHx1jn3Ho5X1oXxTH4dYyp/KzZ8K6zmjS4VMJID8Cg==}
+
+  '@siglum/filesystem@0.3.1':
+    resolution: {integrity: sha512-H3bduKpYKNZD8EV3JdIQsJffBthw8Tl37DQfprlqTTfl43vmpQE2x5TgWbOi909OQesWB0BkqGrkIxrg5CONtQ==}
+
   '@smithy/core@3.40.0':
     resolution: {integrity: sha512-DssGno52pzZ5m6RlDtyKuBIpZNPg9pqgs0CnNDKz9IatxCsmvNmJNn5Zn6rf77MthZo9wf89OvZFhTY/RwxhxQ==}
     engines: {node: '>=18.0.0'}
@@ -2988,6 +3004,9 @@ packages:
 
   bintrees@1.0.2:
     resolution: {integrity: sha512-VOMgTMwjAaUG580SXn3LacVgjurrbMme7ZZNYGSSV7mmtY6QQRh0Eg3pwIcntQ77DErK1L0NxkbetjcoXzVwKw==}
+
+  blake3-wasm@2.1.5:
+    resolution: {integrity: sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g==}
 
   bowser@2.15.0:
     resolution: {integrity: sha512-xic6KSZglg/I4ymp45fdM4GWfYpBK79Fxd/TOvJktlaPgQqqDxvmGwOPZl2V0dyeS3Lj5c180bLhXF43iyAjZQ==}
@@ -4897,6 +4916,9 @@ packages:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
 
+  xzwasm@0.1.2:
+    resolution: {integrity: sha512-AhkIQcyCRTKQAlI+ENhQBB52AUZF7puNmNleawbpyGAzEyflbMbwIKlU5yN99cgiv5XVlXt0mIeYgQrdQghdsA==}
+
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
@@ -5050,6 +5072,15 @@ snapshots:
       '@smithy/core': 3.40.0
       '@smithy/fetch-http-handler': 5.8.1
       '@smithy/node-http-handler': 4.14.2
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
+  '@aws-sdk/s3-request-presigner@3.1168.0':
+    dependencies:
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/signature-v4-multi-region': 3.996.52
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.40.0
       '@smithy/types': 4.20.0
       tslib: 2.9.1
 
@@ -6673,6 +6704,16 @@ snapshots:
       - encoding
       - supports-color
 
+  '@siglum/engine@0.2.2':
+    dependencies:
+      '@siglum/filesystem': 0.3.1
+      blake3-wasm: 2.1.5
+      xzwasm: 0.1.2
+
+  '@siglum/filesystem@0.3.1':
+    dependencies:
+      fflate: 0.8.3
+
   '@smithy/core@3.40.0':
     dependencies:
       '@smithy/types': 4.20.0
@@ -7227,6 +7268,8 @@ snapshots:
   binary-extensions@2.3.0: {}
 
   bintrees@1.0.2: {}
+
+  blake3-wasm@2.1.5: {}
 
   bowser@2.15.0: {}
 
@@ -9296,6 +9339,8 @@ snapshots:
   xmlchars@2.2.0: {}
 
   xtend@4.0.2: {}
+
+  xzwasm@0.1.2: {}
 
   yallist@3.1.1: {}
 

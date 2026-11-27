@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { forwardRef, useImperativeHandle, type ForwardedRef } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { forwardRef, useImperativeHandle, useState, type ForwardedRef } from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PREFERENCES } from "@spektrum/shared/preferences";
@@ -20,6 +20,15 @@ const state = vi.hoisted(() => ({
   revealRange: vi.fn(),
   composerProps: null as Record<string, unknown> | null,
   flush: vi.fn(async () => undefined),
+  pdfViewerProps: null as Record<string, unknown> | null,
+}));
+
+// The editor now drives local compilation through a hook; keep its state
+// controllable so the tests can push queued/result events into the shell.
+const compile = vi.hoisted(() => ({
+  status: null as null | Record<string, unknown>,
+  emit: null as null | ((event: null | Record<string, unknown>) => void),
+  start: vi.fn(async (_mainFile: string) => undefined),
 }));
 
 // Monaco is loaded through next/dynamic, so the mock has to sit there.
@@ -28,7 +37,10 @@ vi.mock("next/dynamic", () => ({
     forwardRef((props: Record<string, unknown>, ref: ForwardedRef<unknown>) => {
       // The shell dynamically imports both Monaco and the PDF viewer. The
       // viewer is the one that receives a pdfUrl.
-      if ("pdfUrl" in props) return <div data-testid="pdf-viewer" />;
+      if ("pdfUrl" in props) {
+        state.pdfViewerProps = props;
+        return <div data-testid="pdf-viewer" />;
+      }
       state.selectionHandler = props.onSelectionChange as (range: unknown) => void;
       useImperativeHandle(ref, () => ({ revealRange: state.revealRange }));
       return <div data-testid="monaco-editor" />;
@@ -50,8 +62,20 @@ vi.mock("./use-autosave", () => ({
   }),
 }));
 
+vi.mock("@/lib/render-client", () => ({
+  useLocalCompile: () => {
+    const [status, setStatus] = useState(compile.status);
+    compile.emit = setStatus;
+    return { status, start: compile.start };
+  },
+}));
+
 import { EditorClient } from "./editor-client";
 import type { DocumentRecord, DocumentSummary } from "@/lib/documents";
+import {
+  createLocalPdfUrl,
+  getLocalPdfBytes,
+} from "@/lib/compile-client";
 
 afterEach(cleanup);
 
@@ -229,12 +253,7 @@ describe("EditorClient", () => {
     expect(screen.queryByTestId("chat-panel-popped")).toBeNull();
   });
 
-  it("forces a fresh compile from the PDF refresh button", async () => {
-    const fetchMock = vi.fn(
-      async (_url: string, _init?: RequestInit) =>
-        new Response("{}", { status: 200 }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
+  it("starts a fresh local compile from the PDF refresh button", async () => {
     renderShell({
       mainFilePath: "main.tex",
       initialRender: {
@@ -249,17 +268,11 @@ describe("EditorClient", () => {
         stats: null,
       },
     });
+    compile.start.mockClear();
 
     await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
 
-    const call = fetchMock.mock.calls.find(([url]) =>
-      String(url).includes("/compile"),
-    );
-    expect(call).toBeTruthy();
-    expect(JSON.parse(String(call![1]?.body))).toEqual({
-      mainFile: "main.tex",
-      force: true,
-    });
+    expect(compile.start).toHaveBeenCalledWith("main.tex");
   });
 
   it("keeps the PDF sheet square under a compile error banner", () => {
@@ -285,5 +298,133 @@ describe("EditorClient", () => {
     expect(screen.getByTestId("editor-root")).toBeTruthy();
     expect(screen.queryByTestId("tab-main.tex")).toBeNull();
     expect(screen.getByTestId("pdf-pane")).toBeTruthy();
+  });
+
+  it("starts a local compile after Ctrl+S flushes the buffer", async () => {
+    renderShell({
+      mainFilePath: "main.tex",
+      initialRender: {
+        isCurrent: true,
+        status: "ok",
+        revision: "a".repeat(64),
+        pdfUrl: "/render.pdf",
+        lastOkRevision: "a".repeat(64),
+        mainFile: "main.tex",
+        durationMs: 10,
+        diagnostics: [],
+        stats: null,
+      },
+    });
+    compile.start.mockClear();
+    state.flush.mockClear();
+
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+
+    await waitFor(() => expect(state.flush).toHaveBeenCalled());
+    await waitFor(() => expect(compile.start).toHaveBeenCalledWith("main.tex"));
+  });
+
+  it("shows the PDF from a local result event", async () => {
+    state.pdfViewerProps = null;
+    renderShell({ mainFilePath: "main.tex", initialRender: null });
+    expect(await screen.findByTestId("monaco-editor")).toBeTruthy();
+
+    act(() => {
+      compile.emit?.({
+        event: "result",
+        revision: "a".repeat(64),
+        pdfUrl: "blob:local-pdf",
+        diagnostics: [],
+        stats: null,
+        durationMs: 12,
+      });
+    });
+
+    expect(await screen.findByTestId("pdf-viewer")).toBeTruthy();
+    expect(
+      (state.pdfViewerProps as Record<string, unknown> | null)?.pdfUrl,
+    ).toBe("blob:local-pdf");
+    expect(screen.getByTestId("pdf-pill").getAttribute("aria-label")).toBe("Compiled");
+  });
+
+  it("does not carry the previous project's local PDF across a project switch", async () => {
+    if (typeof URL.createObjectURL !== "function") {
+      Object.defineProperty(URL, "createObjectURL", {
+        value: vi.fn(() => "blob:old-project-pdf"),
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: vi.fn(),
+        configurable: true,
+        writable: true,
+      });
+    }
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:old-project-pdf");
+    const revision = "a".repeat(64);
+    createLocalPdfUrl("p1", revision, new Uint8Array([37, 80, 68, 70]));
+
+    const { rerender } = renderShell({
+      mainFilePath: "main.tex",
+      initialRender: {
+        isCurrent: true,
+        status: "ok",
+        revision,
+        pdfUrl: "/first-project.pdf",
+        lastOkRevision: revision,
+        mainFile: "main.tex",
+        durationMs: 5,
+        diagnostics: [],
+        stats: null,
+      },
+    });
+    act(() => {
+      compile.emit?.({
+        event: "result",
+        revision,
+        pdfUrl: "blob:old-project-pdf",
+        diagnostics: [],
+        stats: null,
+        durationMs: 5,
+      });
+    });
+    expect(
+      screen.getByRole("link", { name: "Download" }).getAttribute("href"),
+    ).toBe("blob:old-project-pdf");
+
+    rerender(
+      <PreferencesProvider initial={DEFAULT_PREFERENCES}>
+        <EditorClient
+          project={{ id: "p2", name: "Other Project" }}
+          projects={[
+            { id: "p1", name: "My Project" },
+            { id: "p2", name: "Other Project" },
+          ]}
+          documents={DOCS}
+          initialDocument={DOC}
+          mainFilePath="main.tex"
+          initialRender={{
+            isCurrent: true,
+            status: "ok",
+            revision: "c".repeat(64),
+            pdfUrl: "/other-project.pdf",
+            lastOkRevision: "c".repeat(64),
+            mainFile: "main.tex",
+            durationMs: 5,
+            diagnostics: [],
+            stats: null,
+          }}
+          user={{ name: "Keylhan Paumard", email: "owner@spektrum.local" }}
+          aiEnabled
+        />
+      </PreferencesProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("link", { name: "Download" }).getAttribute("href"),
+      ).toBe("/other-project.pdf"),
+    );
+    expect(getLocalPdfBytes("p1", revision)).toBeNull();
   });
 });

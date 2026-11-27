@@ -14,7 +14,10 @@ model names.
 - **BYOK key:** a user can paste a personal key into **LLM API key** in Settings.
   It is stored encrypted in `users.llm_api_key_ciphertext` using
   `LLM_KEY_ENCRYPTION_SECRET`. The API never returns the key — only a masked
-  suffix — so the field shows **Replace key** once configured.
+  suffix — so the field shows **Replace key** once configured. On the free
+  serverless deployment members must add their own key; the optional server key
+  remains owner-only. See
+  [`serverless-deployment.md`](serverless-deployment.md#6-public-signup-and-byok-onboarding).
 - Base URLs are validated before a Bearer token is sent: remote endpoints must
   be HTTPS; plain HTTP is allowed only for `localhost`/loopback model servers.
 
@@ -67,17 +70,20 @@ the model looks text-only or the signal is unknown — while **Force on** and
 **Force off** trust the operator and override detection in both directions.
 
 **Limits.** The browser downscales each image so its longest edge is at most
-1536 px, then re-encodes it (WebP, falling back to JPEG). Allowed source types
-are PNG, JPEG, WebP, and GIF. The server enforces at most **4 images per
-request**, **1 MiB decoded per image**, and a **4 MiB total decoded history
-budget**. When those caps are exceeded the oldest images are dropped first; the
-request then carries the marker
-`[image omitted — re-attach to discuss]`. A request body declaring more than
-8 MiB is rejected with HTTP 413 before it is parsed, and base64 data must be
-canonical (junk characters are refused).
+1536 px, then re-encodes it (WebP, falling back to JPEG) and uploads the bytes
+directly to R2 with a short-lived signed PUT. Allowed source types are PNG,
+JPEG, WebP, and GIF. The server enforces at most **4 images per request**,
+**1 MiB decoded per image**, and a **4 MiB total decoded history budget**. When
+those caps are exceeded the oldest images are dropped first; the request then
+carries the marker `[image omitted — re-attach to discuss]`. A request body
+declaring more than 8 MiB is rejected with HTTP 413 before it is parsed (on
+Vercel the platform's 4.5 MB cap applies first).
 
-**Wire format.** Image parts are OpenAI-compatible `image_url` parts whose URL
-is `data:<mime>;base64,...`. No `detail` field is sent. Text-only messages keep
+**Wire format.** The browser sends only signed keys
+(`u/<userId>/chat-image/…`), never inline bytes: the route verifies the prefix
+and kind and re-reads each object before persisting it. Toward the gateway the
+images become OpenAI-compatible `image_url` parts whose URL is
+`data:<mime>;base64,...`. No `detail` field is sent. Text-only messages keep
 `content` as a plain string, byte-for-byte as before. Recent history carries
 the newest images into follow-ups within the same budget; **New chat** starts a
 fresh thread, so the next message is text-only again.

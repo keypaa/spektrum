@@ -10,7 +10,7 @@ import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
 import { redactSecrets } from "@spektrum/shared/log/redact";
 import {
   SYSTEM_PROMPT,
-  chatImageAttachmentsSchema,
+  chatImageRefsSchema,
   toolSchemas,
   type MessagePart,
   type ThinkingLevel,
@@ -27,7 +27,10 @@ import {
   touchedPaths,
 } from "@/lib/ai/chat-store";
 import { buildContext } from "@/lib/ai/context";
-import { storeChatImage } from "@/lib/ai/image-attachments";
+import {
+  chatImagePart,
+  resolveChatImageRef,
+} from "@/lib/ai/image-attachments";
 import { buildUserContent, type HistoryTurn, type ImagePart } from "@/lib/ai/multimodal";
 import {
   GatewayHttpError,
@@ -40,6 +43,10 @@ import { recordUsage } from "@/lib/ai/usage";
 import { generateTitle } from "@/lib/ai/title";
 
 export const dynamic = "force-dynamic";
+// Vercel Hobby caps a function (including an SSE stream) at 300 s. The gateway
+// stream should finish well inside that; the export keeps the platform limit
+// explicit instead of relying on an implicit default.
+export const maxDuration = 300;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -51,7 +58,9 @@ const bodySchema = z.object({
   message: z.string().min(1),
   thinking: z.enum(THINKING).default("Medium"),
   pinnedPaths: z.array(z.string()).optional(),
-  images: chatImageAttachmentsSchema.optional(),
+  // Uploaded blob keys, never inline bytes: a 4 × 1 MiB base64 body would
+  // exceed Vercel Hobby's 4.5 MB request cap.
+  images: chatImageRefsSchema.optional(),
   // Set once the gateway rejects an image in a thread. Every later turn in
   // that thread must omit history images, otherwise the rejected image is
   // re-attached forever and the thread can only be escaped with "New chat".
@@ -147,6 +156,32 @@ export async function POST(
       );
     }
 
+    // Validate every client-supplied key before writing the stream (an HTTP
+    // error can only be returned before SSE starts), before any thread is
+    // created and before any part is persisted. A retry's images are already
+    // persisted; skip them entirely.
+    const isRetry = Boolean(body.retryOfMessageId);
+    const persistedImageParts: ImagePart[] = [];
+    const contentImageParts: ImagePart[] = [];
+    const usedIds = new Set<string>();
+    for (const ref of (isRetry ? [] : body.images) ?? []) {
+      const image = await resolveChatImageRef(user.id, ref, usedIds);
+      if (image.kind === "foreign") {
+        return NextResponse.json({ error: "bad_request" }, { status: 400 });
+      }
+      if (image.kind === "too_large") {
+        return NextResponse.json({ error: "too_large" }, { status: 413 });
+      }
+      if (image.kind === "missing") {
+        // Keep it in the gateway snapshot so buildUserContent emits its
+        // omission marker, but never persist a key whose object is gone.
+        contentImageParts.push(chatImagePart(ref, usedIds));
+        continue;
+      }
+      contentImageParts.push(image.part);
+      persistedImageParts.push(image.part);
+    }
+
     let thread = body.threadId
       ? await getThread({ threadId: body.threadId, userId: user.id })
       : null;
@@ -202,20 +237,11 @@ export async function POST(
           if (!closed) controller.enqueue(encoder.encode(": ping\n\n"));
         }, 10_000);
 
-        const imageParts: ImagePart[] = [];
         let requestHadImages = false;
         try {
-          // A retry reuses the already-persisted failed turn: its blobs and its
-          // user row already exist, so neither may be created a second time.
-          const isRetry = Boolean(body.retryOfMessageId);
-          for (const attachment of (isRetry ? [] : body.images) ?? []) {
-            // Ownership was checked by getThread(project owner) above.
-            const { part } = await storeChatImage(user.id, projectId, attachment);
-            imageParts.push(part);
-          }
           const userContent = await buildUserContent(
             body.message,
-            imageParts,
+            contentImageParts,
             gatewayHistory,
           );
           requestHadImages = Array.isArray(userContent);
@@ -228,7 +254,10 @@ export async function POST(
               threadId: thread.id,
               role: "user",
               content: {
-                parts: [{ type: "text", text: body.message }, ...imageParts],
+                parts: [
+                  { type: "text", text: body.message },
+                  ...persistedImageParts,
+                ],
               },
             });
             userMessageId = userMessage.id;

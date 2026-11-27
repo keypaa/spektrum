@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @spektrum/web build",
+  "rewrites": [
+    {
+      "source": "/engine/:path*",
+      "destination": "https://packages.siglum.org/:path*"
+    }
+  ]
+}

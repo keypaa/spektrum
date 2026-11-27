@@ -83,6 +83,8 @@ export interface PdfChromeProps {
   onGoToPdf: () => void;
   onSearch: () => void;
   pdfUrl: string | null;
+  /** Bytes from a local WASM compile; exposed as a blob URL for download/open. */
+  pdfBytes?: Uint8Array | null;
   mainFile: string | null;
   durationMs: number | null;
   isCurrent: boolean;
@@ -103,6 +105,7 @@ export function PdfChrome({
   onGoToPdf,
   onSearch,
   pdfUrl,
+  pdfBytes = null,
   mainFile,
   durationMs,
   isCurrent,
@@ -110,6 +113,24 @@ export function PdfChrome({
   darkMode,
   zoomShortcuts,
 }: PdfChromeProps): React.ReactElement {
+  // A local compile has no server URL yet: hand the raw PDF bytes to the
+  // browser as a short-lived blob URL so Download / Open still work. Create it
+  // in an effect (not during render) and revoke it when the bytes change or
+  // the chrome unmounts instead of leaking the PDF.
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pdfBytes || pdfBytes.byteLength === 0) {
+      setLocalPdfUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(
+      new Blob([pdfBytes as BlobPart], { type: "application/pdf" }),
+    );
+    setLocalPdfUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pdfBytes]);
+  const openUrl = localPdfUrl ?? pdfUrl;
+
   const [barVisible, setBarVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // True while the pointer is inside the bar. The window-level pointermove
@@ -301,7 +322,7 @@ export function PdfChrome({
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => {
-                if (pdfUrl) window.open(pdfUrl, "_blank", "noopener");
+                if (openUrl) window.open(openUrl, "_blank", "noopener");
               }}
             >
               Open in new window
@@ -310,9 +331,9 @@ export function PdfChrome({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {pdfUrl ? (
+        {openUrl ? (
           <a
-            href={pdfUrl}
+            href={openUrl}
             download
             aria-label="Download"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border-preview)]"

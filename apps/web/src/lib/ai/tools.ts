@@ -15,7 +15,6 @@ import {
 } from "@/lib/documents";
 import { getProject } from "@/lib/projects";
 import { extractPdfText } from "./pdf-text";
-import { enqueueProjectCompile } from "@/lib/compile-request";
 import {
   DiffError,
   proposeCreate,
@@ -272,37 +271,29 @@ export async function executeTool(
     }
 
     case "compile": {
+      // There is no server compile on this branch. Polling `pdf_renders`
+      // would hang for the old 35 s timeout on a render that will never
+      // arrive: either return a committed render for the current documents,
+      // or hand control back to the user and let the editor compile locally.
       const revision = revisionHash(await listRevisionDocuments(ctx.projectId));
-      const pre = await latestRender(ctx.projectId, revision);
-      const enqueued = await enqueueProjectCompile(
-        { id: ctx.userId },
-        ctx.projectId,
-        ctx.mainFile,
-      );
-      if (enqueued.kind === "rate_limited") {
-        return { ok: false, summary: "compile rate limited", fatal: false };
-      }
-      if (enqueued.kind === "not_found") {
-        return { ok: false, summary: "main file not found", fatal: false };
-      }
-      const result = await compileAndWait(
-        ctx.projectId,
-        enqueued.revision,
-        pre
-          ? {
-              status: pre.status,
-              durationMs: pre.durationMs,
-              log: pre.log,
-            }
-          : undefined,
-      );
-      if (result.status === "timeout") {
-        return { ok: false, summary: "compile timed out", fatal: false };
+      const committed = await latestRender(ctx.projectId, revision);
+      if (committed?.status === "ok") {
+        return {
+          ok: true,
+          summary: "compile ok (current committed render)",
+          data: {
+            status: "ok",
+            revision,
+            current: true,
+            diagnostics: committed.diagnostics ?? [],
+          },
+        };
       }
       return {
-        ok: true,
-        summary: `compile ${result.status}`,
-        data: { status: result.status, diagnostics: result.diagnostics },
+        ok: false,
+        fatal: false,
+        summary:
+          "Compilation runs in the editor, not in chat. Please compile there (Ctrl+S or the refresh button) and ask me again; I can then read the committed PDF and logs.",
       };
     }
 
