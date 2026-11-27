@@ -84,7 +84,9 @@ vi.mock("@/lib/documents", async (io) => {
   };
 });
 
+import { POST as signPOST } from "@/app/api/uploads/sign/route";
 import { MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
+import { assertScopedKey } from "@/lib/upload/scoped-key";
 import { POST } from "./route";
 
 const req = (
@@ -170,10 +172,8 @@ describe("POST /api/projects/:projectId/upload", () => {
         ],
       },
     ]);
-    expect(state.quotaCalls).toEqual([
-      { userId: "u1", bytes: 4 },
-      { userId: "u1", bytes: 5 },
-    ]);
+    // The commit route never charges quota; signing already did.
+    expect(state.quotaCalls).toEqual([]);
   });
 
   it("400 for a key under another user, without reading or persisting it", async () => {
@@ -210,15 +210,54 @@ describe("POST /api/projects/:projectId/upload", () => {
     expect(state.quotaCalls).toEqual([]);
   });
 
-  it("429 with Retry-After when the storage quota is exhausted", async () => {
-    state.quotaAllowed = false;
+  it("charges quota only when signing each key, never on commit", async () => {
+    const sizes = [4, 5];
+    const names = ["paper.pdf", "notes.pdf"];
+    const exts = ["pdf", "pdf"];
+    const keys: string[] = [];
+    for (let i = 0; i < sizes.length; i += 1) {
+      const signReq = new Request("http://localhost:3000/api/uploads/sign", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000", "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "workspace",
+          ext: exts[i],
+          contentType: "application/pdf",
+          sizeBytes: sizes[i],
+        }),
+      }) as never;
+      const signedRes = await signPOST(signReq);
+      expect(signedRes.status).toBe(201);
+      const signed = (await signedRes.json()) as { key: string };
+      expect(assertScopedKey("u1", "workspace", signed.key)).toBe(true);
+      keys.push(signed.key);
+      state.objects.set(signed.key, {
+        body: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+        size: sizes[i]!,
+      });
+    }
+    expect(state.quotaCalls).toEqual([
+      { userId: "u1", bytes: 4 },
+      { userId: "u1", bytes: 5 },
+    ]);
+
     const res = await POST(
-      req({ files: [{ name: "paper.pdf", blobKey: OWNER_A }] }),
+      req({
+        files: keys.map((blobKey, i) => ({
+          name: names[i],
+          blobKey,
+          contentType: "application/pdf",
+        })),
+      }),
       ctx(),
     );
-    expect(res.status).toBe(429);
-    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
-    expect(state.uploadCalls).toEqual([]);
+    expect(res.status).toBe(201);
+    expect(state.uploadCalls).toHaveLength(1);
+    // Still exactly two sign-time charges after the commit.
+    expect(state.quotaCalls).toEqual([
+      { userId: "u1", bytes: 4 },
+      { userId: "u1", bytes: 5 },
+    ]);
   });
 
   it("404 when the project is missing", async () => {

@@ -72,7 +72,9 @@ vi.mock("@/lib/import/import-archive", () => ({
   },
 }));
 
+import { POST as signPOST } from "@/app/api/uploads/sign/route";
 import { MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
+import { assertScopedKey } from "@/lib/upload/scoped-key";
 import { POST } from "./route";
 
 const req = (
@@ -124,7 +126,8 @@ describe("POST /api/import", () => {
     const body = (await res.json()) as { report: { projects: number } };
     expect(body.report.projects).toBe(1);
     expect(state.importCalls).toEqual([{ userId: "u1", bytes: ZIP_MAGIC }]);
-    expect(state.quotaCalls).toEqual([{ userId: "u1", bytes: ZIP_MAGIC.byteLength }]);
+    // No commit-time quota charge: the sign route already counted the bytes.
+    expect(state.quotaCalls).toEqual([]);
   });
 
   it("400 for a key under another user, without reading the object", async () => {
@@ -158,12 +161,32 @@ describe("POST /api/import", () => {
     expect(state.importCalls).toEqual([]);
   });
 
-  it("429 with Retry-After when the storage quota is exhausted", async () => {
-    state.quotaAllowed = false;
-    const res = await POST(req());
-    expect(res.status).toBe(429);
-    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
-    expect(state.importCalls).toEqual([]);
+  it("charges the quota once at signing and not again on commit", async () => {
+    const signReq = new Request("http://localhost:3000/api/uploads/sign", {
+      method: "POST",
+      headers: { origin: "http://localhost:3000", "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "import",
+        ext: "zip",
+        contentType: "application/zip",
+        sizeBytes: ZIP_MAGIC.byteLength,
+      }),
+    }) as never;
+    const signedRes = await signPOST(signReq);
+    expect(signedRes.status).toBe(201);
+    const signed = (await signedRes.json()) as { key: string };
+    expect(assertScopedKey("u1", "import", signed.key)).toBe(true);
+    expect(state.quotaCalls).toEqual([
+      { userId: "u1", bytes: ZIP_MAGIC.byteLength },
+    ]);
+
+    const res = await POST(req({ name: "p.zip", blobKey: signed.key }));
+    expect(res.status).toBe(200);
+    expect(state.importCalls).toHaveLength(1);
+    // Still exactly one charge after the commit.
+    expect(state.quotaCalls).toEqual([
+      { userId: "u1", bytes: ZIP_MAGIC.byteLength },
+    ]);
   });
 
   it("400 for a malformed body", async () => {

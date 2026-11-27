@@ -14,7 +14,7 @@ import { BUDGETS, consume } from "@spektrum/shared/rate-limit";
 import { errorResponse } from "@/auth/route-errors";
 import { ProjectNotFoundError, uploadFiles, type UploadInput } from "@/lib/documents";
 import { assertScopedKey } from "@/lib/upload/scoped-key";
-import { consumeStorageQuota, MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
 
 export const runtime = "nodejs";
 
@@ -93,19 +93,8 @@ export async function POST(
         bytes: new Uint8Array(object.body),
         contentType: file.contentType,
       });
-
-      const quota = await consumeStorageQuota(user.id, object.size);
-      if (!quota.allowed) {
-        return NextResponse.json(
-          { error: "rate_limited" },
-          {
-            status: 429,
-            headers: {
-              "retry-after": String(Math.max(1, Math.ceil(quota.retryAfterMs / 1000))),
-            },
-          },
-        );
-      }
+      // The quota was charged by /api/uploads/sign when the key was minted;
+      // do not charge these bytes a second time when persisting the object.
     }
 
     const result = await uploadFiles(user.id, projectId, files);

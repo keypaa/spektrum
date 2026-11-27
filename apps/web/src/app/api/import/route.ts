@@ -16,7 +16,7 @@ import { importArchive } from "@/lib/import/import-archive";
 import { limitsFromEnv } from "@/lib/import/limits";
 import { assertZipMagic, SniffError } from "@/lib/upload/sniff";
 import { assertScopedKey } from "@/lib/upload/scoped-key";
-import { consumeStorageQuota, MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload/quotas";
 import { ZipError } from "@/lib/import/zip";
 
 export const runtime = "nodejs";
@@ -89,20 +89,8 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
-    // Charge the daily byte budget again now that the object is persisted.
-    const quota = await consumeStorageQuota(user.id, object.size);
-    if (!quota.allowed) {
-      return NextResponse.json(
-        { error: "rate_limited" },
-        {
-          status: 429,
-          headers: {
-            "retry-after": String(Math.max(1, Math.ceil(quota.retryAfterMs / 1000))),
-          },
-        },
-      );
-    }
-
+    // The quota was already charged when /api/uploads/sign minted this key;
+    // charging again here would consume twice the bytes for one file.
     const report = await importArchive(user.id, bytes, limits);
     return NextResponse.json({ report });
   } catch (e) {
