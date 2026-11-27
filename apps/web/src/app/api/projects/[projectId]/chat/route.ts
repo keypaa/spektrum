@@ -43,6 +43,10 @@ import { recordUsage } from "@/lib/ai/usage";
 import { generateTitle } from "@/lib/ai/title";
 
 export const dynamic = "force-dynamic";
+// Vercel Hobby caps a function (including an SSE stream) at 300 s. The gateway
+// stream should finish well inside that; the export keeps the platform limit
+// explicit instead of relying on an implicit default.
+export const maxDuration = 300;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

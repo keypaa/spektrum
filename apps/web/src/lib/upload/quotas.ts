@@ -1,11 +1,12 @@
 // Per-user storage quotas for direct-to-R2 uploads (serverless plan Task 3).
 //
 // The byte counter is deliberately approximate: a signed PUT is a bearer
-// credential and we cannot observe the actual bytes until a later task reads
-// the object back with getObject. We count declared bytes when the URL is
-// minted (and again when an object is persisted) without any rollback, so an
-// abandoned PUT still consumes quota. Once the daily byte budget is exceeded,
-// the coarse `storageDay` token bucket locks the user out until UTC midnight.
+// credential and the app never sees the bytes. We count the declared size once,
+// when /api/uploads/sign mints the URL, with no rollback, so an abandoned PUT
+// still consumes quota. Persisting a key does not charge again (the sign route
+// already did); consumers only re-read the object to enforce its per-kind cap.
+// Once the daily byte budget is exceeded, the coarse `storageDay` token bucket
+// locks the user out until UTC midnight.
 
 import { BUDGETS, consume, getRedis } from "@spektrum/shared/rate-limit";
 import type { UploadKind } from "./scoped-key";

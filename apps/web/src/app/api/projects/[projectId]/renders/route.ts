@@ -15,6 +15,9 @@ import {
 } from "@/lib/render-commit";
 
 export const runtime = "nodejs";
+// Committing a render verifies every signed key with getObject before writing
+// the row; allow the full Hobby budget for a large PDF/SyncTeX pair.
+export const maxDuration = 300;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

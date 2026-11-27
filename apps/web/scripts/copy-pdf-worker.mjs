@@ -13,7 +13,8 @@ console.log("copied", clientSource, "-> apps/web/public/pdf.worker.min.mjs");
 // bundled into. Neither `next build` nor `next dev` emits that file, so copy
 // the worker next to the chunks. `--server` runs after `next build` (the
 // standalone output does not exist before it); `--server-dev` runs before
-// `next dev`.
+// `next dev`. Vercel builds have no standalone output at all (next.config.ts
+// disables it when VERCEL=1), so that target is VPS-only.
 if (process.argv.includes("--server") || process.argv.includes("--server-dev")) {
   const serverSource = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
   const dev = process.argv.includes("--server-dev");
@@ -24,7 +25,9 @@ if (process.argv.includes("--server") || process.argv.includes("--server-dev")) 
       ]
     : [
         resolve(here, "../.next/server/chunks"),
-        resolve(here, "../.next/standalone/apps/web/.next/server/chunks"),
+        ...(process.env.VERCEL === "1"
+          ? []
+          : [resolve(here, "../.next/standalone/apps/web/.next/server/chunks")]),
       ];
   for (const dir of targets) {
     if (!existsSync(dir)) {
