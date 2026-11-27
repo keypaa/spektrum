@@ -51,24 +51,37 @@ export function loadEngineOnce(engine: WasmEngineLike): Promise<void> {
   return pending;
 }
 
+async function runWithEngine(
+  engine: WasmEngineLike,
+  input: CompileInput,
+): Promise<CompileOutcome> {
+  await loadEngineOnce(engine);
+  for (const [path, contents] of Object.entries(input.files)) {
+    await engine.write(
+      path,
+      typeof contents === "string" ? utf8.encode(contents) : contents,
+    );
+  }
+  return engine.run(input.mainFile);
+}
+
 /**
  * Write the project into the engine's in-memory filesystem and compile it.
- * The engine is injectable so callers (and tests) can supply their own instance;
- * without one a worker-backed engine loading from the CDN is created lazily.
+ * The engine is injectable so callers (and tests) can supply their own instance.
+ * By default the worker path is tried first; if the worker cannot be built or
+ * its protocol fails (e.g. no nested dedicated workers in Safari), retry once
+ * through the direct main-thread adapter.
  */
 export async function compileInBrowser(
   input: CompileInput,
   engine?: WasmEngineLike,
 ): Promise<CompileOutcome> {
-  const target = engine ?? createWorkerEngine();
-  await loadEngineOnce(target);
-  for (const [path, contents] of Object.entries(input.files)) {
-    await target.write(
-      path,
-      typeof contents === "string" ? utf8.encode(contents) : contents,
-    );
+  if (engine) return runWithEngine(engine, input);
+  try {
+    return await runWithEngine(createWorkerEngine(), input);
+  } catch {
+    return runWithEngine(createWasmEngine(), input);
   }
-  return target.run(input.mainFile);
 }
 
 /** Turn a TeX log into the compact diagnostics the rest of the app consumes. */
@@ -104,14 +117,6 @@ export function parseDiagnostics(
   return diagnostics;
 }
 
-type SiglumRuntime = {
-  wasmUrl: string;
-  jsUrl: string;
-  bundlesUrl: string;
-  ctanProxyUrl: string;
-  xzwasmUrl: string;
-};
-
 type SiglumResult = {
   success: boolean;
   pdf?: Uint8Array;
@@ -134,11 +139,6 @@ type SiglumCompilerLike = {
   ): Promise<SiglumResult>;
 };
 
-type SiglumModule = {
-  SiglumCompiler: new (options: SiglumRuntime) => SiglumCompilerLike;
-  resolveRuntime(options: { baseUrl: string }): Promise<SiglumRuntime>;
-};
-
 /** Shared mapping: the SDK result can be non-zero even when a PDF exists. */
 function toOutcome(result: SiglumResult, started: number): CompileOutcome {
   const ok = result.success === true && (result.exitCode ?? 0) === 0;
@@ -154,30 +154,23 @@ function toOutcome(result: SiglumResult, started: number): CompileOutcome {
 }
 
 export type WasmEngineOptions = {
-  /** ES module URL of the pinned SDK; required because no SDK is vendored. */
-  moduleUrl?: string;
+  /** Runtime asset origin; defaults to the EnginePick CDN from Task 1. */
   assetOrigin?: string;
 };
 
 /**
- * Real engine adapter: dynamically imports the SDK, resolves its matching
- * runtime from the CDN origin, then maps compile results to CompileOutcome.
+ * Direct adapter: lazily imports the pinned SDK, resolves its matching runtime
+ * from the external CDN, then maps compile results to CompileOutcome. Used as
+ * the main-thread engine and as the fallback when a worker is unavailable.
  */
 export function createWasmEngine(options: WasmEngineOptions = {}): WasmEngineLike {
   const assetOrigin = options.assetOrigin ?? ENGINE_ASSET_ORIGIN;
-  const moduleUrl =
-    options.moduleUrl ?? process.env.NEXT_PUBLIC_SIGLUM_ENGINE_MODULE_URL;
   const files = new Map<string, Uint8Array>();
   let compiler: SiglumCompilerLike | null = null;
 
   return {
     async load() {
-      if (!moduleUrl) {
-        throw new Error(
-          "No WASM engine module configured: set NEXT_PUBLIC_SIGLUM_ENGINE_MODULE_URL to the @siglum/engine ES module URL",
-        );
-      }
-      const sdk = (await import(/* @vite-ignore */ moduleUrl)) as SiglumModule;
+      const sdk = await import("@siglum/engine");
       const runtime = await sdk.resolveRuntime({ baseUrl: assetOrigin });
       compiler = new sdk.SiglumCompiler(runtime);
       await compiler.init();
@@ -204,63 +197,16 @@ export function createWasmEngine(options: WasmEngineOptions = {}): WasmEngineLik
   };
 }
 
-// The engine runs off the main thread. A blob worker keeps the compiled bundle
-// free of engine assets; the SDK module URL and CDN origin arrive as messages.
-const WORKER_SOURCE = `
-let compiler = null;
-let files = new Map();
-const dec = new TextDecoder();
-
-self.onmessage = async (event) => {
-  const { id, type } = event.data;
-  try {
-    if (type === "load") {
-      const mod = await import(event.data.moduleUrl);
-      const runtime = await mod.resolveRuntime({ baseUrl: event.data.assetOrigin });
-      compiler = new mod.SiglumCompiler(runtime);
-      await compiler.init();
-      files = new Map();
-      self.postMessage({ id, ok: true });
-      return;
-    }
-    if (type === "write") {
-      files.set(event.data.path, event.data.bytes);
-      self.postMessage({ id, ok: true });
-      return;
-    }
-    if (type === "run") {
-      const main = files.get(event.data.mainFile);
-      if (!main) throw new Error("main file was not written: " + event.data.mainFile);
-      const additionalFiles = {};
-      for (const [path, bytes] of files) {
-        if (path !== event.data.mainFile) additionalFiles[path] = bytes;
-      }
-      const started = Date.now();
-      const result = await compiler.compile(dec.decode(main), {
-        mainFile: event.data.mainFile,
-        additionalFiles,
-        engine: "auto",
-      });
-      // The main thread normalises the raw result into a CompileOutcome.
-      self.postMessage({ id, ok: true, result, started });
-      return;
-    }
-    throw new Error("unknown worker message: " + type);
-  } catch (error) {
-    self.postMessage({ id, ok: false, error: error instanceof Error ? error.message : String(error) });
-  }
-};
-`;
-
 type WorkerReply =
-  | { ok: true; result?: SiglumResult; started?: number }
+  | { ok: true; outcome?: CompileOutcome }
   | { ok: false; error: string };
 
-/** Worker-backed implementation of the same engine boundary. */
+/**
+ * Worker-backed implementation of the same engine boundary. The worker entry
+ * imports the installed SDK itself, so no runtime module URL is needed here.
+ */
 export function createWorkerEngine(options: WasmEngineOptions = {}): WasmEngineLike {
   const assetOrigin = options.assetOrigin ?? ENGINE_ASSET_ORIGIN;
-  const moduleUrl =
-    options.moduleUrl ?? process.env.NEXT_PUBLIC_SIGLUM_ENGINE_MODULE_URL;
   let worker: Worker | null = null;
   let nextId = 0;
   const pending = new Map<
@@ -279,16 +225,11 @@ export function createWorkerEngine(options: WasmEngineOptions = {}): WasmEngineL
 
   return {
     async load() {
-      if (!moduleUrl) {
-        throw new Error(
-          "No WASM engine module configured: set NEXT_PUBLIC_SIGLUM_ENGINE_MODULE_URL to the @siglum/engine ES module URL",
-        );
-      }
-      const url = URL.createObjectURL(
-        new Blob([WORKER_SOURCE], { type: "text/javascript" }),
-      );
-      worker = new Worker(url, { type: "module" });
-      URL.revokeObjectURL(url);
+      // `new Worker(new URL(...))` is bundled by Turbopack (as in the Monaco
+      // environment) instead of fetching engine bytes at runtime.
+      worker = new Worker(new URL("./wasm-worker.ts", import.meta.url), {
+        type: "module",
+      });
       worker.onmessage = (event: MessageEvent<{ id: number } & WorkerReply>) => {
         const entry = pending.get(event.data.id);
         if (!entry) return;
@@ -301,7 +242,7 @@ export function createWorkerEngine(options: WasmEngineOptions = {}): WasmEngineL
         for (const entry of pending.values()) entry.reject(error);
         pending.clear();
       };
-      await call("load", { moduleUrl, assetOrigin });
+      await call("load", { assetOrigin });
     },
     async write(path, bytes) {
       await call("write", { path, bytes });
@@ -309,8 +250,8 @@ export function createWorkerEngine(options: WasmEngineOptions = {}): WasmEngineL
     async run(mainFile) {
       const reply = await call("run", { mainFile });
       if (!reply.ok) throw new Error(reply.error);
-      if (!reply.result) throw new Error("WASM worker returned no result");
-      return toOutcome(reply.result, reply.started ?? Date.now());
+      if (!reply.outcome) throw new Error("WASM worker returned no outcome");
+      return reply.outcome;
     },
   };
 }
