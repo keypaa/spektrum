@@ -316,8 +316,8 @@ git commit -m "feat(compile): commit browser compile results with ownership chec
 ### Task 8: Editor, PDF and SyncTeX clients use local compile state
 
 **Files:**
-- Modify: `apps/web/src/lib/render-client.ts`, `apps/web/src/lib/compile-client.ts`, `apps/web/src/lib/synctex-client.ts`, `apps/web/src/components/pdf/pdf-chrome.tsx`, `apps/web/src/app/(app)/u/[projectId]/editor-client.tsx`
-- Test: `apps/web/src/lib/render-client.test.ts`, `apps/web/src/components/pdf/pdf-chrome.test.tsx`, `editor-client.test.tsx`
+- Modify: `apps/web/src/lib/render-client.ts`, `apps/web/src/lib/compile-client.ts`, `apps/web/src/lib/synctex-client.ts`, `apps/web/src/lib/ai/tools.ts`, `apps/web/src/components/pdf/pdf-chrome.tsx`, `apps/web/src/app/(app)/u/[projectId]/editor-client.tsx`
+- Test: `apps/web/src/lib/render-client.test.ts`, `apps/web/src/components/pdf/pdf-chrome.test.tsx`, `editor-client.test.tsx`, `apps/web/src/lib/ai/tools.test.ts`
 
 **Interfaces:**
 - Consumes: `compileInBrowser`, `commitRender`, `presignDownload`.
@@ -334,7 +334,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement**
 
-Replace the `EventSource` subscription with the local hook; keep the `RenderEvent` shape so status pills and logs work unchanged. Preserve Ctrl+S save and autosave behaviour in `editor-client.tsx`.
+Replace the `EventSource` subscription with the local hook; keep the `RenderEvent` shape so status pills and logs work unchanged. Preserve Ctrl+S save and autosave behaviour in `editor-client.tsx`. Change the AI `compile` tool so it no longer polls for a server render that will never exist: it must ask the user to compile in the editor (or return the current committed render), not time out after 35 s.
 
 - [ ] **Step 4: Run tests**
 
