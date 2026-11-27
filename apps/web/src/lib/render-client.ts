@@ -1,8 +1,11 @@
+"use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   renderEventSchema,
   type RenderEvent,
 } from "@spektrum/shared/compile";
+import { runLocalCompile } from "@/lib/compile-client";
 
 /** Parse one SSE `data:` payload; null when it is not a render event. */
 export function parseRenderEvent(data: string): RenderEvent | null {
@@ -14,55 +17,43 @@ export function parseRenderEvent(data: string): RenderEvent | null {
   }
 }
 
-export interface RenderState {
+export interface LocalCompileState {
   status: RenderEvent | null;
-  connected: boolean;
+  start(mainFile: string): Promise<void>;
 }
 
-/** Subscribe to a project's render stream. */
-export function useRenderStream(projectId: string): RenderState {
-  const [state, setState] = useState<RenderEvent | null>(null);
-  const [connected, setConnected] = useState(false);
-  const retryRef = useRef(0);
+/**
+ * Local compile state for the editor. There is no server render stream on this
+ * branch: `start` runs the WASM engine in this tab and publishes the same
+ * `RenderEvent` shapes the status pill, logs and error banner already consume.
+ */
+export function useLocalCompile(projectId: string): LocalCompileState {
+  const [status, setStatus] = useState<RenderEvent | null>(null);
+  const running = useRef(false);
+  const mounted = useRef(true);
 
-  const connect = useCallback(() => {
-    // jsdom (unit tests) and SSR have no EventSource; the e2e covers the live path.
-    if (typeof EventSource === "undefined") return () => undefined;
-    const source = new EventSource(
-      `/api/projects/${projectId}/render/stream`,
-    );
-    source.onopen = () => {
-      retryRef.current = 0;
-      setConnected(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
     };
-    source.addEventListener("status", (e) => {
-      const event = parseRenderEvent((e as MessageEvent).data);
-      if (event) setState(event);
-    });
-    source.addEventListener("log", (e) => {
-      const event = parseRenderEvent((e as MessageEvent).data);
-      if (event) setState(event);
-    });
-    source.addEventListener("result", (e) => {
-      const event = parseRenderEvent((e as MessageEvent).data);
-      if (event) setState(event);
-    });
-    source.addEventListener("conflict", (e) => {
-      const event = parseRenderEvent((e as MessageEvent).data);
-      if (event) setState(event);
-    });
-    source.onerror = () => {
-      setConnected(false);
-      source.close();
-      retryRef.current += 1;
-      if (retryRef.current <= 5) {
-        setTimeout(connect, 500 * retryRef.current);
+  }, []);
+
+  const start = useCallback(
+    async (mainFile: string) => {
+      if (!mainFile || running.current) return;
+      running.current = true;
+      setStatus(null);
+      try {
+        await runLocalCompile(projectId, mainFile, (event) => {
+          if (mounted.current) setStatus(event);
+        });
+      } finally {
+        running.current = false;
       }
-    };
-    return () => source.close();
-  }, [projectId]);
+    },
+    [projectId],
+  );
 
-  useEffect(() => connect(), [connect]);
-
-  return { status: state, connected };
+  return { status, start };
 }

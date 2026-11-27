@@ -50,8 +50,8 @@ import { sha256Hex } from "@spektrum/shared/hash";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
 import { useAutosave } from "./use-autosave";
-import { requestCompile } from "@/lib/compile-client";
-import { useRenderStream } from "@/lib/render-client";
+import { getLocalPdfBytes } from "@/lib/compile-client";
+import { useLocalCompile } from "@/lib/render-client";
 import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
 import { PdfChrome, pillState } from "@/components/pdf/pdf-chrome";
@@ -405,21 +405,23 @@ export function EditorClient({
     onError: () => flashSaveNote("error"),
   });
 
-  const render = useRenderStream(project.id);
+  const { status: renderStatus, start: startLocalCompile } = useLocalCompile(
+    project.id,
+  );
   const pdfPageRef = useRef<PdfViewerHandle | null>(null);
   // Keep the last successful URL: a `status: running|error` frame must not
   // unmount the pane (spec §11.2 partial renders).
   const [pdfUrl, setPdfUrl] = useState<string | null>(
     initialRender?.pdfUrl ?? null,
   );
-  // Server-authoritative view of the latest render. SSE events are hints;
-  // /render/latest (backed by getLatestRender) decides which revision is
-  // current, so a directly-issued compile still updates the pill/banner.
+  // Server-side history view of the latest render. Local events drive the
+  // pill immediately; /render/latest is read after a commit so metadata that
+  // only the server knows (isCurrent, last ok revision) stays accurate.
   const [liveRender, setLiveRender] = useState(initialRender);
   useEffect(() => setLiveRender(initialRender), [initialRender]);
   useEffect(() => {
-    if (render.status?.event === "result") setPdfUrl(render.status.pdfUrl);
-  }, [render.status]);
+    if (renderStatus?.event === "result") setPdfUrl(renderStatus.pdfUrl);
+  }, [renderStatus]);
 
   const refreshRender = useCallback(async () => {
     try {
@@ -430,13 +432,13 @@ export function EditorClient({
       const body = (await res.json()) as { render: typeof liveRender };
       setLiveRender(body.render);
     } catch {
-      // Keep the last known render; the stream will try again on the next event.
+      // Keep the last known render; the next local event will retry.
     }
   }, [project.id]);
 
   useEffect(() => {
-    if (render.status) void refreshRender();
-  }, [render.status, refreshRender]);
+    if (renderStatus) void refreshRender();
+  }, [renderStatus, refreshRender]);
   const [zoom, setZoom] = useState(100);
   const [page, setPage] = useState(1);
   const [numPages, setNumPages] = useState(0);
@@ -445,7 +447,7 @@ export function EditorClient({
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
-  // Set while leaving the project: a late SSE `meta` event must not navigate
+  // Set while leaving the project: a late chat stream event must not navigate
   // us back into the project we just left.
   const navigatingAway = useRef(false);
 
@@ -556,9 +558,14 @@ export function EditorClient({
   const cursorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const status = render.status;
-    if (status && "revision" in status) setRevision(status.revision);
-  }, [render.status]);
+    const status = renderStatus;
+    if (status && "revision" in status) {
+      setRevision(status.revision);
+      // A locally accepted compile is the revision the pill must be judged
+      // against: no server job will publish a different one later.
+      setCurrentOverride(status.revision);
+    }
+  }, [renderStatus]);
 
   useEffect(() => {
     const mapRevision = lastOk || revision;
@@ -609,28 +616,28 @@ export function EditorClient({
     liveRender?.diagnostics ?? [],
   );
   useEffect(() => {
-    if (render.status?.event !== "status" || render.status.state !== "error")
-      return;
-    void fetch(`/api/projects/${project.id}/render/latest`, {
-      cache: "no-store",
-    })
-      .then((res) => res.json())
-      .then((body: { render?: { diagnostics?: Diagnostic[] } | null }) => {
-        setLatestDiagnostics(body.render?.diagnostics ?? []);
-      })
-      .catch(() => undefined);
-  }, [render.status, project.id]);
+    const status = renderStatus;
+    if (!status) return;
+    if (status.event === "status" && status.state === "error") {
+      // A local failure never reaches `pdf_renders`, so its diagnostics and
+      // raw log arrive on the event itself rather than from /render/latest.
+      if (status.diagnostics) setLatestDiagnostics(status.diagnostics);
+      if (status.log !== undefined) setLog(status.log);
+      if (status.message) setCompileNotice(status.message);
+    }
+    if (status.event === "result") setLatestDiagnostics(status.diagnostics);
+  }, [renderStatus]);
   const diagnostics =
-    render.status?.event === "result"
-      ? render.status.diagnostics
+    renderStatus?.event === "result"
+      ? renderStatus.diagnostics
       : latestDiagnostics;
 
   // A failed compile must be visible where you are looking. The pill alone
   // changes "Compiled" → "Failed" while the previous PDF stays on screen, and
   // the log text lives behind Tools → Logs, so the failure read as a stale PDF.
-  const failed = render.status
+  const failed = renderStatus
     ? pillState({
-        render: render.status,
+        render: renderStatus,
         isCurrent: liveRender?.isCurrent ?? false,
         dirty: false,
         currentRevision: currentOverride ?? liveRender?.revision ?? null,
@@ -640,12 +647,12 @@ export function EditorClient({
     ? (diagnostics.find((d) => d.severity === "error") ?? diagnostics[0] ?? null)
     : null;
   useEffect(() => {
-    if (render.status?.event === "result")
-      setLastOk(render.status.revision);
-  }, [render.status]);
+    if (renderStatus?.event === "result")
+      setLastOk(renderStatus.revision);
+  }, [renderStatus]);
   const stats =
-    render.status?.event === "result"
-      ? render.status.stats
+    renderStatus?.event === "result"
+      ? renderStatus.stats
       : (liveRender?.stats ?? null);
   const [snapshotRows, setSnapshotRows] = useState<SnapshotRow[]>([]);
 
@@ -706,21 +713,13 @@ export function EditorClient({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const compile = useCallback(async (force = false) => {
+  const compile = useCallback(async () => {
     if (!mainFilePath) return;
     setCompileNotice(null);
-    try {
-      const result = await requestCompile(project.id, mainFilePath, force);
-      // The revision we just asked to compile is now the one the SSE events
-      // should be judged against: a cached hit means it is already current,
-      // and an enqueued job means its result/status events belong on screen.
-      setCurrentOverride(result.revision);
-    } catch (error) {
-      setCompileNotice(
-        error instanceof Error ? error.message : "Compile request failed",
-      );
-    }
-  }, [project.id, mainFilePath]);
+    // The hook owns the whole local pipeline: accept the revision, run WASM,
+    // upload artefacts and commit. The status pill follows its events.
+    await startLocalCompile(mainFilePath);
+  }, [mainFilePath, startLocalCompile]);
 
   // Project open: compile when the persisted render is not the current revision.
   const mountCompiled = useRef(false);
@@ -734,7 +733,7 @@ export function EditorClient({
   // A conflict event is for the tab that did not save: reload that document
   // and keep the cursor (spec §11.0). A dirty buffer is never clobbered.
   useEffect(() => {
-    const status = render.status;
+    const status = renderStatus;
     if (!status || status.event !== "conflict") return;
     if (status.documentId !== activeDoc?.id) return;
     if (dirty) return;
@@ -745,7 +744,7 @@ export function EditorClient({
         editorRef.current?.loadValue(doc.content ?? "");
       })
       .catch(() => undefined);
-  }, [render.status, activeDoc?.id, activePath, project.id]);
+  }, [renderStatus, activeDoc?.id, activePath, project.id]);
 
   // Cmd/Ctrl+S forces a save.
   useEffect(() => {
@@ -1424,7 +1423,7 @@ export function EditorClient({
             <div className="z-10">
               <PdfChrome
                 state={pillState({
-                  render: render.status,
+                  render: renderStatus,
                   isCurrent: liveRender?.isCurrent ?? false,
                   dirty,
                   currentRevision: currentOverride ?? liveRender?.revision ?? null,
@@ -1446,10 +1445,11 @@ export function EditorClient({
                     }
                   });
                 }}
-                onRefresh={() => void compile(true)}
+                onRefresh={() => void compile()}
                 onGoToPdf={() => revealPdfLine(cursorLine.current)}
                 onSearch={() => setSearchOpen(true)}
                 pdfUrl={pdfUrl}
+                pdfBytes={getLocalPdfBytes()}
                 mainFile={liveRender?.mainFile ?? null}
                 durationMs={liveRender?.durationMs ?? null}
                 isCurrent={liveRender?.isCurrent ?? false}

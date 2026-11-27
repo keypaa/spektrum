@@ -3,7 +3,16 @@ import { parseRenderEvent } from "./render-client";
 
 vi.mock("@spektrum/shared/http/guard", () => ({ assertSameOrigin: vi.fn() }));
 
-import { requestCompile } from "./compile-client";
+vi.mock("@/lib/upload/client", () => ({
+  uploadBytesToR2: vi.fn(async () => "u/u1/render/00000000-0000-4000-8000-000000000000.pdf"),
+}));
+
+import { uploadBytesToR2 } from "@/lib/upload/client";
+import {
+  commitLocalRender,
+  requestCompile,
+  uploadRenderArtifacts,
+} from "./compile-client";
 
 describe("parseRenderEvent", () => {
   it("parses a status event", () => {
@@ -73,6 +82,80 @@ describe("requestCompile", () => {
       mainFile: "main.tex",
       force: true,
     });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("uploadRenderArtifacts", () => {
+  const outcome = {
+    pdf: new Uint8Array([37, 80, 68, 70]),
+    log: "ok",
+    synctex: new Uint8Array([1, 2]),
+    diagnostics: [],
+    stats: null,
+    durationMs: 4,
+    ok: true,
+  };
+
+  it("uploads the PDF and SyncTeX through signed render keys", async () => {
+    vi.mocked(uploadBytesToR2)
+      .mockResolvedValueOnce("u/u1/render/a.pdf")
+      .mockResolvedValueOnce("u/u1/render/b.synctex");
+
+    const keys = await uploadRenderArtifacts("p1", outcome);
+
+    expect(keys).toEqual({
+      pdfKey: "u/u1/render/a.pdf",
+      synctexKey: "u/u1/render/b.synctex",
+    });
+    expect(uploadBytesToR2).toHaveBeenNthCalledWith(1, {
+      bytes: outcome.pdf,
+      contentType: "application/pdf",
+      kind: "render",
+      ext: "pdf",
+      projectId: "p1",
+    });
+    expect(uploadBytesToR2).toHaveBeenNthCalledWith(2, {
+      bytes: outcome.synctex,
+      contentType: "application/octet-stream",
+      kind: "render",
+      ext: "synctex",
+      projectId: "p1",
+    });
+  });
+
+  it("does not upload an absent SyncTeX map", async () => {
+    vi.mocked(uploadBytesToR2).mockResolvedValueOnce("u/u1/render/a.pdf");
+    const keys = await uploadRenderArtifacts("p1", { ...outcome, synctex: null });
+    expect(keys.synctexKey).toBeNull();
+    expect(uploadBytesToR2).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("commitLocalRender", () => {
+  it("POSTs the commit body to the ownership-checked route", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response(JSON.stringify({ revision: "a".repeat(64) }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const body = {
+      revision: "a".repeat(64),
+      mainFile: "main.tex",
+      pdfKey: "u/u1/render/a.pdf",
+      synctexKey: null,
+      log: "ok",
+      diagnostics: [],
+      stats: null,
+      durationMs: 4,
+    };
+    await commitLocalRender("p1", body);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("/api/projects/p1/renders");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual(body);
     vi.unstubAllGlobals();
   });
 });

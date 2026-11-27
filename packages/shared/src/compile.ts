@@ -81,6 +81,11 @@ export const renderEventSchema = z.discriminatedUnion("event", [
     event: z.literal("status"),
     state: renderStatusSchema,
     revision: z.string(),
+    // A local WASM failure never reaches a server row, so its diagnostics and
+    // raw log travel with the event. Optional: server SSE frames stay unchanged.
+    diagnostics: z.array(diagnosticSchema).optional(),
+    log: z.string().optional(),
+    message: z.string().optional(),
   }),
   z.object({ event: z.literal("log"), line: z.string() }),
   z.object({
@@ -88,7 +93,9 @@ export const renderEventSchema = z.discriminatedUnion("event", [
     revision: z.string(),
     pdfUrl: z.string(),
     diagnostics: z.array(diagnosticSchema),
-    stats: projectStatsSchema,
+    // The browser SDK reports engine metrics, not genuine ProjectStats. The
+    // compile outcome is deliberately null until a real mapper exists.
+    stats: projectStatsSchema.nullable(),
     durationMs: z.number(),
   }),
   z.object({

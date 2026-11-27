@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, pool } from "@spektrum/db";
 import { listRevisionDocuments } from "@spektrum/db/documents";
@@ -12,21 +12,10 @@ import { revisionHash } from "@spektrum/shared/revision";
 import type { Diagnostic } from "@spektrum/shared/compile";
 import { compileAndWait, executeTool } from "./tools";
 import { extractPdfText } from "./pdf-text";
-
-const state = vi.hoisted(() => ({
-  enqueued: { kind: "enqueued", revision: "r" } as
-    | { kind: "enqueued"; revision: string }
-    | { kind: "cached"; revision: string }
-    | { kind: "rate_limited"; retryAfterMs: number }
-    | { kind: "not_found" },
-  waited: {
-    status: "ok",
-    diagnostics: [] as Diagnostic[],
-  } as { status: "ok" | "error" | "superseded" | "timeout"; diagnostics: Diagnostic[] },
-}));
+import { enqueueProjectCompile } from "@/lib/compile-request";
 
 vi.mock("@/lib/compile-request", () => ({
-  enqueueProjectCompile: vi.fn(async () => state.enqueued),
+  enqueueProjectCompile: vi.fn(async () => ({ kind: "enqueued", revision: "r" })),
 }));
 
 vi.mock("./pdf-text", () => ({
@@ -202,18 +191,42 @@ describe("executeTool proposal tools", () => {
 });
 
 describe("compile tool", () => {
-  it("enqueues and waits for the revision", async () => {
-    state.enqueued = { kind: "enqueued", revision };
-    state.waited = { status: "ok", diagnostics: [] };
-    const result = await executeTool("compile", {}, ctx());
-    expect(result.ok).toBe(true);
-    expect((result as { data?: unknown }).data).toBeDefined();
+  beforeEach(() => {
+    vi.mocked(enqueueProjectCompile).mockClear();
   });
 
-  it("turns a 429 into a non-fatal tool error", async () => {
-    state.enqueued = { kind: "rate_limited", retryAfterMs: 1000 };
+  it("asks the user to compile in the editor instead of polling for a server render", async () => {
+    // The seeded render for this project is an `error` row for the current
+    // revision: there is no committed PDF to return, and no server compile
+    // will ever finish on this branch.
+    const started = Date.now();
     const result = await executeTool("compile", {}, ctx());
+    expect(Date.now() - started).toBeLessThan(1000);
     expect(result).toMatchObject({ ok: false, fatal: false });
+    expect(result.summary).toMatch(/editor/i);
+    expect(result.summary).not.toMatch(/timed out/i);
+    expect(enqueueProjectCompile).not.toHaveBeenCalled();
+  });
+
+  it("returns the current committed render when one exists", async () => {
+    await db
+      .update(pdfRenders)
+      .set({ status: "ok", diagnostics: [] })
+      .where(eq(pdfRenders.projectId, projectId));
+    try {
+      const result = await executeTool("compile", {}, ctx());
+      expect(result.ok).toBe(true);
+      expect((result as { data?: { status: string; current: boolean } }).data).toMatchObject({
+        status: "ok",
+        current: true,
+      });
+      expect(enqueueProjectCompile).not.toHaveBeenCalled();
+    } finally {
+      await db
+        .update(pdfRenders)
+        .set({ status: "error", diagnostics })
+        .where(eq(pdfRenders.projectId, projectId));
+    }
   });
 });
 
