@@ -80,8 +80,9 @@ Browser ──HTTPS──▶ spektrum.vercel.app
 
 Everything that used to be a daemon becomes either a stateless function or a
 browser task. Caddy's TLS/CSP/SSE responsibilities move to Vercel + the
-existing headers in `apps/web/next.config.ts`; its 30 MB body limit becomes a
-Vercel/route limit plus explicit validation.
+existing headers in `apps/web/next.config.ts`. Large files (project imports,
+compiled PDFs, pasted images) are uploaded **directly to R2 with signed URLs**,
+so Vercel's 4.5 MB request-body cap is never in the path.
 
 ## 5. Decisions already made
 
@@ -95,25 +96,30 @@ Vercel/route limit plus explicit validation.
    `spektrum` as the first label. My call — no owned domain is involved.
 3. **Free external data services:** Neon (Postgres + `citext`), Upstash Redis
    (TCP endpoint, Lua/pub-sub supported), Cloudflare R2 (S3-compatible,
-   `forcePathStyle`, two buckets, no egress). These are not paid, but they are
-   separate providers from Vercel — flagged as a question below.
+   `forcePathStyle`, two buckets, no egress). Approved by the owner: both
+   third-party free services and platform-native services are acceptable.
 4. **Public signup:** set `ALLOW_PUBLIC_SIGNUP=true`; keep the invite path and
    `admin:create-owner` for the first owner and admins. Email/password works
    with no external service; Google/GitHub OAuth buttons appear only when both
    credentials are configured.
-5. **Compile: browser-side WASM TeX** with on-demand package fetch — my
-   recommended call, detailed in §6, pending your confirmation.
-6. **No new provider SDKs** for AI; chat still uses the existing
+5. **Compile: browser-side WASM TeX** with on-demand package fetch — approved
+   by the owner, detailed in §6.
+6. **LLM access: BYOK for members.** The owner's server key stays owner-only;
+   public users add their own key in Settings. No LLM spend for the owner and
+   no per-user quota subsystem needed; onboarding must say chat needs a key.
+7. **Uploads: signed direct-to-R2.** Preserve current import/image limits;
+   the browser uploads bytes straight to R2 and the app stores only keys.
+8. **No new provider SDKs** for AI; chat still uses the existing
    OpenAI-compatible gateway via `LLM_BASE_URL` / `LLM_API_KEY`.
-7. **Secrets stay out of the repo**; only `.env.example` and docs change.
+9. **Secrets stay out of the repo**; only `.env.example` and docs change.
 
-## 6. The compile question (most important open decision)
+## 6. Compile pipeline (decided: browser WASM)
 
 The VPS compile pipeline is a permanent BullMQ worker invoking Docker to run a
 TeX Live container (30 s timeout, 1 CPU/1 GB, uid 10001), writing PDF + SyncTeX
 to S3 and publishing SSE events through Redis. None of that can run on Vercel.
 
-**Recommended: compile in the browser.** Bundle a modern WASM TeX engine
+**Decision (owner-approved): compile in the browser.** Bundle a modern WASM TeX engine
 (BusyTeX/TeX Live 2026, or SwiftLaTeX) as static assets on the CDN; on compile,
 the client materialises the project files into the engine's memory filesystem,
 runs the engine in a Web Worker, shows the PDF with the existing PDF.js viewer,
@@ -132,21 +138,22 @@ needs a server-side package cache, and still cannot match full TeX Live.
 **Alternative B — no compile.** Ship an editor + PDF viewer for uploaded PDFs
 only. Simplest and cheapest, but removes the feature Prism users most need.
 
-**Recommendation: browser WASM, with Alternative B's viewer as the fallback
-when the engine cannot be loaded.** This is marked as my call in the doc, but
-it changes what the product can do and therefore needs your confirmation.
+**Chosen: browser WASM, with Alternative B's viewer as the fallback when the
+engine cannot be loaded.** The engine is loaded as an external CDN asset with
+attribution (AGPL engines are not vendored or modified in this repo).
 
 ## 7. Repository changes (what I would actually do)
 
 | Area | Change |
 |---|---|
 | `next.config.ts` | Keep headers; make `output: "standalone"` / `outputFileTracingRoot` conditional so Vercel's builder is not fighting the VPS setup. Set `maxDuration = 300` on chat, render/stream and compile routes. |
-| `vercel.json` | New: build command for the pnpm workspace, function memory/duration, security headers (CSP/HSTS), body-size/rewrite rules where needed. |
+| `vercel.json` | New: build command for the pnpm workspace, function memory/duration, security headers (CSP/HSTS), rewrite rules where needed. No 20 MiB opt-in (Hobby cannot use it). |
+| Uploads | New signed-URL endpoints for import files, pasted images, PDF/log/SyncTeX; browser PUTs directly to R2, app persists only keys. Body sent through functions stays well under 4.5 MB. |
 | `packages/storage/src/index.ts` | Read `S3_ENDPOINT`, `S3_BUCKET`, `S3_PDF_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` (default `auto`), keep `forcePathStyle` configurable. No logic change for SeaweedFS/VPS. |
 | `apps/web/src/lib/env/validation` | Keep existing required keys; add `S3_REGION`, `ALLOW_PUBLIC_SIGNUP`; make VPS-only keys optional (`PUBLIC_URL`, `ACME_EMAIL`, `POSTGRES_*`, `METRICS_TOKEN`, host cron vars). Update `.env.example` and its test. |
 | `apps/web/src/lib/ai/chat` | Unchanged behaviour; SSE and image handling stay. Ensure function duration covers streams. |
 | Compile queue/stream | Replace the Docker-backed worker path with the browser-WASM flow; keep DB rows and SSE event names so the UI contract stays stable. Redis pub/sub remains for multi-instance SSE fan-out. |
-| Auth/signup | Default `ALLOW_PUBLIC_SIGNUP=true` in serverless config; add docs and CLI steps for first owner; OAuth remains credential-gated. |
+| Auth/signup | Default `ALLOW_PUBLIC_SIGNUP=true` in serverless config; add docs and CLI steps for first owner; OAuth remains credential-gated. Onboarding says chat needs the user's own LLM key (BYOK); no server-key quota subsystem. |
 | Migrations | Add a documented release step (`pnpm db:migrate` against Neon) and `CREATE EXTENSION IF NOT EXISTS citext`; R2 buckets created once via `wrangler` or dashboard. |
 | Tests | Keep the VPS CI green on `main`; add serverless config/env tests and a compile-flow unit test. CI does not deploy this branch. |
 | Docs | New `docs/serverless-deployment.md` + linked README entries; cover provisioning, env table, release, backups, limits, and what differs from VPS. |
@@ -225,31 +232,16 @@ it changes what the product can do and therefore needs your confirmation.
 - How to condition `output: "standalone"` for Vercel without touching VPS builds.
 - Fallback naming if `spektrum.vercel.app` is already taken.
 
-## 13. Builder-check resolutions and remaining decisions
+## 13. Decisions (owner-confirmed)
 
-Resolved by the project/conversation (recorded so a builder need not guess):
-- **No data migration.** Nothing is live on the VPS path yet; this branch is a
-  clean-slate deployment. Fresh Neon/R2/Upstash instances are sufficient.
-- **WASM engine licensing.** My call: prefer a permissive engine. If only an
-  AGPL engine can meet the compile requirements, load it as an external CDN
-  asset with attribution rather than vendoring or modifying it in this repo.
-- **OAuth timing.** My call: keep Google/GitHub wired but hidden until you add
-  credentials; email/password signup works from day one.
+| Decision | Answer | Consequence for the plan |
+|---|---|---|
+| Compile | **Browser WASM** | No worker/Docker. Package/BibTeX limits and a large first asset download are accepted; PDF/log/SyncTeX go to R2 via signed URLs. |
+| LLM access | **BYOK for members** | Server `LLM_API_KEY` stays owner-only. No per-user quota subsystem; onboarding/docs state chat needs a personal key. |
+| Upload size | **Signed direct-to-R2** | Current 26 MB imports and image limits survive Vercel's 4.5 MB body cap. Browser uploads bytes to R2; app stores only keys. |
+| Providers | **Both are fine** | Neon + Upstash + R2 are approved; platform-native Vercel/Cloudflare services remain an option where useful. |
+| OAuth | My call: wired but hidden until credentials are added | Email/password signup works from day one; adding OAuth creds is a config-only change. |
+| Data migration | None | Nothing is live on the VPS path; fresh Neon/Upstash/R2 instances are sufficient. |
+| WASM licensing | My call: external CDN asset with attribution | No AGPL code vendored or modified in this repo. |
 
-A builder check surfaced two more scope questions. All decisions still needed
-from the owner, most important first, with the facts needed to decide:
-
-1. **LLM access for public users.** Today the server `LLM_API_KEY` is used only
-   for the `owner` role; ordinary members are expected to bring their own key.
-   If public chat must work out of the box, the plan needs a per-user quota or
-   budget design and the "zero cost" claim needs revisiting. If BYOK stands,
-   onboarding must state that chat requires a personal key.
-2. **Upload size.** Vercel Functions accept 4.5 MB request bodies by default;
-   the 20 MiB opt-in needs 4 GB performance memory, which is Pro/Enterprise
-   only. Today imports allow 26 MB and image chat declares an 8 MiB guard (four
-   1 MiB base64 images ≈ 5.3 MB). Keeping those limits needs signed
-   direct-to-R2 uploads; otherwise caps must be lowered and documented.
-3. **Compile fidelity.** Accept browser WASM with its package/BibTeX limits
-   (recommended), keep a server-side WASM function, or ship without compile?
-4. **Free providers outside Vercel.** Are Neon + Upstash + R2 acceptable, or
-   must everything besides the app host live on Vercel/Cloudflare only?
+The design is now complete and awaiting approval before implementation.
