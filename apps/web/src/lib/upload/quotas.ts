@@ -23,7 +23,7 @@ export const MAX_UPLOAD_BYTES: Record<UploadKind, number> = {
 };
 
 /** Total bytes a user may declare/persist in one UTC day on the free tier. */
-export const DAILY_STORAGE_BYTES = 50 * MIB;
+export const DAILY_STORAGE_BYTES = 256 * MIB;
 
 // INCRBY + lazy TTL in one atomic step: concurrent sign/commit calls cannot
 // lose an increment or leave a counter key without an expiry.

@@ -23,6 +23,12 @@ describe("upload caps", () => {
   });
 });
 
+describe("daily byte budget", () => {
+  it("allows 256 MiB per user per UTC day", () => {
+    expect(DAILY_STORAGE_BYTES).toBe(256 * 1024 * 1024);
+  });
+});
+
 describe("consumeStorageQuota", () => {
   it("allows a call that fills the daily byte budget but blocks the next one", async () => {
     const userId = `quota-${randomUUID()}`;

@@ -59,11 +59,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // All signed uploads land in the uploads bucket. Rendered PDFs produced by
-    // the worker are written to the pdf bucket and are not signed here.
+    // Render PDFs and SyncTeX files are read back from the pdf bucket by the
+    // render routes; every other upload kind lives in uploads. The scoped key
+    // shape is identical in both buckets, so assertScopedKey still accepts it.
+    const bucket = body.kind === "render" ? "pdf" : "uploads";
     const key = scopedKey(user.id, body.kind, body.ext);
     const { url, headers, expiresAt } = await presignUpload({
-      bucket: "uploads",
+      bucket,
       key,
       contentType: body.contentType,
       maxBytes,

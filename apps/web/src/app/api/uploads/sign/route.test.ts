@@ -76,11 +76,32 @@ describe("POST /api/uploads/sign", () => {
     expect(assertScopedKey(state.user!.id, "render", result.key)).toBe(true);
     expect(result.key).toMatch(/\.pdf$/);
     expect(result.url).toContain(result.key);
+    expect(result.url).toContain(`/${process.env.S3_PDF_BUCKET ?? "spektrum-pdf"}/`);
+    expect(Object.keys(result).sort()).toEqual(["expiresAt", "headers", "key", "url"]);
     const url = new URL(result.url);
     expect(Number(url.searchParams.get("X-Amz-Expires"))).toBeLessThanOrEqual(900);
     expect(result.headers).toEqual({ "Content-Type": "application/pdf" });
     expect(Number.isNaN(Date.parse(result.expiresAt))).toBe(false);
     expect(state.quotaCalls).toEqual([{ userId: "sign-u1", bytes: 1024 }]);
+  });
+
+  it("201 signs non-render kinds into the uploads bucket with a scoped key", async () => {
+    const res = await POST(
+      req({
+        kind: "import",
+        ext: "zip",
+        contentType: "application/zip",
+        sizeBytes: 4096,
+      }),
+    );
+    expect(res.status).toBe(201);
+    const result = (await res.json()) as SignUploadResult;
+    expect(assertScopedKey(state.user!.id, "import", result.key)).toBe(true);
+    expect(result.key).toMatch(/\.zip$/);
+    expect(result.url).toContain(result.key);
+    expect(result.url).toContain(`/${process.env.S3_BUCKET ?? "spektrum-uploads"}/`);
+    expect(result.url).not.toContain(`/${process.env.S3_PDF_BUCKET ?? "spektrum-pdf"}/`);
+    expect(Object.keys(result).sort()).toEqual(["expiresAt", "headers", "key", "url"]);
   });
 
   it("413 when the declared size exceeds the kind's cap", async () => {
