@@ -24,6 +24,11 @@ export const BUDGETS = {
   // audit addition: the invite-redemption route lives under /api/auth/* but is
   // our own handler, so Better Auth's limiter does not cover it
   inviteRedeem: { limit: 5, windowMs: 15 * 60_000 },
+  // free-tier abuse controls (serverless plan Tasks 3 and 9): public signup is
+  // throttled per IP, and storageDay is the coarse once-per-day lockout used
+  // after a user's daily upload byte budget has been exhausted.
+  signup: { limit: 3, windowMs: 15 * 60_000 },
+  storageDay: { limit: 1, windowMs: 24 * 60 * 60_000 },
 } as const;
 
 let _redis: Redis | undefined;
