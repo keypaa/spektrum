@@ -8,6 +8,9 @@
 //     implements the SecondaryStorage interface over the same Redis, and
 //     auth.ts points rateLimit.storage at it (sign-in: 5 / 15 min).
 import Redis from "ioredis";
+import { createRestRedis, type RedisLike } from "./rate-limit-rest";
+
+export type { RedisLike } from "./rate-limit-rest";
 
 export type Budget = { limit: number; windowMs: number; burst?: number };
 
@@ -31,13 +34,46 @@ export const BUDGETS = {
   storageDay: { limit: 1, windowMs: 24 * 60 * 60_000 },
 } as const;
 
-let _redis: Redis | undefined;
+// ioredis has many overloads with callback variants that do not fit RedisLike;
+// this thin adapter keeps the TCP path behind the same interface as REST.
+function createTcpRedis(url: string): RedisLike {
+  const redis = new Redis(url, { maxRetriesPerRequest: 2 });
+  return {
+    eval: (script, numKeys, ...args) =>
+      redis.call("EVAL", script, numKeys, ...args),
+    get: (key) => redis.get(key),
+    set: (key, value, ...args) => redis.call("SET", key, value, ...args),
+    incr: (key) => redis.incr(key),
+    del: (key) => redis.del(key),
+    expire: (key, seconds) => redis.expire(key, seconds),
+    getdel: (key) => redis.getdel(key),
+    ping: () => redis.ping(),
+    publish: (channel, message) => redis.publish(channel, message),
+    quit: async () => {
+      await redis.quit();
+    },
+  };
+}
 
-export function getRedis(): Redis {
+let _redis: RedisLike | undefined;
+
+export function getRedis(): RedisLike {
   if (!_redis) {
     const url = process.env.REDIS_URL;
-    if (!url) throw new Error("REDIS_URL is not set");
-    _redis = new Redis(url, { maxRetriesPerRequest: 2 });
+    if (url) {
+      // VPS/dev path: one long-lived TCP connection (spec §10.5).
+      _redis = createTcpRedis(url);
+    } else {
+      // Serverless path: no sockets in Vercel functions; use Upstash REST.
+      const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+      const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+      if (!restUrl || !token) {
+        throw new Error(
+          "REDIS_URL or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN must be set",
+        );
+      }
+      _redis = createRestRedis({ url: restUrl, token });
+    }
   }
   return _redis;
 }
