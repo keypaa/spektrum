@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatImageAttachment } from "@spektrum/shared/ai";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ChatImageRef } from "@spektrum/shared/ai";
 import {
   appendStreamDelta,
   partsFromThreadMessages,
@@ -28,27 +28,15 @@ function mockFetch(): ReturnType<typeof vi.fn> {
   return fetchMock;
 }
 
-const IMAGE: ChatImageAttachment = {
+const IMAGE: ChatImageRef = {
   id: "client-1",
+  blobKey: "u/u1/chat-image/00000000-0000-4000-8000-000000000000.png",
   mimeType: "image/png",
-  data: "AQIDBA==",
+  name: "shot.png",
 };
-
-beforeEach(() => {
-  Object.defineProperty(URL, "createObjectURL", {
-    configurable: true,
-    value: vi.fn(() => "blob:local-image"),
-  });
-  Object.defineProperty(URL, "revokeObjectURL", {
-    configurable: true,
-    value: vi.fn(),
-  });
-});
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete (URL as unknown as Record<string, unknown>).createObjectURL;
-  delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
 });
 
 describe("useChat.send", () => {
@@ -87,7 +75,7 @@ describe("useChat.send", () => {
     expect(JSON.parse(init.body as string).selection).toEqual(selection);
   });
 
-  it("sends images in the POST body and appends optimistic image parts", async () => {
+  it("sends uploaded blob keys in the POST body and appends optimistic image parts", async () => {
     const fetchMock = mockFetch();
     const { result } = renderHook(() => useChat({ projectId: "p1" }));
 
@@ -101,11 +89,37 @@ describe("useChat.send", () => {
     expect(result.current.parts[0]).toEqual({ type: "text", text: "User: look" });
     expect(result.current.parts[1]).toMatchObject({
       type: "image",
-      blobKey: "blob:local-image",
+      blobKey: IMAGE.blobKey,
       name: "Image 1",
       mimeType: "image/png",
     });
     expect((result.current.parts[1] as { id: string }).id).toMatch(/^local-/);
+  });
+
+  it("uses a local preview URL for the optimistic part when the ref carries one", async () => {
+    const fetchMock = mockFetch();
+    const { result } = renderHook(() => useChat({ projectId: "p1" }));
+    const withPreview = { ...IMAGE, previewUrl: "blob:local-image" };
+
+    act(() =>
+      result.current.send(
+        "look",
+        "Medium",
+        [],
+        undefined,
+        undefined,
+        [withPreview],
+      ),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(result.current.parts[1]).toMatchObject({
+      type: "image",
+      blobKey: "blob:local-image",
+    });
+    // Preview URLs are local UI state; only the key goes over the wire.
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(init.body as string).images).toEqual([IMAGE]);
   });
 
   it("keeps a text-only POST body byte-for-byte when no images are passed", async () => {
@@ -254,7 +268,7 @@ describe("useChat.send", () => {
     expect(body).not.toHaveProperty("omitHistoryImages");
   });
 
-  it("revokes object URLs on reset", async () => {
+  it("starts a fresh text-only session after reset", async () => {
     const fetchMock = mockFetch();
     const { result } = renderHook(() => useChat({ projectId: "p1" }));
     act(() =>
@@ -263,30 +277,13 @@ describe("useChat.send", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     act(() => result.current.reset());
-
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:local-image");
-  });
-
-  it("revokes object URLs when loading a thread", async () => {
-    const fetchMock = mockFetch();
-    const { result } = renderHook(() => useChat({ projectId: "p1" }));
-    act(() =>
-      result.current.send("look", "Medium", [], undefined, undefined, [IMAGE]),
-    );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const loadFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ thread: { id: "t1" }, messages: [] }),
-        { status: 200 },
-      ),
-    );
-    vi.stubGlobal("fetch", loadFetch);
-
-    await act(async () => {
-      await result.current.loadThread("t1");
-    });
-
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:local-image");
+    act(() => result.current.send("fresh", "Medium", []));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const body = JSON.parse(
+      (fetchMock.mock.calls[1]![1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("images");
+    expect(result.current.parts).toHaveLength(1);
   });
 });
 

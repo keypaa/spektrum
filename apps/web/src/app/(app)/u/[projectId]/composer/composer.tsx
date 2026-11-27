@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   IconArrowUp,
   IconChevronDown,
@@ -21,7 +28,8 @@ import {
   IMAGE_LIMITS,
   THINKING,
   imageMimeTypeSchema,
-  type ChatImageAttachment,
+  type ChatImageRef,
+  type ImageMimeType,
   type ImageSupportPreference,
   type MessagePart,
   type ThinkingLevel,
@@ -30,12 +38,30 @@ import { useOptionalPreferences } from "@/components/preferences-provider";
 import { resolveImageCapability } from "@/lib/ai/image-capability";
 import type { ImageSupport } from "@/lib/ai/model-capabilities";
 import type { DocumentSummary } from "@/lib/documents";
+import { uploadBytesToR2 } from "@/lib/upload/client";
 import { readPastedImages } from "./image-paste";
 import type { useChat } from "./use-chat";
 import { Transcript } from "./transcript";
 
 const LINE_HEIGHT = 16;
 const MAX_LINES = 5;
+
+const EXT_BY_MIME: Record<ImageMimeType, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+/** A ref plus its local thumbnail URL; the URL never leaves the browser. */
+type UploadedImage = ChatImageRef & { previewUrl?: string };
+
+function newImageId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function Composer({
   chat,
@@ -72,7 +98,8 @@ export function Composer({
 }): React.ReactElement {
   const [value, setValue] = useState("");
   const [pinnedPaths, setPinnedPaths] = useState<string[]>([]);
-  const [images, setImages] = useState<ChatImageAttachment[]>([]);
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const previewUrls = useRef<Set<string>>(new Set());
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [level, setLevel] = useState<ThinkingLevel>("Extra high");
@@ -116,12 +143,55 @@ export function Composer({
     };
   }, [imageSupport, activeModel]);
 
+  // The bytes go straight from the browser to R2; the chat request only ever
+  // carries the returned key. A local object URL keeps the thumbnail alive
+  // until the session ends (it is never sent to the server).
+  const uploadImage = useCallback(
+    async (bytes: Uint8Array, mimeType: ImageMimeType): Promise<UploadedImage> => {
+      const ext = EXT_BY_MIME[mimeType];
+      const blobKey = await uploadBytesToR2({
+        bytes,
+        contentType: mimeType,
+        kind: "chat-image",
+        ext,
+        projectId: chat.projectId,
+      });
+      const previewUrl =
+        typeof URL.createObjectURL === "function"
+          ? URL.createObjectURL(
+              // Copy into a fresh ArrayBuffer: TS 6 no longer accepts an
+              // ArrayBufferLike view as a BlobPart.
+              new Blob([new Uint8Array(bytes)], { type: mimeType }),
+            )
+          : undefined;
+      if (previewUrl) previewUrls.current.add(previewUrl);
+      return {
+        id: newImageId(),
+        blobKey,
+        mimeType,
+        name: `image.${ext}`,
+        ...(previewUrl ? { previewUrl } : {}),
+      };
+    },
+    [chat.projectId],
+  );
+
+  const revokePreviews = useCallback(() => {
+    if (typeof URL.revokeObjectURL === "function") {
+      for (const url of previewUrls.current) URL.revokeObjectURL(url);
+    }
+    previewUrls.current.clear();
+  }, []);
+
+  useEffect(() => () => revokePreviews(), [revokePreviews]);
+
   // New chat / loading a thread starts with an empty composer: drop the
   // previous thread's pending attachments (useChat bumps the epoch on both).
   const sessionEpoch = chat.sessionEpoch ?? 0;
   useEffect(() => {
     setImages([]);
-  }, [sessionEpoch]);
+    revokePreviews();
+  }, [sessionEpoch, revokePreviews]);
 
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -274,7 +344,7 @@ export function Composer({
             {images.map((image, index) => (
               <div key={image.id} data-testid="pasted-image" className="relative">
                 <img
-                  src={`data:${image.mimeType};base64,${image.data}`}
+                  src={image.previewUrl ?? image.blobKey}
                   alt={`Attached image ${index + 1}`}
                   className="h-16 w-16 rounded-lg object-cover"
                 />
@@ -365,7 +435,7 @@ export function Composer({
             // must still insert their text.
             if (!capability.canAttach) return;
             event.preventDefault();
-            void readPastedImages(items).then((added) => {
+            void readPastedImages(items, uploadImage).then((added) => {
               if (added.length === 0) return;
               setImages((current) => {
                 const room = IMAGE_LIMITS.maxCount - current.length;

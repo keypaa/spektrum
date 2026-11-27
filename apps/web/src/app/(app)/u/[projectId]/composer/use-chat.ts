@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   chatEventSchema,
   type ChatEvent,
-  type ChatImageAttachment,
+  type ChatImageRef,
   type MessagePart,
   type ThinkingLevel,
   type ToolName,
@@ -13,27 +13,10 @@ import {
 import { isUserTextPart, USER_TEXT_PREFIX } from "./chat-parts";
 
 /**
- * Live thumbnails must survive the send until the persisted image parts (whose
- * ids are server-generated) arrive on the next thread load, so build a local
- * object URL from the attachment's base64 bytes.
+ * The composer attaches a local object URL to each uploaded ref so its live
+ * thumbnail survives the send. It is UI-only: the wire body carries the key.
  */
-function objectUrlFor(
-  image: ChatImageAttachment,
-  register: (url: string) => void,
-): string {
-  const binary = atob(image.data);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  const blob = new Blob([bytes], { type: image.mimeType });
-  const url =
-    typeof URL.createObjectURL === "function"
-      ? URL.createObjectURL(blob)
-      : `data:${image.mimeType};base64,${image.data}`;
-  register(url);
-  return url;
-}
+type PreviewRef = ChatImageRef & { previewUrl?: string };
 
 /**
  * Append one streamed delta. Consecutive deltas of the same kind belong to a
@@ -102,7 +85,7 @@ export interface ChatController {
     pinnedPaths: string[],
     displayText?: string,
     selection?: LineSelection,
-    images?: ChatImageAttachment[],
+    images?: ChatImageRef[],
     options?: { retryWithoutImages?: boolean; retryOfMessageId?: string },
   ): void;
   loadThread(threadId: string): Promise<void>;
@@ -128,13 +111,6 @@ export function useChat(input: {
   const [status, setStatus] = useState<"idle" | "streaming" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
-  // Object URLs for optimistic thumbnails live until the transcript that uses
-  // them is replaced (reset / loadThread / unmount), not after each send.
-  const objectUrls = useRef<Set<string>>(new Set());
-  const revokeObjectUrls = useCallback(() => {
-    for (const url of objectUrls.current) URL.revokeObjectURL(url);
-    objectUrls.current.clear();
-  }, []);
   // Once the gateway rejects an image in a thread, every later turn must omit
   // history images — otherwise the rejected image is re-sent forever. Unlike
   // the UI flag below this is deliberately NOT cleared at the start of a send.
@@ -147,20 +123,14 @@ export function useChat(input: {
   // route does not append a duplicate user row.
   const lastUserMessageId = useRef<string | null>(null);
   // An unmounted chat must not keep applying SSE events to a dead page.
-  useEffect(
-    () => () => {
-      controller.current?.abort();
-      revokeObjectUrls();
-    },
-    [revokeObjectUrls],
-  );
+  useEffect(() => () => controller.current?.abort(), []);
   const lastSend = useRef<{
     text: string;
     thinking: ThinkingLevel;
     pinnedPaths: string[];
     displayText?: string | undefined;
     selection?: LineSelection | undefined;
-    images?: ChatImageAttachment[] | undefined;
+    images?: ChatImageRef[] | undefined;
   } | null>(null);
 
   const loadThread = useCallback(
@@ -174,9 +144,6 @@ export function useChat(input: {
         messages: Array<{ role: string; content: unknown }>;
       };
       const loaded = partsFromThreadMessages(body.messages);
-      // The loaded parts use persisted blob keys; the optimistic object URLs
-      // from this session are no longer referenced by the transcript.
-      revokeObjectUrls();
       omitHistoryImages.current = false;
       setImageRejected(false);
       setSessionEpoch((value) => value + 1);
@@ -185,7 +152,7 @@ export function useChat(input: {
       setThreadId(id);
       cb.current.onThreadChange?.(id);
     },
-    [revokeObjectUrls],
+    [],
   );
 
   const send = useCallback(
@@ -195,7 +162,7 @@ export function useChat(input: {
       pinnedPaths: string[],
       displayText?: string,
       selection?: LineSelection,
-      images?: ChatImageAttachment[],
+      images?: ChatImageRef[],
       options?: { retryWithoutImages?: boolean; retryOfMessageId?: string },
     ) => {
       if (cb.current.disabled) return;
@@ -221,12 +188,20 @@ export function useChat(input: {
         .map((path) => `@${path}`)
         .filter((mention) => !shown.includes(mention));
       const display = mentions.length ? `${shown} ${mentions.join(" ")}` : shown;
+      // Only the key (and the ref's four fields) travel to the server; a local
+      // preview URL, when present, is for this page's thumbnail only.
+      const wireImages = images?.map(({ id, blobKey, mimeType, name }) => ({
+        id,
+        blobKey,
+        mimeType,
+        name,
+      }));
       if (!retryWithoutImages) {
-        // Live ids are local: the persisted image parts get server-generated ids.
+        // Live ids are local: the persisted image parts get server ids.
         const imageParts: MessagePart[] = (images ?? []).map((image, index) => ({
           type: "image",
           id: `local-${image.id}`,
-          blobKey: objectUrlFor(image, (url) => objectUrls.current.add(url)),
+          blobKey: (image as PreviewRef).previewUrl ?? image.blobKey,
           name: `Image ${index + 1}`,
           mimeType: image.mimeType,
         }));
@@ -255,7 +230,7 @@ export function useChat(input: {
                 thinking,
                 pinnedPaths,
                 ...(selection ? { selection } : {}),
-                ...(images && images.length > 0 ? { images } : {}),
+                ...(wireImages && wireImages.length > 0 ? { images: wireImages } : {}),
                 ...(omitHistoryImages.current ? { omitHistoryImages: true } : {}),
                 ...(retryWithoutImages ? { retryWithoutImages: true } : {}),
                 ...(retryOfMessageId ? { retryOfMessageId } : {}),
@@ -402,13 +377,12 @@ export function useChat(input: {
     setImageRejected(false);
     setSessionEpoch((value) => value + 1);
     lastUserMessageId.current = null;
-    revokeObjectUrls();
     setThreadId(null);
     setParts([]);
     setStatus("idle");
     setError(null);
     cb.current.onThreadChange?.(null);
-  }, [revokeObjectUrls]);
+  }, []);
 
   const setDiffStatus = useCallback(
     (diffId: string, status: "accepted" | "rejected") => {

@@ -165,11 +165,25 @@ const gatewayContent = () =>
   )[1]!.content;
 
 const PNG = Buffer.from("89504e470d0a1a0a", "hex");
-const attachment = (id: string) => ({
+
+/** A key of the shape minted by /api/uploads/sign for the signed-in user. */
+const scopedKey = (
+  id = crypto.randomUUID(),
+  userId = "u1",
+  kind = "chat-image",
+) => `u/${userId}/${kind}/${id}.png`;
+
+/** Chat now carries uploaded blob keys, not inline base64. */
+const imageRef = (id = crypto.randomUUID(), blobKey = scopedKey()) => ({
   id,
+  blobKey,
   mimeType: "image/png" as const,
-  data: PNG.toString("base64"),
+  name: "shot.png",
 });
+
+function seedImage(ref: { blobKey: string; mimeType: string }, bytes = PNG): void {
+  state.objects.set(ref.blobKey, { body: bytes, contentType: ref.mimeType });
+}
 
 /** Persist an image in history so buildUserContent can re-attach it. */
 async function seedHistoryImage() {
@@ -354,12 +368,14 @@ describe("POST /chat", () => {
     expect(body).not.toContain("test-key");
   });
 
-  it("stores images and persists image parts on the user message", async () => {
+  it("persists the uploaded key as an image part on the user message", async () => {
     state.gateway = async function* () {
       yield { type: "text", delta: "ok" };
     };
+    const ref = imageRef("client-1");
+    seedImage(ref);
     const res = await POST(
-      req({ message: "what is this", images: [attachment("client-1")] }),
+      req({ message: "what is this", images: [ref] }),
       ctx,
     );
     expect(res.status).toBe(200);
@@ -371,38 +387,102 @@ describe("POST /chat", () => {
       .parts;
     expect(parts).toHaveLength(2);
     expect(parts[0]).toEqual({ type: "text", text: "what is this" });
-    const imagePart = parts[1]!;
-    expect(imagePart.type).toBe("image");
-    expect(imagePart.id).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(imagePart.id).not.toBe("client-1");
-    expect(imagePart.mimeType).toBe("image/png");
-    expect(String(imagePart.blobKey)).toMatch(
-      new RegExp(`^chat/${PROJECT_ID}/[0-9a-f-]+\\.png$`),
-    );
-    expect([...state.objects.keys()]).toContain(imagePart.blobKey);
+    expect(parts[1]).toEqual({
+      type: "image",
+      id: "client-1",
+      blobKey: ref.blobKey,
+      name: "shot.png",
+      mimeType: "image/png",
+    });
   });
 
-  it("sends a content array to the gateway when images are present", async () => {
+  it("builds one text part and one image_url data URL from the uploaded object", async () => {
     state.gateway = async function* () {
       yield { type: "text", delta: "ok" };
     };
+    const ref = imageRef("client-2");
+    seedImage(ref);
     const res = await POST(
-      req({ message: "what is this", images: [attachment("client-2")] }),
+      req({ message: "what is this", images: [ref] }),
       ctx,
     );
     await res.text();
 
     const content = gatewayContent();
-    expect(Array.isArray(content)).toBe(true);
-    const parts = content as Array<Record<string, unknown>>;
-    expect(parts[0]).toEqual({ type: "text", text: "what is this" });
-    const image = parts.find((part) => part.type === "image_url") as {
-      image_url: Record<string, unknown>;
+    expect(content).toEqual([
+      { type: "text", text: "what is this" },
+      {
+        type: "image_url",
+        image_url: { url: `data:image/png;base64,${PNG.toString("base64")}` },
+      },
+    ]);
+  });
+
+  it("rejects a key owned by another user before reading or persisting it", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
     };
-    expect(image.image_url.url).toBe(
-      `data:image/png;base64,${PNG.toString("base64")}`,
+    const foreign = imageRef("foreign", scopedKey("foreign-uuid", "u2"));
+    seedImage(foreign);
+    const res = await POST(
+      req({ message: "what is this", images: [foreign] }),
+      ctx,
     );
-    expect(image.image_url).not.toHaveProperty("detail");
+    expect(res.status).toBe(400);
+    expect(state.gatewayInput).toBeNull();
+    expect(state.appends).toHaveLength(0);
+  });
+
+  it("rejects a key of a different upload kind with 400", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const importKey = imageRef("wrong-kind", scopedKey("k", "u1", "import"));
+    seedImage(importKey);
+    const res = await POST(
+      req({ message: "what is this", images: [importKey] }),
+      ctx,
+    );
+    expect(res.status).toBe(400);
+    expect(state.gatewayInput).toBeNull();
+  });
+
+  it("omits a missing object with a marker instead of failing the turn", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const missing = imageRef("missing"); // no object seeded
+    const res = await POST(
+      req({ message: "what is this", images: [missing] }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    expect(body).not.toContain("event: error");
+    expect(gatewayContent()).toEqual([
+      { type: "text", text: "what is this" },
+      { type: "text", text: "[image omitted — re-attach to discuss]" },
+    ]);
+    // A key whose object vanished must not be persisted in the transcript.
+    const parts = (
+      state.appends[0]!.content as { parts: Array<Record<string, unknown>> }
+    ).parts;
+    expect(parts).toEqual([{ type: "text", text: "what is this" }]);
+  });
+
+  it("rejects an object whose actual size exceeds 1 MiB", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const oversized = imageRef("oversized");
+    seedImage(oversized, Buffer.alloc(1024 * 1024 + 1, 7));
+    const res = await POST(
+      req({ message: "what is this", images: [oversized] }),
+      ctx,
+    );
+    expect(res.status).toBe(413);
+    expect(state.gatewayInput).toBeNull();
+    expect(state.appends).toHaveLength(0);
   });
 
   it("keeps gateway content a plain string for text-only messages", async () => {
@@ -422,8 +502,10 @@ describe("POST /chat", () => {
       );
       yield { type: "done" };
     };
+    const image = imageRef("client-3");
+    seedImage(image);
     const res = await POST(
-      req({ message: "what is this", images: [attachment("client-3")] }),
+      req({ message: "what is this", images: [image] }),
       ctx,
     );
     const body = await res.text();
@@ -434,15 +516,16 @@ describe("POST /chat", () => {
     expect(body).not.toContain("sk-abcdefgh12345678");
   });
 
-  it("generates distinct server-side part ids for duplicate client ids", async () => {
+  it("keeps a ref's id but regenerates on a collision within the request", async () => {
     state.gateway = async function* () {
       yield { type: "text", delta: "ok" };
     };
+    const first = imageRef("same-id");
+    const second = imageRef("same-id");
+    seedImage(first);
+    seedImage(second);
     const res = await POST(
-      req({
-        message: "two",
-        images: [attachment("same-id"), attachment("same-id")],
-      }),
+      req({ message: "two", images: [first, second] }),
       ctx,
     );
     await res.text();
@@ -450,9 +533,23 @@ describe("POST /chat", () => {
       state.appends[0]!.content as { parts: Array<Record<string, unknown>> }
     ).parts.filter((part) => part.type === "image");
     expect(parts).toHaveLength(2);
-    expect(parts[0]!.id).not.toBe(parts[1]!.id);
-    expect(parts[0]!.id).not.toBe("same-id");
+    expect(parts[0]!.id).toBe("same-id");
     expect(parts[1]!.id).not.toBe("same-id");
+    expect(parts[1]!.id).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it("generates a server-side id when the ref has no usable id", async () => {
+    state.gateway = async function* () {
+      yield { type: "text", delta: "ok" };
+    };
+    const ref = imageRef("");
+    seedImage(ref);
+    const res = await POST(req({ message: "one", images: [ref] }), ctx);
+    await res.text();
+    const image = (
+      state.appends[0]!.content as { parts: Array<Record<string, unknown>> }
+    ).parts.find((part) => part.type === "image")!;
+    expect(image.id).toMatch(/^[0-9a-f-]{36}$/i);
   });
 
   it("keeps recent history images on a normal follow-up turn", async () => {

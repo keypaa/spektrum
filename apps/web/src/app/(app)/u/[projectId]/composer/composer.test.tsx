@@ -1,17 +1,22 @@
 // @vitest-environment jsdom
 import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatImageAttachment, ImageSupportPreference } from "@spektrum/shared/ai";
+import type { ChatImageRef, ImageSupportPreference } from "@spektrum/shared/ai";
 import type { ImageSupport } from "@/lib/ai/model-capabilities";
+import { uploadBytesToR2 } from "@/lib/upload/client";
 import { Composer } from "./composer";
+import { readPastedImages } from "./image-paste";
 import type { useChat } from "./use-chat";
 
 import type { ComponentProps } from "react";
 import type { DocumentSummary } from "@/lib/documents";
 
+type UploadedRef = ChatImageRef & { previewUrl: string };
+
 const pasteState = vi.hoisted(() => ({
-  files: [] as ChatImageAttachment[],
+  files: [] as UploadedRef[],
 }));
 
 // The paste decoder is covered in image-paste.test.ts; here we only need its
@@ -20,8 +25,22 @@ vi.mock("./image-paste", () => ({
   readPastedImages: vi.fn(async () => pasteState.files),
 }));
 
+vi.mock("@/lib/upload/client", () => ({
+  uploadBytesToR2: vi.fn(async () => "u/u1/chat-image/uploaded.png"),
+}));
+
 beforeEach(() => {
   pasteState.files = [];
+  vi.mocked(uploadBytesToR2).mockClear();
+  vi.mocked(readPastedImages).mockClear();
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: vi.fn(() => "blob:local-image"),
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: vi.fn(),
+  });
 });
 
 afterEach(cleanup);
@@ -283,10 +302,12 @@ describe("Composer", () => {
 });
 
 describe("Composer image attachments", () => {
-  const attachment = (id: string): ChatImageAttachment => ({
+  const attachment = (id: string): UploadedRef => ({
     id,
+    blobKey: `u/u1/chat-image/${id}.webp`,
     mimeType: "image/webp",
-    data: "AQIDBA==",
+    name: "shot.webp",
+    previewUrl: "blob:local-image",
   });
 
   function paste(area: HTMLElement): void {
@@ -331,6 +352,26 @@ describe("Composer image attachments", () => {
       [attachment("a1")],
     );
     expect(screen.queryByTestId("pasted-image")).toBeNull();
+  });
+
+  it("uploads pasted bytes with kind chat-image before returning a ref", async () => {
+    renderComposer();
+    paste(screen.getByLabelText("Ask anything"));
+    await waitFor(() => expect(readPastedImages).toHaveBeenCalledTimes(1));
+
+    const upload = vi.mocked(readPastedImages).mock.calls[0]![1];
+    const bytes = new Uint8Array([1, 2, 3]);
+    const ref = await upload(bytes, "image/webp");
+
+    expect(uploadBytesToR2).toHaveBeenCalledWith({
+      bytes,
+      contentType: "image/webp",
+      kind: "chat-image",
+      ext: "webp",
+      projectId: "p1",
+    });
+    expect(ref.blobKey).toBe("u/u1/chat-image/uploaded.png");
+    expect(ref.mimeType).toBe("image/webp");
   });
 
   it("does not attach pasted images when the override is off", async () => {

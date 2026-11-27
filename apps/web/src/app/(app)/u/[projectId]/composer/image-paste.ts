@@ -1,13 +1,14 @@
 import {
   IMAGE_LIMITS,
-  type ChatImageAttachment,
+  type ChatImageRef,
   type ImageMimeType,
 } from "@spektrum/shared/ai";
 
 /**
  * Browser-side preparation of clipboard images. The server remains the
- * validator (`chatImageAttachmentSchema` uses Node's Buffer, so it must never
- * run here): this module only decodes, downscales, re-encodes and encodes.
+ * validator: this module only decodes, downscales and re-encodes before handing
+ * the bytes to the uploader. The resulting key — never the bytes — is sent to
+ * the chat route.
  */
 
 const ALLOWED_MIMES = new Set<string>([
@@ -30,22 +31,6 @@ const ENCODE_ATTEMPTS: ReadonlyArray<{ mimeType: ImageMimeType; quality: number 
   { mimeType: "image/jpeg", quality: 0.5 },
 ];
 
-function newId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function toBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let offset = 0; offset < bytes.length; offset += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunk));
-  }
-  return btoa(binary);
-}
-
 function canvasToBlob(
   canvas: HTMLCanvasElement,
   mimeType: ImageMimeType,
@@ -64,7 +49,9 @@ function canvasToBlob(
   });
 }
 
-async function toAttachment(file: File): Promise<ChatImageAttachment | null> {
+async function toEncodedImage(
+  file: File,
+): Promise<{ bytes: Uint8Array; mimeType: ImageMimeType } | null> {
   if (file.size > MAX_SOURCE_BYTES) return null;
   let bitmap: ImageBitmap | undefined;
   try {
@@ -90,8 +77,7 @@ async function toAttachment(file: File): Promise<ChatImageAttachment | null> {
       const mimeType = ALLOWED_MIMES.has(blob.type)
         ? (blob.type as ImageMimeType)
         : attempt.mimeType;
-      const data = toBase64(new Uint8Array(await blob.arrayBuffer()));
-      return { id: newId(), mimeType, data };
+      return { bytes: new Uint8Array(await blob.arrayBuffer()), mimeType };
     }
     return null;
   } catch {
@@ -102,18 +88,34 @@ async function toAttachment(file: File): Promise<ChatImageAttachment | null> {
 }
 
 /**
- * Turn image items from a paste event into attachments. Non-image items,
- * undecodable files and files still over the byte cap are skipped; at most
- * `IMAGE_LIMITS.maxCount` images are decoded.
+ * Turn image items from a paste event into uploaded refs. Non-image items,
+ * undecodable files, files still over the byte cap and failed uploads are
+ * skipped; at most `IMAGE_LIMITS.maxCount` images are decoded and uploaded.
  */
 export async function readPastedImages(
   items: DataTransferItemList | DataTransferItem[],
-): Promise<ChatImageAttachment[]> {
+  upload: (
+    bytes: Uint8Array,
+    mimeType: ImageMimeType,
+  ) => Promise<ChatImageRef>,
+): Promise<ChatImageRef[]> {
   const files = Array.from(items)
     .filter((item) => item?.kind === "file" && ALLOWED_MIMES.has(item.type))
     .slice(0, IMAGE_LIMITS.maxCount)
     .map((item) => item.getAsFile())
     .filter((file): file is File => file !== null && file !== undefined);
-  const encoded = await Promise.all(files.map(toAttachment));
-  return encoded.filter((attachment): attachment is ChatImageAttachment => attachment !== null);
+  const encoded = await Promise.all(
+    files.map(async (file) => {
+      const image = await toEncodedImage(file);
+      if (!image) return null;
+      try {
+        return await upload(image.bytes, image.mimeType);
+      } catch {
+        // An upload can fail (quota, network); drop this image and keep the
+        // rest of the paste instead of blocking the message.
+        return null;
+      }
+    }),
+  );
+  return encoded.filter((ref): ref is ChatImageRef => ref !== null);
 }

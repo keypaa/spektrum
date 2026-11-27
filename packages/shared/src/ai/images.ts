@@ -56,6 +56,24 @@ export const chatImageAttachmentsSchema = z
   .array(chatImageAttachmentSchema)
   .max(IMAGE_LIMITS.maxCount);
 
+/**
+ * A pasted image after it has been uploaded straight to R2. Only the key
+ * crosses the chat request: the bytes never touch the serverless function.
+ * The route re-checks the key's owner/kind and the object's actual size.
+ */
+export const chatImageRefSchema = z.object({
+  id: z.string(),
+  blobKey: z.string(),
+  mimeType: imageMimeTypeSchema,
+  name: z.string(),
+});
+
+export type ChatImageRef = z.infer<typeof chatImageRefSchema>;
+
+export const chatImageRefsSchema = z
+  .array(chatImageRefSchema)
+  .max(IMAGE_LIMITS.maxCount);
+
 /** The Settings override: detect automatically, force images on, or force off. */
 export const imageSupportSchema = z.enum(["auto", "on", "off"]);
 
