@@ -4,7 +4,6 @@ import { pdfRenders } from "@spektrum/db/schema";
 import { currentRevisionKey } from "@spektrum/shared/compile";
 import { BUDGETS, consume, getRedis } from "@spektrum/shared/rate-limit";
 import { revisionHash } from "@spektrum/shared/revision";
-import { enqueueCompile } from "./compile-queue";
 import {
   getDocumentByPath,
   listRevisionDocuments,
@@ -57,10 +56,8 @@ export async function enqueueProjectCompile(
   }
 
   await getRedis().set(currentRevisionKey(projectId), revision);
-  await enqueueCompile({
-    projectId,
-    revisionHash: revision,
-    mainFile: main.path,
-  });
+  // Compilation now happens in the browser against the WASM engine; there is
+  // no BullMQ job to enqueue. The revision marker above still lets the client
+  // detect that this compile was accepted for the current document state.
   return { kind: "enqueued", revision };
 }
