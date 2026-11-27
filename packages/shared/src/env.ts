@@ -34,11 +34,15 @@ const envVarSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
   GITHUB_CLIENT_SECRET: z.string().optional(),
-  S3_ENDPOINT: z.string().optional(),
-  S3_BUCKET: z.string().optional(),
-  S3_PDF_BUCKET: z.string().optional(),
-  S3_ACCESS_KEY: z.string().optional(),
-  S3_SECRET_KEY: z.string().optional(),
+  // S3/R2 settings mirror the defaults in @spektrum/storage so validation and
+  // presigning agree on endpoint, buckets, credentials and region. An empty
+  // value is filtered out below and therefore falls back to the same default.
+  S3_ENDPOINT: envString("S3_ENDPOINT").default("http://localhost:9000"),
+  S3_BUCKET: envString("S3_BUCKET").default("spektrum-uploads"),
+  S3_PDF_BUCKET: envString("S3_PDF_BUCKET").default("spektrum-pdf"),
+  S3_ACCESS_KEY: envString("S3_ACCESS_KEY").default("spektrum"),
+  S3_SECRET_KEY: envString("S3_SECRET_KEY").default("spektrum-secret"),
+  S3_REGION: envString("S3_REGION").default("auto"),
   // Prism import caps (spec §13.2.4). Positive integers only: a bad value must
   // fail at startup, not on the first upload.
   IMPORT_MAX_FILE_BYTES: z.coerce.number().int().positive().default(26_214_400),
@@ -71,11 +75,12 @@ export interface WebEnv {
   googleClientSecret?: string | undefined;
   githubClientId?: string | undefined;
   githubClientSecret?: string | undefined;
-  s3Endpoint?: string | undefined;
-  s3Bucket?: string | undefined;
-  s3PdfBucket?: string | undefined;
-  s3AccessKey?: string | undefined;
-  s3SecretKey?: string | undefined;
+  s3Endpoint: string;
+  s3Bucket: string;
+  s3PdfBucket: string;
+  s3AccessKey: string;
+  s3SecretKey: string;
+  s3Region: string;
   importMaxFileBytes: number;
   importMaxTotalBytes: number;
   importMaxEntries: number;
@@ -119,6 +124,7 @@ export function loadWebEnv(source: NodeJS.ProcessEnv = process.env): WebEnv {
       s3PdfBucket: v.S3_PDF_BUCKET,
       s3AccessKey: v.S3_ACCESS_KEY,
       s3SecretKey: v.S3_SECRET_KEY,
+      s3Region: v.S3_REGION,
       importMaxFileBytes: v.IMPORT_MAX_FILE_BYTES,
       importMaxTotalBytes: v.IMPORT_MAX_TOTAL_BYTES,
       importMaxEntries: v.IMPORT_MAX_ENTRIES,

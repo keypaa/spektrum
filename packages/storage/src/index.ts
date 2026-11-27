@@ -11,8 +11,12 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type Bucket = "pdf" | "uploads";
+
+/** Short-lived URLs only: a signed PUT/GET is a bearer credential. */
+const MAX_PRESIGN_EXPIRY = 900;
 
 export class StorageError extends Error {
   constructor(message: string) {
@@ -22,12 +26,13 @@ export class StorageError extends Error {
 }
 
 const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9000";
+const region = process.env.S3_REGION ?? "auto";
 const accessKeyId = process.env.S3_ACCESS_KEY ?? "spektrum";
 const secretAccessKey = process.env.S3_SECRET_KEY ?? "spektrum-secret";
 
 const client = new S3Client({
   endpoint,
-  region: "us-east-1",
+  region,
   forcePathStyle: true,
   credentials: { accessKeyId, secretAccessKey },
 });
@@ -41,6 +46,68 @@ function bucketName(bucket: Bucket): string {
 function isMissing(e: unknown): boolean {
   const name = (e as { name?: string }).name;
   return name === "NoSuchKey" || name === "NotFound";
+}
+
+function presignExpiry(expiresInSeconds?: number): number {
+  if (expiresInSeconds === undefined) return MAX_PRESIGN_EXPIRY;
+  if (!Number.isFinite(expiresInSeconds) || expiresInSeconds <= 0) {
+    throw new StorageError("invalid_presign_expiry");
+  }
+  // A long-lived presigned URL is a bearer credential; never mint one beyond
+  // the platform's 15-minute ceiling, even if a caller asks for more.
+  return Math.min(Math.floor(expiresInSeconds), MAX_PRESIGN_EXPIRY);
+}
+
+export interface PresignUploadInput {
+  bucket: Bucket;
+  key: string;
+  contentType: string;
+  /** Quota ceiling agreed with the caller, not a ContentLength to sign. */
+  maxBytes: number;
+  expiresInSeconds?: number;
+}
+
+/**
+ * Mint a PUT URL for a direct-to-R2 upload. The browser sends the returned
+ * headers verbatim; signing `content-type` stops it from swapping the type
+ * after the URL has been issued.
+ */
+export async function presignUpload(
+  input: PresignUploadInput,
+): Promise<{ url: string; headers: Record<string, string>; expiresAt: Date }> {
+  if (!Number.isInteger(input.maxBytes) || input.maxBytes <= 0) {
+    throw new StorageError("invalid_max_bytes");
+  }
+  if (input.key.length === 0) throw new StorageError("invalid_key");
+  const expiresIn = presignExpiry(input.expiresInSeconds);
+  const url = await getSignedUrl(
+    client,
+    new PutObjectCommand({
+      Bucket: bucketName(input.bucket),
+      Key: input.key,
+      ContentType: input.contentType,
+    }),
+    { expiresIn, signableHeaders: new Set(["content-type"]) },
+  );
+  return {
+    url,
+    headers: { "Content-Type": input.contentType },
+    expiresAt: new Date(Date.now() + expiresIn * 1000),
+  };
+}
+
+/** Mint a short-lived GET URL for an object the browser may read. */
+export async function presignDownload(
+  bucket: Bucket,
+  key: string,
+  expiresInSeconds?: number,
+): Promise<string> {
+  const expiresIn = presignExpiry(expiresInSeconds);
+  return getSignedUrl(
+    client,
+    new GetObjectCommand({ Bucket: bucketName(bucket), Key: key }),
+    { expiresIn },
+  );
 }
 
 /** Create a bucket if it does not exist (dev/MinIO/SeaweedFS).

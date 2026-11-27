@@ -33,6 +33,9 @@ describe("environment contract", () => {
       "S3_ENDPOINT",
       "S3_BUCKET",
       "S3_PDF_BUCKET",
+      "S3_ACCESS_KEY",
+      "S3_SECRET_KEY",
+      "S3_REGION",
       "IMPORT_MAX_FILE_BYTES",
       "IMPORT_MAX_TOTAL_BYTES",
       "IMPORT_MAX_ENTRIES",
@@ -70,5 +73,31 @@ describe("environment contract", () => {
   it("rejects a non-numeric or negative import limit", () => {
     expect(() => loadWebEnv({ ...base, IMPORT_MAX_ENTRIES: "many" })).toThrow();
     expect(() => loadWebEnv({ ...base, IMPORT_MAX_RATIO: "-1" })).toThrow();
+  });
+
+  it("exposes all six S3 settings with the storage defaults", () => {
+    const defaults = loadWebEnv(base);
+    expect(defaults.s3Endpoint).toBe("http://localhost:9000");
+    expect(defaults.s3Bucket).toBe("spektrum-uploads");
+    expect(defaults.s3PdfBucket).toBe("spektrum-pdf");
+    expect(defaults.s3AccessKey).toBe("spektrum");
+    expect(defaults.s3SecretKey).toBe("spektrum-secret");
+    expect(defaults.s3Region).toBe("auto");
+
+    const overridden = loadWebEnv({
+      ...base,
+      S3_ENDPOINT: "https://acct.r2.cloudflarestorage.com",
+      S3_BUCKET: "custom-uploads",
+      S3_PDF_BUCKET: "custom-pdf",
+      S3_ACCESS_KEY: "r2-key",
+      S3_SECRET_KEY: "r2-secret",
+      S3_REGION: "eu-west-1",
+    });
+    expect(overridden.s3Endpoint).toBe("https://acct.r2.cloudflarestorage.com");
+    expect(overridden.s3Bucket).toBe("custom-uploads");
+    expect(overridden.s3PdfBucket).toBe("custom-pdf");
+    expect(overridden.s3AccessKey).toBe("r2-key");
+    expect(overridden.s3SecretKey).toBe("r2-secret");
+    expect(overridden.s3Region).toBe("eu-west-1");
   });
 });

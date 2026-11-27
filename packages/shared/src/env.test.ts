@@ -41,7 +41,8 @@ describe("loadWebEnv", () => {
   // `env_file: .env` in docker/compose.prod.yml passes `KEY=` through as an
   // empty string, not as an unset variable. Treating that as a value would make
   // loadWebEnv throw, and every mutating route answers 500 while /api/health
-  // (which never calls loadWebEnv) still says "ok".
+  // (which never calls loadWebEnv) still says "ok". S3 settings have storage
+  // defaults, so an empty S3_ACCESS_KEY falls back to "spektrum".
   it("treats an empty value as unset for the optional keys", () => {
     const env = loadWebEnv({
       ...base,
@@ -52,7 +53,7 @@ describe("loadWebEnv", () => {
     });
     expect(env.metricsToken).toBeUndefined();
     expect(env.sentryDsn).toBeUndefined();
-    expect(env.s3AccessKey).toBeUndefined();
+    expect(env.s3AccessKey).toBe("spektrum");
     expect(env.llmApiKey).toBeUndefined();
   });
 
