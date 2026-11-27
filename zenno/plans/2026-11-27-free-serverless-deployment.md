@@ -18,6 +18,7 @@
 - No Docker socket, no permanent worker, no local persistent filesystem, no host cron.
 - Data services: Neon Postgres (enable `citext`), Upstash Redis, Cloudflare R2 (`spektrum-uploads`, `spektrum-pdf`); all free, no card.
 - Every uploaded object key is `u/<userId>/<kind>/<uuid>.<ext>` with `kind ∈ {import, workspace, chat-image, render}`; the server verifies prefix and kind before persisting a key.
+- A presigned PUT cannot enforce content-length; every consumer of a signed key must `getObject` and reject an object whose actual size exceeds that kind's cap before persisting the key.
 - `ALLOW_PUBLIC_SIGNUP` stays `false` in shared code; set `true` only as a Vercel deployment env var after the owner exists.
 - Chat: members use BYOK; the server key remains owner-only. Text-only requests keep a plain string body and gateway content byte-for-byte.
 - No AGPL WASM code is vendored or modified; load engines from an external CDN with attribution.
@@ -189,7 +190,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement**
 
-Replace `req.formData()` with `bodySchema.parse(await req.json())`; verify each `blobKey` with `assertScopedKey(user.id, kind, key)` before `getObject`; keep `assertZipMagic`, limits, rate limits and error mapping. Add `uploadBytesToR2` client helper and switch both UI components to it before posting the key.
+Replace `req.formData()` with `bodySchema.parse(await req.json())`; verify each `blobKey` with `assertScopedKey(user.id, kind, key)` before `getObject`, and reject the request when `object.size` exceeds `MAX_UPLOAD_BYTES[kind]`; keep `assertZipMagic`, limits, rate limits and error mapping. Add `uploadBytesToR2` client helper and switch both UI components to it before posting the key.
 
 - [ ] **Step 4: Run tests**
 
@@ -226,7 +227,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement**
 
-Add `chatImageRefsSchema` beside the existing base64 schema. In the route replace `chatImageAttachmentsSchema` with refs and `storeChatImage` with key verification + `getObject`; build `ImagePart` directly from the ref (server-generated `id` only if absent). Keep `withoutHistoryImages`, `retryWithoutImages`, `retryOfMessageId`, the 8 MiB declared-length guard and SSE events unchanged. Change `readPastedImages` to accept an upload callback; wire the composer to `uploadBytesToR2` with `kind: "chat-image"`.
+Add `chatImageRefsSchema` beside the existing base64 schema. In the route replace `chatImageAttachmentsSchema` with refs and `storeChatImage` with key verification + `getObject`; reject images whose actual object size exceeds 1 MiB; build `ImagePart` directly from the ref (server-generated `id` only if absent). Keep `withoutHistoryImages`, `retryWithoutImages`, `retryOfMessageId`, the 8 MiB declared-length guard and SSE events unchanged. Change `readPastedImages` to accept an upload callback; wire the composer to `uploadBytesToR2` with `kind: "chat-image"`.
 
 - [ ] **Step 4: Run tests**
 
@@ -300,7 +301,7 @@ Expected: FAIL.
 
 - [ ] **Step 3: Implement**
 
-Validate keys with `assertScopedKey(userId, "render", key)` and existence with `getObject` (or `headObject`); write with Drizzle `onConflictDoUpdate` on the unique index; route uses `requireUser`, `assertSameOrigin`, zod body and `errorResponse`. Delete the server render SSE route and its client subscription.
+Validate keys with `assertScopedKey(userId, "render", key)`, existence with `getObject` and actual size ≤ 20 MiB; write with Drizzle `onConflictDoUpdate` on the unique index; route uses `requireUser`, `assertSameOrigin`, zod body and `errorResponse`. Delete the server render SSE route and its client subscription.
 
 - [ ] **Step 4: Run tests**
 
