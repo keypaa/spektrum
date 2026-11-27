@@ -13,13 +13,13 @@ stays in the hostname. Substitute that URL everywhere below.
 
 - Vercel Hobby, Next.js 16 App Router, Node runtime, pnpm 12.18.0 / Node
   26.13.0 (pinned and enforced).
-- Neon Postgres, Upstash Redis over **REST only**, and two Cloudflare R2
-  buckets. No credit card is required for any of them.
+- Neon Postgres, Upstash Redis over **REST only**, and two S3-compatible
+  **Backblaze B2** buckets. No credit card is required for any of them.
 - Compilation runs in the **browser** via `@siglum/engine@0.2.2` (MIT), loading
   TeX Live 2026 assets from `https://packages.siglum.org`. No AGPL code is
   vendored or modified; the evidence is in
   [`zenno/docs/2026-11-27-wasm-feasibility.md`](../zenno/docs/2026-11-27-wasm-feasibility.md).
-- Large files (imports, pasted images, PDF/SyncTeX results) go straight to R2
+- Large files (imports, pasted images, PDF/SyncTeX results) go straight to B2
   through short-lived signed URLs; the app stores only `u/<userId>/<kind>/…`
   keys. See [`compilation.md`](compilation.md) and
   [`image-chat-input.md`](image-chat-input.md).
@@ -47,23 +47,42 @@ stays in the hostname. Substitute that URL everywhere below.
    ships `REDIS_URL=` (blank) with a VPS/dev comment; keep it blank on Vercel.
    Never copy a `redis://…` value into a Vercel environment variable.
 
-### Cloudflare R2
+### Backblaze B2 (S3-compatible)
 
-1. Create two buckets: `spektrum-uploads` and `spektrum-pdf`.
-2. Create an API token with **Object Read & Write** on both buckets; set
-   `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`,
-   `S3_REGION=auto`, `S3_BUCKET=spektrum-uploads`,
-   `S3_PDF_BUCKET=spektrum-pdf`, and the token's access/secret key.
-3. Add a **CORS policy on both buckets** allowing **PUT and GET** from the app
+Cloudflare R2 also works but requires a payment method to activate even on its
+free tier. B2's first 10 GB is free with no card.
+
+1. Create two **private** buckets: `spektrum-uploads` and `spektrum-pdf` (names
+   must be globally unique). Copy the **Endpoint** from each bucket card, for
+   example `s3.us-east-005.backblazeb2.com`.
+2. Create an **Application Key** with **Read & Write** access to both buckets.
+   Set `S3_ENDPOINT=https://<endpoint>`, `S3_REGION=auto`,
+   `S3_BUCKET=spektrum-uploads`, `S3_PDF_BUCKET=spektrum-pdf`, and the keyID /
+   applicationKey as `S3_ACCESS_KEY` / `S3_SECRET_KEY`. B2's master key does not
+   work with the S3 API.
+3. Add a **CORS rule on both buckets** allowing **PUT and GET** from the app
    origin (`https://spektrum.vercel.app`, plus a Preview origin if you use one).
    PUT is needed for signed browser uploads; GET is needed for the browser-side
    SyncTeX read (the client follows a signed URL minted by
    `/api/projects/:projectId/render/:revision/synctex/url`). The PDF itself is
    streamed server-side by `/api/projects/:projectId/render/:revision/pdf` via
-   `getObject`/`getObjectRange`, so a signed R2 PDF GET is **not** required —
-   allowing GET on the PDF bucket is harmless. Allow `content-type` and the
-   `x-amz-*` request headers and expose `ETag`. A PUT-only policy breaks
-   SyncTeX downloads and a GET-only policy breaks every upload.
+   `getObject`/`getObjectRange`, so a signed PDF GET is **not** required —
+   allowing GET on the PDF bucket is harmless. B2 uses its own CORS format:
+```json
+[
+  {
+    "corsRuleName": "spektrum",
+    "allowedOrigins": ["*"],
+    "allowedOperations": ["s3_put", "s3_get", "s3_head", "s3_delete"],
+    "allowedHeaders": ["*"],
+    "exposeHeaders": ["ETag"],
+    "maxAgeSeconds": 3600
+  }
+]
+```
+   A PUT-only policy breaks SyncTeX downloads and a GET-only policy breaks every
+   upload. B2 buckets are versioned by default; add a lifecycle rule to keep
+   only the latest version if storage grows.
 
 ## 3. Environment variables (Vercel project → Production and Preview)
 
@@ -77,10 +96,10 @@ stays in the hostname. Substitute that URL everywhere below.
 | `BETTER_AUTH_URL` | `https://spektrum.vercel.app` |
 | `LLM_KEY_ENCRYPTION_SECRET` | generated, ≥32 chars; changing it loses BYOK keys |
 | `PUBLIC_URL` | `https://spektrum.vercel.app` (documentation/meta only; the CSRF guard uses `BETTER_AUTH_URL`) |
-| `S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` (also added to CSP `connect-src`) |
+| `S3_ENDPOINT` | `https://<b2-endpoint>` (e.g. `https://s3.us-east-005.backblazeb2.com`; also added to CSP `connect-src`) |
 | `S3_BUCKET` | `spektrum-uploads` |
 | `S3_PDF_BUCKET` | `spektrum-pdf` |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | R2 API token |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | B2 application keyID / applicationKey |
 | `S3_REGION` | `auto` |
 | `ENGINE_ASSET_ORIGIN` | `https://packages.siglum.org` (allowlisted CDN in CSP) |
 | `ENGINE_PACKAGE_ORIGIN` | `https://packages.siglum.org/api/texlive` (allowlisted package server) |
@@ -95,7 +114,7 @@ stays in the hostname. Substitute that URL everywhere below.
 are VPS-only or unused here.
 
 The CSP is built by `apps/web/src/lib/serverless-config.ts`: with no engine or
-R2 origins set it is `'self'`-only; the engine variables add only the pinned CDN
+storage origins set it is `'self'`-only; the engine variables add only the pinned CDN
 origin and `S3_ENDPOINT` adds its HTTPS origin to `connect-src`. `script-src`
 always includes `blob:` and `worker-src 'self' blob:` stays, as required by the
 Siglum worker. `vercel.json` also exposes an optional same-origin rewrite
@@ -148,13 +167,13 @@ shell is needed.
       `redis` is `down`, `REDIS_URL` is set or the Upstash values are wrong.
 - [ ] Response headers include the full CSP: `default-src 'self'`,
       `script-src … blob:`, `worker-src 'self' blob:`, and `connect-src 'self'
-      https://packages.siglum.org https://<account>.r2.cloudflarestorage.com`.
+      https://packages.siglum.org https://<endpoint>.backblazeb2.com`.
 - [ ] Sign in as the bootstrapped owner (this is the Preview argon2 check).
 - [ ] Signup is **closed** before the flip: a fresh browser cannot register.
 - [ ] Create a project, create/edit/save a file, reload — content persists.
 - [ ] Compile: first load downloads ~30 MB of engine assets; PDF preview, log
       and diagnostics appear; **Reload** shows the persisted render for the
-      current revision (the app streams it from R2, no signed PDF GET).
+      current revision (the app streams it from B2, no signed PDF GET).
 - [ ] Cursor-to-PDF SyncTeX jump works (browser follows a signed SyncTeX GET;
       requires CORS GET on the PDF bucket).
 - [ ] Chat text with a BYOK key streams SSE and edits propose diffs; a
@@ -195,8 +214,8 @@ size exceeds the cap — a presigned PUT cannot enforce content length.
 
 There is no `backup.sh` or host cron here. Use provider features: Neon
 snapshots/PITR (and branches before risky migrations), Upstash's export/backup
-option for rate-limit/auth state, and R2 versioning or a periodic
-`rclone`/`wrangler` copy of both buckets to storage you control. Verify a
+option for rate-limit/auth state, and B2 versioning or a periodic
+`rclone`/`b2` copy of both buckets to storage you control. Verify a
 restore to a scratch Neon project before relying on it. Keep secrets out of the
 repo; only `.env.example` and this document are committed.
 
@@ -210,7 +229,7 @@ repo; only `.env.example` and this document are committed.
   consumers do **not** work on Vercel. Chat SSE is streamed directly from the
   gateway and is unaffected; the old server-side render SSE path does not exist
   on this branch.
-- Node cold starts and Neon's scale-to-zero add latency after inactivity; R2
+- Node cold starts and Neon's scale-to-zero add latency after inactivity; B2
   and Upstash free quotas are finite.
 - Browser WASM is not full TeX Live: first load is large (~30 MB wasm plus
   bundles), package coverage depends on `packages.siglum.org`, and BibTeX/biber
