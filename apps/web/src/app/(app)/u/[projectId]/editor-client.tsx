@@ -50,7 +50,7 @@ import { sha256Hex } from "@spektrum/shared/hash";
 import { readTabs, tabsReducer, writeTabs, type TabsState } from "./tabs/tabs";
 import { TabStrip } from "./tabs/tab-strip";
 import { useAutosave } from "./use-autosave";
-import { getLocalPdfBytes } from "@/lib/compile-client";
+import { clearLocalPdf, getLocalPdfBytes } from "@/lib/compile-client";
 import { useLocalCompile } from "@/lib/render-client";
 import type { MonacoEditorHandle } from "@/editor/monaco-editor";
 import type { PdfViewerHandle } from "@/components/pdf/pdf-viewer";
@@ -414,14 +414,34 @@ export function EditorClient({
   const [pdfUrl, setPdfUrl] = useState<string | null>(
     initialRender?.pdfUrl ?? null,
   );
+  // The revision whose bytes/URL are on screen. Local PDF bytes are only
+  // passed to the chrome when they belong to this exact project + revision.
+  const [pdfRevision, setPdfRevision] = useState<string | null>(
+    initialRender?.lastOkRevision ?? null,
+  );
   // Server-side history view of the latest render. Local events drive the
   // pill immediately; /render/latest is read after a commit so metadata that
   // only the server knows (isCurrent, last ok revision) stays accurate.
   const [liveRender, setLiveRender] = useState(initialRender);
   useEffect(() => setLiveRender(initialRender), [initialRender]);
   useEffect(() => {
-    if (renderStatus?.event === "result") setPdfUrl(renderStatus.pdfUrl);
+    if (renderStatus?.event === "result") {
+      setPdfUrl(renderStatus.pdfUrl);
+      setPdfRevision(renderStatus.revision);
+    }
   }, [renderStatus]);
+
+  // Switching projects (or unmounting) must not leave the previous project's
+  // local PDF displayed or offered as a download. Read the incoming props from
+  // a ref so this effect depends only on the project id.
+  const initialRenderRef = useRef(initialRender);
+  initialRenderRef.current = initialRender;
+  useEffect(() => {
+    const incoming = initialRenderRef.current;
+    setPdfUrl(incoming?.pdfUrl ?? null);
+    setPdfRevision(incoming?.lastOkRevision ?? null);
+    return () => clearLocalPdf(project.id);
+  }, [project.id]);
 
   const refreshRender = useCallback(async () => {
     try {
@@ -1449,7 +1469,11 @@ export function EditorClient({
                 onGoToPdf={() => revealPdfLine(cursorLine.current)}
                 onSearch={() => setSearchOpen(true)}
                 pdfUrl={pdfUrl}
-                pdfBytes={getLocalPdfBytes()}
+                pdfBytes={
+                  pdfRevision
+                    ? getLocalPdfBytes(project.id, pdfRevision)
+                    : null
+                }
                 mainFile={liveRender?.mainFile ?? null}
                 durationMs={liveRender?.durationMs ?? null}
                 isCurrent={liveRender?.isCurrent ?? false}

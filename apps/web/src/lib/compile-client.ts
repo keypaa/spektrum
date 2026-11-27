@@ -49,19 +49,20 @@ export async function loadCompileFiles(
   const body = (await res.json()) as { documents: DocumentSummary[] };
   const files: CompileInput["files"] = {};
   for (const doc of body.documents ?? []) {
-    if (doc.kind === "img") {
-      // Blob documents have no text content: read their bytes from the
-      // owner-checked download route instead of handing the engine an empty
-      // file (§11.2 materialisation).
+    const record: DocumentRecord = await getDocumentRequest(projectId, doc.path);
+    if (record.content === null || record.blobKey) {
+      // Blob-backed documents have no inline text: images, and every text file
+      // above UPLOAD_INLINE_BYTES (.bib/.cls/.sty included). Read their bytes
+      // from the owner-checked download route — passing "" would silently
+      // compile without the bibliography/style instead of failing loudly.
       const download = await fetch(
-        `/api/projects/${projectId}/documents/${doc.id}/download`,
+        `/api/projects/${projectId}/documents/${record.id}/download`,
       );
       if (!download.ok) throw new Error(await readError(download));
       files[doc.path] = new Uint8Array(await download.arrayBuffer());
-      continue;
+    } else {
+      files[doc.path] = record.content;
     }
-    const record: DocumentRecord = await getDocumentRequest(projectId, doc.path);
-    files[doc.path] = record.content ?? "";
   }
   return files;
 }
@@ -105,22 +106,47 @@ export async function commitLocalRender(
   return (await res.json()) as { revision: string };
 }
 
-let localPdfUrl: string | null = null;
-let localPdfBytes: Uint8Array | null = null;
+type LocalPdf = { url: string; bytes: Uint8Array };
+const localPdfs = new Map<string, LocalPdf>();
+const localPdfKey = (projectId: string, revision: string): string =>
+  `${projectId}\u0000${revision}`;
 
-/** Object URL for the last local PDF, so pdfjs can render bytes without a round trip. */
-export function createLocalPdfUrl(bytes: Uint8Array): string {
-  if (localPdfUrl) URL.revokeObjectURL(localPdfUrl);
-  localPdfUrl = URL.createObjectURL(
+/**
+ * Object URL for a local PDF, keyed by project + revision. Kept here so pdfjs
+ * can render the bytes and the chrome can offer Download / Open without a
+ * server round trip. Revoked on the next compile for the same project, on
+ * project switch, and on editor unmount.
+ */
+export function createLocalPdfUrl(
+  projectId: string,
+  revision: string,
+  bytes: Uint8Array,
+): string {
+  clearLocalPdf(projectId);
+  const url = URL.createObjectURL(
     new Blob([bytes as BlobPart], { type: "application/pdf" }),
   );
-  localPdfBytes = bytes;
-  return localPdfUrl;
+  localPdfs.set(localPdfKey(projectId, revision), { url, bytes });
+  return url;
 }
 
-/** Raw bytes of the last local compile, for the PDF chrome's download/open. */
-export function getLocalPdfBytes(): Uint8Array | null {
-  return localPdfBytes;
+/** Raw bytes only for the exact project + revision currently displayed. */
+export function getLocalPdfBytes(
+  projectId: string,
+  revision: string,
+): Uint8Array | null {
+  return localPdfs.get(localPdfKey(projectId, revision))?.bytes ?? null;
+}
+
+/** Drop local PDFs for one project (or all of them) and revoke their URLs. */
+export function clearLocalPdf(projectId?: string): void {
+  for (const [key, pdf] of localPdfs) {
+    if (projectId !== undefined && !key.startsWith(`${projectId}\u0000`)) {
+      continue;
+    }
+    URL.revokeObjectURL(pdf.url);
+    localPdfs.delete(key);
+  }
 }
 
 export type LocalCompileEmitter = (event: RenderEvent) => void;
@@ -171,7 +197,7 @@ export async function runLocalCompile(
     emit({
       event: "result",
       revision,
-      pdfUrl: createLocalPdfUrl(outcome.pdf),
+      pdfUrl: createLocalPdfUrl(projectId, revision, outcome.pdf),
       diagnostics: outcome.diagnostics,
       stats: outcome.stats,
       durationMs: outcome.durationMs,

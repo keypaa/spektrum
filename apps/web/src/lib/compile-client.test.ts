@@ -10,6 +10,7 @@ vi.mock("@/lib/upload/client", () => ({
 import { uploadBytesToR2 } from "@/lib/upload/client";
 import {
   commitLocalRender,
+  loadCompileFiles,
   requestCompile,
   uploadRenderArtifacts,
 } from "./compile-client";
@@ -82,6 +83,89 @@ describe("requestCompile", () => {
       mainFile: "main.tex",
       force: true,
     });
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("loadCompileFiles", () => {
+  it("downloads large blob-backed text documents instead of an empty file", async () => {
+    // .bib/.cls/.sty uploads above UPLOAD_INLINE_BYTES are stored with
+    // content: null and a blobKey. They must reach the engine as bytes.
+    const bibBytes = new TextEncoder().encode(
+      "@article{key, title={A very large bibliography}}\n",
+    );
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const target = String(url);
+      if (target === "/api/projects/p1/tree") {
+        return json({
+          documents: [
+            { id: "d1", path: "main.tex", kind: "tex", updatedAt: "t" },
+            { id: "d2", path: "refs.bib", kind: "bib", updatedAt: "t" },
+            { id: "d3", path: "logo.png", kind: "img", updatedAt: "t" },
+          ],
+        });
+      }
+      if (target.includes("/documents?path=main.tex")) {
+        return json({
+          document: {
+            id: "d1",
+            path: "main.tex",
+            kind: "tex",
+            updatedAt: "t",
+            content: "\\documentclass{article}",
+            blobKey: null,
+          },
+        });
+      }
+      if (target.includes("/documents?path=refs.bib")) {
+        return json({
+          document: {
+            id: "d2",
+            path: "refs.bib",
+            kind: "bib",
+            updatedAt: "t",
+            content: null,
+            blobKey: "p1/refs.bib",
+          },
+        });
+      }
+      if (target.includes("/documents?path=logo.png")) {
+        return json({
+          document: {
+            id: "d3",
+            path: "logo.png",
+            kind: "img",
+            updatedAt: "t",
+            content: null,
+            blobKey: "p1/logo.png",
+          },
+        });
+      }
+      if (target.endsWith("/documents/d2/download")) {
+        return new Response(bibBytes as unknown as BodyInit, { status: 200 });
+      }
+      if (target.endsWith("/documents/d3/download")) {
+        return new Response(new Uint8Array([1, 2, 3]) as unknown as BodyInit, {
+          status: 200,
+        });
+      }
+      throw new Error(`unexpected fetch: ${target}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const files = await loadCompileFiles("p1");
+
+    expect(files["main.tex"]).toBe("\\documentclass{article}");
+    expect(files["refs.bib"]).toEqual(bibBytes);
+    expect(files["logo.png"]).toEqual(new Uint8Array([1, 2, 3]));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/p1/documents/d2/download",
+    );
     vi.unstubAllGlobals();
   });
 });

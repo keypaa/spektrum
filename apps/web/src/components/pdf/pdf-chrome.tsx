@@ -4,7 +4,7 @@
 // count, zoom and render state come from the parent; every control is an
 // `aria-label`led button or input.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   IconCheck,
   IconChevronDown,
@@ -114,20 +114,21 @@ export function PdfChrome({
   zoomShortcuts,
 }: PdfChromeProps): React.ReactElement {
   // A local compile has no server URL yet: hand the raw PDF bytes to the
-  // browser as a short-lived blob URL so Download / Open still work. Revoke it
-  // when the bytes change or the chrome unmounts instead of leaking the PDF.
-  const localPdfUrl = useMemo(() => {
-    if (!pdfBytes || pdfBytes.byteLength === 0) return null;
-    return URL.createObjectURL(
+  // browser as a short-lived blob URL so Download / Open still work. Create it
+  // in an effect (not during render) and revoke it when the bytes change or
+  // the chrome unmounts instead of leaking the PDF.
+  const [localPdfUrl, setLocalPdfUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pdfBytes || pdfBytes.byteLength === 0) {
+      setLocalPdfUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(
       new Blob([pdfBytes as BlobPart], { type: "application/pdf" }),
     );
+    setLocalPdfUrl(url);
+    return () => URL.revokeObjectURL(url);
   }, [pdfBytes]);
-  useEffect(
-    () => () => {
-      if (localPdfUrl) URL.revokeObjectURL(localPdfUrl);
-    },
-    [localPdfUrl],
-  );
   const openUrl = localPdfUrl ?? pdfUrl;
 
   const [barVisible, setBarVisible] = useState(true);

@@ -72,6 +72,10 @@ vi.mock("@/lib/render-client", () => ({
 
 import { EditorClient } from "./editor-client";
 import type { DocumentRecord, DocumentSummary } from "@/lib/documents";
+import {
+  createLocalPdfUrl,
+  getLocalPdfBytes,
+} from "@/lib/compile-client";
 
 afterEach(cleanup);
 
@@ -341,5 +345,86 @@ describe("EditorClient", () => {
       (state.pdfViewerProps as Record<string, unknown> | null)?.pdfUrl,
     ).toBe("blob:local-pdf");
     expect(screen.getByTestId("pdf-pill").getAttribute("aria-label")).toBe("Compiled");
+  });
+
+  it("does not carry the previous project's local PDF across a project switch", async () => {
+    if (typeof URL.createObjectURL !== "function") {
+      Object.defineProperty(URL, "createObjectURL", {
+        value: vi.fn(() => "blob:old-project-pdf"),
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: vi.fn(),
+        configurable: true,
+        writable: true,
+      });
+    }
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:old-project-pdf");
+    const revision = "a".repeat(64);
+    createLocalPdfUrl("p1", revision, new Uint8Array([37, 80, 68, 70]));
+
+    const { rerender } = renderShell({
+      mainFilePath: "main.tex",
+      initialRender: {
+        isCurrent: true,
+        status: "ok",
+        revision,
+        pdfUrl: "/first-project.pdf",
+        lastOkRevision: revision,
+        mainFile: "main.tex",
+        durationMs: 5,
+        diagnostics: [],
+        stats: null,
+      },
+    });
+    act(() => {
+      compile.emit?.({
+        event: "result",
+        revision,
+        pdfUrl: "blob:old-project-pdf",
+        diagnostics: [],
+        stats: null,
+        durationMs: 5,
+      });
+    });
+    expect(
+      screen.getByRole("link", { name: "Download" }).getAttribute("href"),
+    ).toBe("blob:old-project-pdf");
+
+    rerender(
+      <PreferencesProvider initial={DEFAULT_PREFERENCES}>
+        <EditorClient
+          project={{ id: "p2", name: "Other Project" }}
+          projects={[
+            { id: "p1", name: "My Project" },
+            { id: "p2", name: "Other Project" },
+          ]}
+          documents={DOCS}
+          initialDocument={DOC}
+          mainFilePath="main.tex"
+          initialRender={{
+            isCurrent: true,
+            status: "ok",
+            revision: "c".repeat(64),
+            pdfUrl: "/other-project.pdf",
+            lastOkRevision: "c".repeat(64),
+            mainFile: "main.tex",
+            durationMs: 5,
+            diagnostics: [],
+            stats: null,
+          }}
+          user={{ name: "Keylhan Paumard", email: "owner@spektrum.local" }}
+          aiEnabled
+        />
+      </PreferencesProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("link", { name: "Download" }).getAttribute("href"),
+      ).toBe("/other-project.pdf"),
+    );
+    expect(getLocalPdfBytes("p1", revision)).toBeNull();
   });
 });

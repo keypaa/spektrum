@@ -28,7 +28,12 @@ vi.mock("@/lib/upload/client", () => ({
 
 import { compileInBrowser } from "@/lib/compile/wasm-engine";
 import { uploadBytesToR2 } from "@/lib/upload/client";
-import { runLocalCompile } from "@/lib/compile-client";
+import {
+  clearLocalPdf,
+  createLocalPdfUrl,
+  getLocalPdfBytes,
+  runLocalCompile,
+} from "@/lib/compile-client";
 import { useLocalCompile } from "./render-client";
 
 function json(body: unknown, status = 200): Response {
@@ -177,6 +182,20 @@ describe("runLocalCompile", () => {
     }
     expect(uploadBytesToR2).not.toHaveBeenCalled();
     expect(state.calls.some(([url]) => url.includes("/renders"))).toBe(false);
+  });
+});
+
+describe("local PDF scoping", () => {
+  it("keeps bytes per project + revision and clears them on demand", () => {
+    const bytes = new Uint8Array([37, 80, 68, 70]);
+    expect(createLocalPdfUrl("p1", REVISION, bytes)).toBe("blob:local-pdf");
+
+    expect(getLocalPdfBytes("p1", REVISION)).toBe(bytes);
+    expect(getLocalPdfBytes("p2", REVISION)).toBeNull();
+    expect(getLocalPdfBytes("p1", "b".repeat(64))).toBeNull();
+
+    clearLocalPdf("p1");
+    expect(getLocalPdfBytes("p1", REVISION)).toBeNull();
   });
 });
 
