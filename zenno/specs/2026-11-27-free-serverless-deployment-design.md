@@ -64,7 +64,7 @@ Browser ──HTTPS──▶ spektrum.vercel.app
                      ▼
               Next.js 16 Node functions (Vercel Hobby)
               · web UI, auth, projects, files, chat, SSE streams
-              · compile request/result endpoints (stateless)
+              · signed-URL endpoints + compile-result persistence (stateless)
                      │
       ┌──────────────┼──────────────────┐
       ▼              ▼                  ▼
@@ -108,9 +108,13 @@ so Vercel's 4.5 MB request-body cap is never in the path.
    public users add their own key in Settings. No LLM spend for the owner and
    no per-user quota subsystem needed; onboarding must say chat needs a key.
 7. **Uploads: signed direct-to-R2.** Preserve current import/image limits;
-   the browser uploads bytes straight to R2 and the app stores only keys.
-8. **No new provider SDKs** for AI; chat still uses the existing
-   OpenAI-compatible gateway via `LLM_BASE_URL` / `LLM_API_KEY`.
+   the browser uploads bytes straight to R2 and the app stores only keys. Every
+   signed URL is minted only for the authenticated user and a key under that
+   user's project prefix; the route verifies the prefix before persisting the
+   key. R2 buckets need CORS allowing PUT from the app origin.
+8. **AI transport unchanged.** Chat still uses the existing OpenAI-compatible
+   gateway via `LLM_BASE_URL`; members use the BYOK key already supported in
+   Settings, and the server key remains owner-only.
 9. **Secrets stay out of the repo**; only `.env.example` and docs change.
 
 ## 6. Compile pipeline (decided: browser WASM)
@@ -119,16 +123,17 @@ The VPS compile pipeline is a permanent BullMQ worker invoking Docker to run a
 TeX Live container (30 s timeout, 1 CPU/1 GB, uid 10001), writing PDF + SyncTeX
 to S3 and publishing SSE events through Redis. None of that can run on Vercel.
 
-**Decision (owner-approved): compile in the browser.** Bundle a modern WASM TeX engine
-(BusyTeX/TeX Live 2026, or SwiftLaTeX) as static assets on the CDN; on compile,
-the client materialises the project files into the engine's memory filesystem,
-runs the engine in a Web Worker, shows the PDF with the existing PDF.js viewer,
-and uploads PDF/log/SyncTeX to R2 through a signed URL so server-side history,
-download and audit still work. Benefits: no worker, no compute bill, no Docker,
-no long-running function, no cross-instance lock. Costs: first visit downloads
-engine assets (tens of MB), package coverage depends on the on-demand package
-server, BibTeX/biber workflows and full TeX Live parity are not guaranteed, and
-AGPL/licensing must be reviewed before vendoring a WASM engine.
+**Decision (owner-approved): compile in the browser.** Load a modern WASM TeX
+engine (BusyTeX/TeX Live 2026, or SwiftLaTeX) from an external CDN as static
+assets with attribution; nothing is vendored or modified in this repo. On
+compile, the client materialises the project files into the engine's memory
+filesystem, runs the engine in a Web Worker, shows the PDF with the existing
+PDF.js viewer, and uploads PDF/log/SyncTeX to R2 through a signed URL so
+server-side history, download and audit still work. Benefits: no worker, no
+compute bill, no Docker, no long-running function, no cross-instance lock.
+Costs: first visit downloads engine assets (tens of MB), package coverage
+depends on the on-demand package server, BibTeX/biber workflows and full TeX
+Live parity are not guaranteed.
 
 **Alternative A — server-side WASM in a Node function.** Keeps the current API
 shape and history semantics; uses `wasmtex/node` with assets on R2. Fits the
@@ -152,7 +157,7 @@ attribution (AGPL engines are not vendored or modified in this repo).
 | `packages/storage/src/index.ts` | Read `S3_ENDPOINT`, `S3_BUCKET`, `S3_PDF_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` (default `auto`), keep `forcePathStyle` configurable. No logic change for SeaweedFS/VPS. |
 | `apps/web/src/lib/env/validation` | Keep existing required keys; add `S3_REGION`, `ALLOW_PUBLIC_SIGNUP`; make VPS-only keys optional (`PUBLIC_URL`, `ACME_EMAIL`, `POSTGRES_*`, `METRICS_TOKEN`, host cron vars). Update `.env.example` and its test. |
 | `apps/web/src/lib/ai/chat` | Unchanged behaviour; SSE and image handling stay. Ensure function duration covers streams. |
-| Compile queue/stream | Replace the Docker-backed worker path with the browser-WASM flow; keep DB rows and SSE event names so the UI contract stays stable. Redis pub/sub remains for multi-instance SSE fan-out. |
+| Compile queue/stream | Remove the Docker-backed worker **and** the server render/compile SSE endpoint on this branch; compile progress becomes local UI state. Keep compile DB rows and result shape so history/download work. Chat SSE stays unchanged; Redis pub/sub remains only for chat fan-out. |
 | Auth/signup | Default `ALLOW_PUBLIC_SIGNUP=true` in serverless config; add docs and CLI steps for first owner; OAuth remains credential-gated. Onboarding says chat needs the user's own LLM key (BYOK); no server-key quota subsystem. |
 | Migrations | Add a documented release step (`pnpm db:migrate` against Neon) and `CREATE EXTENSION IF NOT EXISTS citext`; R2 buckets created once via `wrangler` or dashboard. |
 | Tests | Keep the VPS CI green on `main`; add serverless config/env tests and a compile-flow unit test. CI does not deploy this branch. |
@@ -197,8 +202,10 @@ attribution (AGPL engines are not vendored or modified in this repo).
 1. Create Vercel Hobby project from the GitHub repo, branch `free-serverless-deploy`.
 2. Create Neon Postgres (enable `citext`), Upstash Redis, R2 buckets + API token.
 3. Fill Vercel env vars from §8 for Production (and a separate Preview set).
-4. Run migrations once: `DATABASE_URL=... pnpm db:migrate`; verify bucket probe.
-5. Bootstrap first owner with `admin:create-owner` against the Neon URL.
+4. Run migrations **locally** once: `DATABASE_URL=... pnpm db:migrate` against
+   Neon; verify the bucket probe. There is no shell on Vercel.
+5. Bootstrap first owner **locally** with `admin:create-owner` against the Neon
+   URL (same reason).
 6. Deploy; confirm `spektrum.vercel.app`, sign-in, project create, image chat,
    and a compile round-trip.
 7. Set `ALLOW_PUBLIC_SIGNUP=true` only after the owner exists.
@@ -223,6 +230,10 @@ attribution (AGPL engines are not vendored or modified in this repo).
   are finite (10 GB storage, 500 k Redis commands/month).
 - Serverless instances do not share the module-level import lock; all
   coordination must go through Redis locks.
+- Native `@node-rs/argon2` must build for Vercel's Amazon Linux 2023 image; if
+  it fails, auth needs a pure-JS fallback before launch.
+- Vercel's monorepo build must be scoped so the worker/Docker targets do not
+  break the web build; verify the build command on a Preview deployment.
 - DuckDNS remains useful only for the VPS path on `main`.
 
 ## 12. Left to the builder (my calls, unless you override)
