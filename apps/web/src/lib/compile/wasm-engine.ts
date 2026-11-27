@@ -79,8 +79,19 @@ export async function compileInBrowser(
   if (engine) return runWithEngine(engine, input);
   try {
     return await runWithEngine(createWorkerEngine(), input);
-  } catch {
+  } catch (error) {
+    // Only worker construction / protocol failures justify a main-thread
+    // retry. Retrying every error would double unrelated work and hide it.
+    if (!(error instanceof WorkerCompileError)) throw error;
     return runWithEngine(createWasmEngine(), input);
+  }
+}
+
+/** Marks failures of the worker boundary itself (not of the compile logic). */
+class WorkerCompileError extends Error {
+  constructor(error: unknown) {
+    super(error instanceof Error ? error.message : String(error));
+    this.name = "WorkerCompileError";
   }
 }
 
@@ -117,12 +128,23 @@ export function parseDiagnostics(
   return diagnostics;
 }
 
+/**
+ * The SDK returns compile metrics, not the spec's `ProjectStats` (§9.1).
+ * Typed honestly here so nobody mistakes `compileTimeMs` for `words`.
+ */
+type SiglumStats = {
+  compileTimeMs?: number;
+  bundlesUsed?: string[];
+  wasmHeapBytes?: number;
+  memory?: { wasmHeapBytes?: number };
+};
+
 type SiglumResult = {
   success: boolean;
   pdf?: Uint8Array;
   log?: string;
   syncTexData?: string | null;
-  stats?: ProjectStats | null;
+  stats?: SiglumStats | null;
   exitCode?: number;
   error?: string;
 };
@@ -134,7 +156,6 @@ type SiglumCompilerLike = {
     options: {
       mainFile: string;
       additionalFiles: Record<string, string | Uint8Array>;
-      engine: string;
     },
   ): Promise<SiglumResult>;
 };
@@ -147,7 +168,9 @@ function toOutcome(result: SiglumResult, started: number): CompileOutcome {
     log: result.log ?? "",
     synctex: result.syncTexData ? utf8.encode(result.syncTexData) : null,
     diagnostics: parseDiagnostics(result.log ?? "", result.error, !ok),
-    stats: result.stats ?? null,
+    // SDK metrics are not ProjectStats; mapping them here would invent numbers
+    // for words/figures that the TeX engine never produced.
+    stats: null,
     durationMs: Date.now() - started,
     ok,
   };
@@ -187,12 +210,17 @@ export function createWasmEngine(options: WasmEngineOptions = {}): WasmEngineLik
         if (path !== mainFile) additionalFiles[path] = bytes;
       }
       const started = Date.now();
-      const result = await compiler.compile(decoder.decode(main), {
-        mainFile,
-        additionalFiles,
-        engine: "auto",
-      });
-      return toOutcome(result, started);
+      try {
+        // Omit `engine`: "auto" is not a supported SDK value and suppresses
+        // the SDK's own detectEngine(source) call.
+        const result = await compiler.compile(decoder.decode(main), {
+          mainFile,
+          additionalFiles,
+        });
+        return toOutcome(result, started);
+      } finally {
+        files.clear();
+      }
     },
   };
 }
@@ -214,44 +242,89 @@ export function createWorkerEngine(options: WasmEngineOptions = {}): WasmEngineL
     { resolve: (value: WorkerReply) => void; reject: (error: Error) => void }
   >();
 
+  function terminateWorker(): void {
+    if (!worker) return;
+    const current = worker;
+    worker = null;
+    const error = new WorkerCompileError("WASM worker terminated");
+    for (const entry of pending.values()) entry.reject(error);
+    pending.clear();
+    current.terminate();
+  }
+
   function call(type: string, payload: Record<string, unknown>): Promise<WorkerReply> {
-    if (!worker) return Promise.reject(new Error("WASM worker is not loaded"));
+    if (!worker) {
+      return Promise.reject(new WorkerCompileError("WASM worker is not loaded"));
+    }
     const id = ++nextId;
     return new Promise<WorkerReply>((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      worker?.postMessage({ id, type, ...payload });
+      pending.set(id, {
+        resolve,
+        reject: (error) => reject(new WorkerCompileError(error)),
+      });
+      try {
+        worker?.postMessage({ id, type, ...payload });
+      } catch (error) {
+        pending.delete(id);
+        reject(new WorkerCompileError(error));
+      }
     });
   }
 
-  return {
-    async load() {
+  async function start(): Promise<void> {
+    if (worker) return;
+    let created: Worker;
+    try {
       // `new Worker(new URL(...))` is bundled by Turbopack (as in the Monaco
       // environment) instead of fetching engine bytes at runtime.
-      worker = new Worker(new URL("./wasm-worker.ts", import.meta.url), {
+      created = new Worker(new URL("./wasm-worker.ts", import.meta.url), {
         type: "module",
       });
-      worker.onmessage = (event: MessageEvent<{ id: number } & WorkerReply>) => {
-        const entry = pending.get(event.data.id);
-        if (!entry) return;
-        pending.delete(event.data.id);
-        if (event.data.ok) entry.resolve(event.data);
-        else entry.reject(new Error(event.data.error));
-      };
-      worker.onerror = (event: ErrorEvent) => {
-        const error = new Error(event.message || "WASM worker failed");
-        for (const entry of pending.values()) entry.reject(error);
-        pending.clear();
-      };
+    } catch (error) {
+      throw new WorkerCompileError(error);
+    }
+    worker = created;
+    created.onmessage = (event: MessageEvent<{ id: number } & WorkerReply>) => {
+      const entry = pending.get(event.data.id);
+      if (!entry) return;
+      pending.delete(event.data.id);
+      if (event.data.ok) entry.resolve(event.data);
+      else entry.reject(new Error(event.data.error));
+    };
+    created.onerror = (event: ErrorEvent) => {
+      const error = new WorkerCompileError(
+        new Error(event.message || "WASM worker failed"),
+      );
+      for (const entry of pending.values()) entry.reject(error);
+      pending.clear();
+      terminateWorker();
+    };
+    try {
       await call("load", { assetOrigin });
-    },
+    } catch (error) {
+      terminateWorker();
+      throw error;
+    }
+  }
+
+  return {
+    load: start,
     async write(path, bytes) {
+      if (!worker) await start();
       await call("write", { path, bytes });
     },
     async run(mainFile) {
-      const reply = await call("run", { mainFile });
-      if (!reply.ok) throw new Error(reply.error);
-      if (!reply.outcome) throw new Error("WASM worker returned no outcome");
-      return reply.outcome;
+      if (!worker) await start();
+      try {
+        const reply = await call("run", { mainFile });
+        if (!reply.ok) throw new Error(reply.error);
+        // A malformed reply is our bug, not a worker failure: do not retry.
+        if (!reply.outcome) throw new Error("WASM worker returned no outcome");
+        return reply.outcome;
+      } finally {
+        // Each compile owns a worker holding ~30 MB of WASM; never leak it.
+        terminateWorker();
+      }
     },
   };
 }

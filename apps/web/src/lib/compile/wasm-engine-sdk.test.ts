@@ -38,15 +38,12 @@ function sdkResult(exitCode = 0): Record<string, unknown> {
     pdf: new Uint8Array([0x25, 0x50, 0x44, 0x46]),
     log: "! Undefined control sequence.\nOutput written on main.pdf.",
     syncTexData: "synctex bytes",
+    // The real SDK returns compile metrics, not ProjectStats (spec §9.1).
     stats: {
-      words: 1,
-      wordsInText: 1,
-      wordsInHeaders: 0,
-      wordsOutsideText: 0,
-      headers: 0,
-      figures: 0,
-      mathInline: 0,
-      mathDisplay: 0,
+      compileTimeMs: 12,
+      bundlesUsed: ["core"],
+      wasmHeapBytes: 123456,
+      memory: { wasmHeapBytes: 123456 },
     },
     exitCode,
   };
@@ -62,6 +59,7 @@ const input = {
 
 class WorkingWorker {
   static constructed = 0;
+  static terminated = 0;
   static outcome: CompileOutcome | null = null;
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onerror: ((event: { message: string }) => void) | null = null;
@@ -90,7 +88,9 @@ class WorkingWorker {
     queueMicrotask(() => this.onmessage?.({ data: reply }));
   }
 
-  terminate(): void {}
+  terminate(): void {
+    WorkingWorker.terminated++;
+  }
 }
 
 class FailingWorker {
@@ -103,6 +103,7 @@ class FailingWorker {
 
 class FailingProtocolWorker {
   static constructed = 0;
+  static terminated = 0;
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onerror: ((event: { message: string }) => void) | null = null;
 
@@ -118,13 +119,58 @@ class FailingProtocolWorker {
     queueMicrotask(() => this.onmessage?.({ data: reply }));
   }
 
+  terminate(): void {
+    FailingProtocolWorker.terminated++;
+  }
+}
+
+class FailingLoadWorker {
+  static constructed = 0;
+  static terminated = 0;
+  onmessage: ((event: { data: unknown }) => void) | null = null;
+  onerror: ((event: { message: string }) => void) | null = null;
+
+  constructor() {
+    FailingLoadWorker.constructed++;
+  }
+
+  postMessage(message: { id: number; type: string }): void {
+    const reply =
+      message.type === "load"
+        ? { id: message.id, ok: false, error: "worker init failed" }
+        : { id: message.id, ok: true };
+    queueMicrotask(() => this.onmessage?.({ data: reply }));
+  }
+
+  terminate(): void {
+    FailingLoadWorker.terminated++;
+  }
+}
+
+class BadOutcomeWorker {
+  onmessage: ((event: { data: unknown }) => void) | null = null;
+  onerror: ((event: { message: string }) => void) | null = null;
+
+  postMessage(message: { id: number; type: string }): void {
+    const reply =
+      message.type === "run"
+        ? { id: message.id, ok: true, outcome: null }
+        : { id: message.id, ok: true };
+    queueMicrotask(() => this.onmessage?.({ data: reply }));
+  }
+
   terminate(): void {}
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   WorkingWorker.constructed = 0;
+  WorkingWorker.terminated = 0;
   FailingWorker.constructed = 0;
+  FailingProtocolWorker.constructed = 0;
+  FailingProtocolWorker.terminated = 0;
+  FailingLoadWorker.constructed = 0;
+  FailingLoadWorker.terminated = 0;
   delete process.env.NEXT_PUBLIC_SIGLUM_ENGINE_MODULE_URL;
   sdk.resolveRuntime.mockResolvedValue(runtime);
   sdk.init.mockResolvedValue(undefined);
@@ -148,17 +194,20 @@ describe("createWasmEngine with the installed SDK", () => {
     expect(sdk.compile).toHaveBeenCalledTimes(1);
     const [source, options] = sdk.compile.mock.calls[0]! as [
       string,
-      { mainFile: string; additionalFiles: Record<string, unknown>; engine: string },
+      { mainFile: string; additionalFiles: Record<string, unknown>; engine?: string },
     ];
     expect(source).toContain("\\documentclass{article}");
     expect(options.mainFile).toBe("main.tex");
     expect(options.additionalFiles).toEqual({
       "chapter.tex": new TextEncoder().encode("Chapter text"),
     });
+    // SDK compile metrics are not ProjectStats — never expose fabricated words.
+    expect(outcome.stats).toBeNull();
+    // "auto" is not a supported engine value; the SDK must detect by itself.
+    expect(options.engine).toBeUndefined();
     expect(outcome.ok).toBe(true);
     expect(outcome.pdf).toEqual(new Uint8Array([0x25, 0x50, 0x44, 0x46]));
     expect(outcome.synctex).toEqual(new TextEncoder().encode("synctex bytes"));
-    expect(outcome.stats?.words).toBe(1);
   });
 
   it("maps a non-zero SDK exit code to ok:false with diagnostics", async () => {
@@ -187,6 +236,7 @@ describe("compileInBrowser default engine", () => {
     const outcome = await compileInBrowser(input);
 
     expect(WorkingWorker.constructed).toBe(1);
+    expect(WorkingWorker.terminated).toBe(1);
     expect(sdk.resolveRuntime).not.toHaveBeenCalled();
     expect(sdk.compile).not.toHaveBeenCalled();
     expect(outcome).toBe(WorkingWorker.outcome);
@@ -209,8 +259,30 @@ describe("compileInBrowser default engine", () => {
     const outcome = await compileInBrowser(input);
 
     expect(FailingProtocolWorker.constructed).toBe(1);
+    expect(FailingProtocolWorker.terminated).toBe(1);
     expect(sdk.resolveRuntime).toHaveBeenCalledTimes(1);
     expect(sdk.compile).toHaveBeenCalledTimes(1);
     expect(outcome.ok).toBe(true);
+  });
+
+  it("terminates a worker whose load fails before retrying on the main thread", async () => {
+    vi.stubGlobal("Worker", FailingLoadWorker);
+
+    const outcome = await compileInBrowser(input);
+
+    expect(FailingLoadWorker.constructed).toBe(1);
+    expect(FailingLoadWorker.terminated).toBe(1);
+    expect(sdk.resolveRuntime).toHaveBeenCalledTimes(1);
+    expect(outcome.ok).toBe(true);
+  });
+
+  it("does not retry a non-worker failure on the main thread", async () => {
+    vi.stubGlobal("Worker", BadOutcomeWorker);
+
+    await expect(compileInBrowser(input)).rejects.toThrow(
+      "WASM worker returned no outcome",
+    );
+    expect(sdk.resolveRuntime).not.toHaveBeenCalled();
+    expect(sdk.compile).not.toHaveBeenCalled();
   });
 });
