@@ -38,6 +38,15 @@ describe("loadWebEnv", () => {
     expect(loadWebEnv({ ...base, ALLOW_PUBLIC_SIGNUP: "true" }).allowPublicSignup).toBe(true);
   });
 
+  // The shared-code default guards `main`: the serverless branch opens signup
+  // only with a Vercel deployment env var, never by changing this default.
+  it("keeps public signup closed unless a deployment explicitly opts in", () => {
+    expect(loadWebEnv(base).allowPublicSignup).toBe(false);
+    expect(loadWebEnv({ ...base, ALLOW_PUBLIC_SIGNUP: "false" }).allowPublicSignup).toBe(false);
+    expect(loadWebEnv({ ...base, ALLOW_PUBLIC_SIGNUP: "TRUE" }).allowPublicSignup).toBe(false);
+    expect(loadWebEnv({ ...base, ALLOW_PUBLIC_SIGNUP: "true" }).allowPublicSignup).toBe(true);
+  });
+
   // `env_file: .env` in docker/compose.prod.yml passes `KEY=` through as an
   // empty string, not as an unset variable. Treating that as a value would make
   // loadWebEnv throw, and every mutating route answers 500 while /api/health
