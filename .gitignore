@@ -22,3 +22,4 @@ zenno/recon/css/
 zenno/recon/html/
 zenno/recon/tokens-*.css
 e2e/fixtures/*.zip
+.vercel
