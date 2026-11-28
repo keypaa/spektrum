@@ -12,6 +12,7 @@ without becoming a wall of text.
 | [Compilation and PDF preview](compilation.md) | wondering when a compile runs, what the status pill means, or how the PDF stays up to date |
 | [Troubleshooting](troubleshooting.md) | something looks stuck: rate limits, stale statuses, missing keys, PDF issues |
 | [Serverless deployment](serverless-deployment.md) | deploying the free public Vercel instance: provisioning, env vars, smoke checklist, quotas, limits |
+| [Serverless build notes](serverless-build-notes.md) | why the branch builds with webpack and stubs BLAKE3; the Siglum SDK bundle problem and rejected alternatives |
 
 The authoritative product specification is
 [`zenno/specs/2026-11-07-spektrum-design.md`](../zenno/specs/2026-11-07-spektrum-design.md).

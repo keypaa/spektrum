@@ -9,6 +9,10 @@ Target URL: **`https://spektrum.vercel.app`**. Vercel subdomains are globally
 unique — if it is taken, use `spektrum-<short-suffix>.vercel.app` so `spektrum`
 stays in the hostname. Substitute that URL everywhere below.
 
+The build configuration has its own note:
+[`serverless-build-notes.md`](serverless-build-notes.md) explains why this
+branch builds with webpack and stubs BLAKE3 instead of using Turbopack.
+
 ## 1. What this deployment is (and is not)
 
 - Vercel Hobby, Next.js 16 App Router, Node runtime, pnpm 12.18.0 / Node
