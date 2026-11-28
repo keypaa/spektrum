@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/copy-pdf-worker.mjs --server-dev && next dev",
-    "build": "node scripts/copy-pdf-worker.mjs && next build && node scripts/copy-pdf-worker.mjs --server",
+    "build": "node scripts/copy-pdf-worker.mjs && next build --webpack && node scripts/copy-pdf-worker.mjs --server",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

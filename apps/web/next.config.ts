@@ -21,6 +21,25 @@ const base: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: "30mb",
   },
+  // The Siglum SDK's optional BLAKE3 accelerator ships a broken browser entry
+  // (it imports a missing blake3_js_bg.js). The SDK already falls back to DJB2
+  // when that import fails, so stub it at build time. Next 16's Turbopack build
+  // stalls on the WASM graph; webpack builds this branch correctly.
+  webpack(config) {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      "blake3-wasm/browser.js": path.resolve(
+        import.meta.dirname,
+        "src/lib/compile/blake3-stub.js",
+      ),
+      "blake3-wasm": path.resolve(
+        import.meta.dirname,
+        "src/lib/compile/blake3-stub.js",
+      ),
+    };
+    return config;
+  },
   // The same hardening Caddy sets (docker/Caddyfile), for deployments that are
   // not behind it. Caddy's copy wins where both apply.
   async headers() {
