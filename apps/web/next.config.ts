@@ -61,8 +61,9 @@ const base: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Siglum's worker loads its fetched busytex.js from a blob URL.
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+              // Siglum's worker loads its fetched busytex.js from a blob URL,
+              // and pulls xzwasm.js straight from the engine CDN.
+              ["script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:", ...origins].join(" "),
               // The worker itself is created from a blob URL (unchanged).
               "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline'",
