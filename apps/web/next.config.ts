@@ -69,7 +69,7 @@ const base: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
-              ["connect-src 'self'", ...origins].join(" "),
+              ["connect-src 'self'", ...origins, "data:"].join(" "),
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
