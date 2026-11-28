@@ -79,17 +79,19 @@ free tier. B2's first 10 GB is free with no card.
 ```json
 [
   {
-    "corsRuleName": "spektrum",
-    "allowedOrigins": ["*"],
-    "allowedOperations": ["s3_put", "s3_get", "s3_head", "s3_delete"],
-    "allowedHeaders": ["*"],
-    "exposeHeaders": ["ETag"],
-    "maxAgeSeconds": 3600
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "PUT", "HEAD", "POST", "DELETE"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
   }
 ]
 ```
    A PUT-only policy breaks SyncTeX downloads and a GET-only policy breaks every
-   upload. B2 buckets are versioned by default; add a lifecycle rule to keep
+   upload. B2's dashboard expects its own `corsRuleName` + `s3_*` variant; if a
+   dashboard-entered rule leaves `GetBucketCors` returning
+   `NoSuchCorsConfiguration`, apply the S3-format rule above with
+   `PutBucketCors` instead. Verify with `GetBucketCors`. B2 buckets are versioned by default; add a lifecycle rule to keep
    only the latest version if storage grows.
 
 ## 3. Environment variables (Vercel project → Production and Preview)

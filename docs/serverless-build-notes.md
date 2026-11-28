@@ -107,7 +107,15 @@ Content Security Policy directive: "script-src 'self' 'unsafe-inline'
 
 The PDF pane stayed at `Initializing...`. Fix: add the engine origins to **both**
 `script-src` and `connect-src`, keep `script-src blob:`, and keep
-`worker-src 'self' blob:`.
+`worker-src 'self' blob:`. `connect-src` must also allow **`data:`** (the
+embedded `xzwasm` WASM module is `fetch`ed as a `data:application/wasm`
+URL) and **`blob:`** (the SDK fetches `busytex.js`, converts it to a blob and
+loads a `blob:` worker / WASM source).
+
+**CORS is the other half.** With CSP fixed, signed browser `PUT`s to B2 failed
+preflight until both buckets had a real CORS rule. Verify with
+`GetBucketCors`; `NoSuchCorsConfiguration` means nothing was saved. Applying
+S3-format `PutBucketCors` worked.
 
 ### Measured engine stats (probed on a machine + headless Chromium)
 
