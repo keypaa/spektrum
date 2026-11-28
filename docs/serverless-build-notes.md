@@ -88,6 +88,52 @@ it either (`https://esm.sh/@siglum/engine@0.2.2?bundle` returns 500 with
 - Live deployment: https://spektrum-olive.vercel.app
 - `pnpm test`: 1,096 passed / 8 skipped; `pnpm typecheck` and `pnpm lint` clean.
 
+## Runtime CSP (the other half of "Initializing…")
+
+The `VERCEL=1` production build is not enough; the page must also load engine
+code under CSP. The SDK pulls `xzwasm.js` **directly from
+`https://packages.siglum.org`** as a script, fetches `busytex.js` and converts
+it to a blob for `importScripts`, and downloads `busytex.wasm`. A CSP with only
+`connect-src` allowlisting is insufficient.
+
+Observed failure before `02236c2`:
+
+```
+[console.error] Loading the script
+'https://packages.siglum.org/releases/.../xzwasm.js' violates the following
+Content Security Policy directive: "script-src 'self' 'unsafe-inline'
+'unsafe-eval' blob:". The action has been blocked.
+```
+
+The PDF pane stayed at `Initializing...`. Fix: add the engine origins to **both**
+`script-src` and `connect-src`, keep `script-src blob:`, and keep
+`worker-src 'self' blob:`.
+
+### Measured engine stats (probed on a machine + headless Chromium)
+
+| Item | Value |
+|---|---|
+| `@siglum/engine` | 0.2.2, `@siglum/engine@latest` CDN origin `https://packages.siglum.org` |
+| `latest.json` pointer | ~354 B, ~0.25 s |
+| `runtime.json` manifest | 128 files, ~17.9 KB, ~302.5 MiB total across on-demand bundles |
+| `wasm/busytex.wasm` | **32,282,976 bytes = ~30.79 MiB**, `application/wasm`, `Accept-Ranges`, CORS `*` |
+| `wasm/busytex.js` | ~0.29 MiB |
+| `worker.js` | ~0.12 MiB |
+| `xzwasm.js` | ~0.02 MiB |
+| Sample CDN download | ~55 MB/s on one host (not a guarantee; browser caching applies) |
+
+CDN responses are CORS-open (`access-control-allow-origin: *`) and `HEAD`/`Range`
+work. First load pays ~30 MiB for `busytex.wasm` plus on-demand package bundles;
+the build-time webpack stub does not change that runtime cost.
+
+### Known performance limitation
+
+`compileInBrowser` currently creates a fresh worker per compile and terminates
+it in `finally` to avoid leaking ~30 MB, so each compile re-reads the WASM and
+re-initializes. That means compile time includes engine re-initialization, not
+just TeX work. The CSP fix removes the blocker; worker reuse would be a
+separate performance change.
+
 ## If this breaks again
 
 - Check that `apps/web/package.json` still says `next build --webpack`.
