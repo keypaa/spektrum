@@ -26,6 +26,10 @@ stays in the hostname. Substitute that URL everywhere below.
 - **No** Docker socket, permanent worker, local persistent filesystem, or host
   cron. Hobby is **non-commercial/fair-use**, with 4.5 MB request bodies, 2 GB
   fixed memory (not configurable) and 300 s maximum function duration.
+- If `spektrum.vercel.app` is already taken, Vercel assigns a suffixed URL such
+  as `spektrum-olive.vercel.app`. Use that exact URL in `BETTER_AUTH_URL`,
+  `PUBLIC_URL` and the bucket CORS origins — the app's CSRF guard compares
+  against `BETTER_AUTH_URL`, so a placeholder URL breaks sign-in.
 
 ## 2. Provision the services
 
